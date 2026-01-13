@@ -367,6 +367,35 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             return null;
         }
 
+        // Check if URL contains template variables (e.g., ${API_DOMAIN})
+        boolean hasTemplateVars = serverUrl.contains("${") || serverUrl.contains("{{");
+        
+        if (hasTemplateVars) {
+            // For URLs with template variables, extract path manually
+            // Pattern: https://${VAR}/path or https://{{VAR}}/path
+            // Extract everything after the third slash
+            int thirdSlash = -1;
+            int slashCount = 0;
+            for (int i = 0; i < serverUrl.length(); i++) {
+                if (serverUrl.charAt(i) == '/') {
+                    slashCount++;
+                    if (slashCount == 3) {
+                        thirdSlash = i;
+                        break;
+                    }
+                }
+            }
+            if (thirdSlash >= 0 && thirdSlash < serverUrl.length() - 1) {
+                String path = serverUrl.substring(thirdSlash);
+                // Remove trailing slash if present
+                if (path.endsWith("/") && path.length() > 1) {
+                    path = path.substring(0, path.length() - 1);
+                }
+                return path;
+            }
+            return null;
+        }
+
         try {
             URI uri = URI.create(serverUrl);   // validates syntax
             java.net.URL url = uri.toURL();
@@ -378,7 +407,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             }
 
             return path != null && !path.isEmpty() ? path : null;
-        } catch (java.net.MalformedURLException e) {
+        } catch (java.net.MalformedURLException | IllegalArgumentException e) {
             // If URL parsing fails, try to extract path manually
             // Look for path after the domain (after third slash)
             int thirdSlash = -1;
@@ -820,7 +849,12 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                         if (referencedSchema != null) {
                             // Don't recurse into top-level schemas - they're already being processed
                             if (!topLevelSchemaObjects.contains(referencedSchema)) {
-                                collectInlineSchemasFromSchemaProperties(referencedSchema, parentPropertyName, spec, visited, topLevelSchemaObjects, isInCompositionContext);
+                                // Check if we've already visited this referenced schema to prevent cycles
+                                // Add to visited BEFORE recursing to prevent infinite loops
+                                if (visited.add(referencedSchema)) {
+                                    // Only recurse if we successfully added (wasn't already visited)
+                                    collectInlineSchemasFromSchemaProperties(referencedSchema, parentPropertyName, spec, visited, topLevelSchemaObjects, isInCompositionContext);
+                                }
                             }
                         }
                     }
@@ -1895,7 +1929,22 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      */
     private void mergeSchemaProperties(Map<String, Object> schema, Map<String, Object> allProperties,
                                        List<String> allRequired, Map<String, Object> spec) {
+        mergeSchemaProperties(schema, allProperties, allRequired, spec, new java.util.IdentityHashMap<>());
+    }
+
+    /**
+     * Merge schema properties with cycle detection to prevent infinite recursion
+     */
+    private void mergeSchemaProperties(Map<String, Object> schema, Map<String, Object> allProperties,
+                                       List<String> allRequired, Map<String, Object> spec,
+                                       java.util.Map<Object, Boolean> visited) {
         if (schema == null) return;
+
+        // Cycle detection - prevent infinite recursion
+        if (visited.containsKey(schema)) {
+            return;
+        }
+        visited.put(schema, Boolean.TRUE);
 
         // Handle $ref
         if (schema.containsKey("$ref")) {
@@ -1907,7 +1956,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
                     if (schemas != null && schemas.containsKey(schemaName)) {
                         Map<String, Object> referencedSchema = Util.asStringObjectMap(schemas.get(schemaName));
-                        mergeSchemaProperties(referencedSchema, allProperties, allRequired, spec);
+                        if (referencedSchema != null) {
+                            mergeSchemaProperties(referencedSchema, allProperties, allRequired, spec, visited);
+                        }
                     }
                 }
             }
@@ -1917,8 +1968,12 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         // Handle allOf
         if (schema.containsKey("allOf")) {
             List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
-            for (Map<String, Object> subSchema : allOfSchemas) {
-                mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
+            if (allOfSchemas != null) {
+                for (Map<String, Object> subSchema : allOfSchemas) {
+                    if (subSchema != null) {
+                        mergeSchemaProperties(subSchema, allProperties, allRequired, spec, visited);
+                    }
+                }
             }
             return;
         }
@@ -1927,8 +1982,12 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
             List<Map<String, Object>> schemas = Util.asStringObjectMapList(
                     schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
-            for (Map<String, Object> subSchema : schemas) {
-                mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
+            if (schemas != null) {
+                for (Map<String, Object> subSchema : schemas) {
+                    if (subSchema != null) {
+                        mergeSchemaProperties(subSchema, allProperties, allRequired, spec, visited);
+                    }
+                }
             }
             return;
         }
@@ -2221,7 +2280,29 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     /**
      * Convert OpenAPI type to Java type
      */
+    // Thread-local visited set for getJavaType to prevent infinite recursion
+    private final ThreadLocal<java.util.Set<Object>> getJavaTypeVisited = ThreadLocal.withInitial(() -> 
+        java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
+
     private String getJavaType(Map<String, Object> schema) {
+        if (schema == null) {
+            return "Object";
+        }
+
+        // Cycle detection for getJavaType
+        java.util.Set<Object> visited = getJavaTypeVisited.get();
+        if (visited.contains(schema)) {
+            return "Object"; // Return default to break cycle
+        }
+        visited.add(schema);
+        try {
+            return getJavaTypeInternal(schema);
+        } finally {
+            visited.remove(schema);
+        }
+    }
+
+    private String getJavaTypeInternal(Map<String, Object> schema) {
         if (schema == null) {
             return "Object";
         }
@@ -2281,9 +2362,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                             }
                         }
 
-                        // Second priority: Use getJavaType to resolve (it also checks for $ref)
+                        // Second priority: Use getJavaTypeInternal to resolve (it also checks for $ref)
                         if (itemType == null) {
-                            itemType = getJavaType(items);
+                            itemType = getJavaTypeInternal(items);
                         }
 
                         // Fallback: If still Object but items has $ref, resolve it manually
@@ -2296,8 +2377,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                         }
                     } else {
                         // If items is not a Map, try to get type from it directly
-                        itemType = getJavaType(schema);
-                        if (itemType.startsWith("List<")) {
+                        itemType = getJavaTypeInternal(schema);
+                        if (itemType != null && itemType.startsWith("List<")) {
                             // Already a List type, extract inner type
                             itemType = itemType.substring(5, itemType.length() - 1);
                         }
