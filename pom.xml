@@ -585,12 +585,12 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/him6ul2-coder/oas-sdk-java-forked</url>
+            <url>https://maven.pkg.github.com/egain/oas-sdk-java</url>
         </repository>
         <snapshotRepository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/him6ul2-coder/oas-sdk-java-forked</url>
+            <url>https://maven.pkg.github.com/egain/oas-sdk-java</url>
         </snapshotRepository>
     </distributionManagement>
 </project>
