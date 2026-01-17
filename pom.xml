@@ -4,7 +4,7 @@
 
     <groupId>com.egain</groupId>
     <artifactId>oas-sdk-java</artifactId>
-    <version>1.2</version>
+    <version>1.3-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>OAS SDK Java</name>
@@ -579,7 +579,7 @@
         <url>https://github.com/eGain/oas-sdk-java</url>
         <connection>scm:git:https://github.com/eGain/oas-sdk-java.git</connection>
         <developerConnection>scm:git:git@github.com:egain/oas-sdk-java.git</developerConnection>
-        <tag>v1.2</tag>
+        <tag>HEAD</tag>
     </scm>
     <distributionManagement>
         <repository>
