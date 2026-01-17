@@ -79,7 +79,7 @@ public class Util {
         }
 
         List<Object> out = new ArrayList<>(raw.size());
-        // All items are Objects, so no type checking needed
+
         out.addAll(raw);
         return out;
     }
