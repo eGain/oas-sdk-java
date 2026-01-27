@@ -583,12 +583,12 @@
     </scm>
     <distributionManagement>
         <repository>
-            <id>github</id>
+            <id>github-os</id>
             <name>GitHub Packages</name>
             <url>https://maven.pkg.github.com/egain/oas-sdk-java</url>
         </repository>
         <snapshotRepository>
-            <id>github</id>
+            <id>github-os</id>
             <name>GitHub Packages</name>
             <url>https://maven.pkg.github.com/egain/oas-sdk-java</url>
         </snapshotRepository>
