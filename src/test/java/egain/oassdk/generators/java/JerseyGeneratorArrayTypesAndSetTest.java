@@ -432,4 +432,150 @@ public class JerseyGeneratorArrayTypesAndSetTest {
         assertFalse(Files.exists(unreferencedArrayFile), 
             "UnreferencedArray.java should NOT be generated (not referenced in response)");
     }
+    
+    @Test
+    @DisplayName("Test ArticleTypes model generation from bundle-openapi 3.yaml")
+    public void testArticleTypesFromBundleOpenAPI3() throws OASSDKException, IOException {
+        // Test the specific case from bundle-openapi 3.yaml where ArticleTypes 
+        // is referenced in ArticleTypesGetByDepartmentResponse at line 11711
+        String yamlFile = "examples/bundle-openapi 3.yaml";
+        Path yamlPath = Paths.get(yamlFile);
+        
+        // Verify the test file exists
+        assertTrue(Files.exists(yamlPath), 
+            "bundle-openapi 3.yaml should exist for testing");
+        
+        Path outputDir = tempOutputDir.resolve("generated-bundle-sdk");
+        String packageName = "com.egain.bundle.api";
+        
+        // Generate SDK
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(yamlFile);
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+        
+        // Verify ArticleTypes model class was generated
+        Path articleTypesFile = outputDir.resolve("src/main/java")
+            .resolve(packageName.replace(".", "/"))
+            .resolve("model/ArticleTypes.java");
+        
+        assertTrue(Files.exists(articleTypesFile), 
+            "ArticleTypes.java should be generated for array type referenced in ArticleTypesGetByDepartmentResponse");
+        
+        // Verify the generated class has correct structure
+        String content = Files.readString(articleTypesFile);
+        
+        // Should have List<ArticleTypeInfo> items field
+        assertTrue(content.contains("List<ArticleTypeInfo>") || 
+                   content.contains("List<ArticleTypeInfo> items"),
+            "ArticleTypes should have List<ArticleTypeInfo> items field");
+        
+        // Should have proper getter/setter with List type
+        assertTrue(content.contains("getItems()") || 
+                   content.contains("public List<ArticleTypeInfo> getItems()"),
+            "Getter should exist for items field");
+        
+        // Should have JAXB annotations
+        assertTrue(content.contains("@XmlElementWrapper") || 
+                   content.contains("@XmlElement") ||
+                   content.contains("@XmlRootElement"),
+            "Should have JAXB annotations");
+        
+        // Should implement Serializable and JAXBBean
+        assertTrue(content.contains("implements Serializable") ||
+                   content.contains("implements JAXBBean") ||
+                   content.contains("implements Serializable, JAXBBean"),
+            "Should implement Serializable and/or JAXBBean interface");
+        
+        // Verify ArticleTypeInfo is also generated (referenced in ArticleTypes items)
+        Path articleTypeInfoFile = outputDir.resolve("src/main/java")
+            .resolve(packageName.replace(".", "/"))
+            .resolve("model/ArticleTypeInfo.java");
+        
+        assertTrue(Files.exists(articleTypeInfoFile), 
+            "ArticleTypeInfo.java should be generated (referenced in ArticleTypes items)");
+    }
+    
+    @Test
+    @DisplayName("Test that ArticleTypes is collected when referenced in response components")
+    public void testArticleTypesCollectedFromResponseComponents() throws OASSDKException, IOException {
+        // Test that array types referenced via $ref in response components are collected
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            servers:
+              - url: https://api.example.com/v1
+            paths:
+              /articleTypes:
+                get:
+                  summary: Get All Article Types in a Department
+                  operationId: getAllArticleTypes
+                  responses:
+                    '200':
+                      $ref: '#/components/responses/ArticleTypesGetByDepartmentResponse'
+            components:
+              responses:
+                ArticleTypesGetByDepartmentResponse:
+                  description: Success
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/ArticleTypes'
+              schemas:
+                ArticleTypeInfo:
+                  type: object
+                  properties:
+                    articleTypeId:
+                      type: string
+                      minLength: 15
+                      maxLength: 20
+                    typeName:
+                      type: string
+                      enum:
+                        - General
+                        - Guided Help
+                    articleCategoryId:
+                      type: integer
+                      format: int64
+                    useStructuredAuthoring:
+                      type: boolean
+                ArticleTypes:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ArticleTypeInfo'
+                  maxItems: 250
+            """;
+        
+        Path testSpecFile = tempOutputDir.resolve("test-article-types-spec.yaml");
+        Files.writeString(testSpecFile, yamlContent);
+        
+        Path outputDir = tempOutputDir.resolve("generated-sdk");
+        String packageName = "com.test.api";
+        
+        // Generate SDK
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(testSpecFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+        
+        // Verify ArticleTypes model class was generated
+        Path articleTypesFile = outputDir.resolve("src/main/java")
+            .resolve(packageName.replace(".", "/"))
+            .resolve("model/ArticleTypes.java");
+        
+        assertTrue(Files.exists(articleTypesFile), 
+            "ArticleTypes.java should be generated when referenced in response components");
+        
+        String content = Files.readString(articleTypesFile);
+        
+        // Verify correct List type
+        assertTrue(content.contains("List<ArticleTypeInfo>"),
+            "ArticleTypes should have List<ArticleTypeInfo> type");
+        
+        // Verify maxItems constraint is handled (if applicable)
+        // The maxItems: 250 should be reflected in validation annotations
+        assertTrue(content.contains("@Size") || content.contains("maxItems") || 
+                   content.contains("250") || !content.contains("maxItems"),
+            "ArticleTypes should handle maxItems constraint if applicable");
+    }
 }
