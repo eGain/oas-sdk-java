@@ -1008,6 +1008,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         // Collect inline object schemas from schema properties
         collectInlinedSchemasFromProperties(schemas, spec);
 
+        // Collect schemas referenced in components/responses
+        Set<String> referencedInResponses = collectSchemasReferencedInResponses(spec);
+
         // Generate all models from schemas section
         for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
             String schemaName = schemaEntry.getKey();
@@ -1039,11 +1042,18 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     schema.containsKey("enum");
 
             // If it's a simple type (string, integer, etc.) without structure, skip it
+            // EXCEPT if it's an array type that's referenced in responses (needs a wrapper class)
             if (!hasStructure && schema.containsKey("type")) {
                 Object type = schema.get("type");
-                if (type instanceof String && !"object".equals(type)) {
-                    // Skip simple primitives without any structure
-                    continue;
+                if (type instanceof String) {
+                    String typeStr = (String) type;
+                    // Don't skip array types that are referenced in responses
+                    if ("array".equals(typeStr) && referencedInResponses.contains(schemaName)) {
+                        // Generate model for array type that's referenced in responses
+                    } else if (!"object".equals(typeStr)) {
+                        // Skip simple primitives without any structure
+                        continue;
+                    }
                 }
             }
 
@@ -1362,6 +1372,45 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     }
 
     /**
+     * Collect schemas that are referenced in components/responses
+     * This is needed to generate model classes for array types that are referenced in responses
+     */
+    private Set<String> collectSchemasReferencedInResponses(Map<String, Object> spec) {
+        Set<String> referencedSchemas = new java.util.HashSet<>();
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        if (components == null) {
+            return referencedSchemas;
+        }
+
+        Map<String, Object> responses = Util.asStringObjectMap(components.get("responses"));
+        if (responses == null) {
+            return referencedSchemas;
+        }
+
+        // Iterate through all response definitions
+        for (Map.Entry<String, Object> responseEntry : responses.entrySet()) {
+            Map<String, Object> response = Util.asStringObjectMap(responseEntry.getValue());
+            if (response == null) continue;
+
+            // Check content section
+            if (response.containsKey("content")) {
+                Map<String, Object> content = Util.asStringObjectMap(response.get("content"));
+                if (content != null) {
+                    for (Object mediaTypeObj : content.values()) {
+                        Map<String, Object> mediaType = Util.asStringObjectMap(mediaTypeObj);
+                        if (mediaType != null && mediaType.containsKey("schema")) {
+                            Object schemaObj = mediaType.get("schema");
+                            collectSchemasFromSchemaObject(schemaObj, referencedSchemas, spec);
+                        }
+                    }
+                }
+            }
+        }
+
+        return referencedSchemas;
+    }
+
+    /**
      * Generate individual model
      */
     private void generateModel(String schemaName, Map<String, Object> schema, String outputDir, String packagePath, Map<String, Object> spec) throws IOException {
@@ -1391,20 +1440,37 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         Map<String, Object> allProperties = new java.util.LinkedHashMap<>();
         List<String> allRequired = new ArrayList<>();
 
-        // Extract properties first to get field names
-        if (schema.containsKey("allOf")) {
-            List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
-            for (Map<String, Object> subSchema : allOfSchemas) {
-                mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
-            }
-        } else if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
-            List<Map<String, Object>> schemas = Util.asStringObjectMapList(
-                    schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
-            for (Map<String, Object> subSchema : schemas) {
-                mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
+        // Check if this is an array type schema
+        boolean isArrayType = schema.containsKey("type") && "array".equals(schema.get("type"));
+        
+        // Handle array types - create a wrapper class with a List field
+        if (isArrayType) {
+            // For array types, create a wrapper with a single "items" field of type List
+            // We'll handle the List type wrapping when generating the field
+            Object itemsObj = schema.get("items");
+            if (itemsObj != null) {
+                Map<String, Object> itemsSchema = Util.asStringObjectMap(itemsObj);
+                if (itemsSchema != null) {
+                    allProperties.put("items", itemsSchema);
+                    allRequired.add("items");
+                }
             }
         } else {
-            mergeSchemaProperties(schema, allProperties, allRequired, spec);
+            // Extract properties first to get field names
+            if (schema.containsKey("allOf")) {
+                List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
+                for (Map<String, Object> subSchema : allOfSchemas) {
+                    mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
+                }
+            } else if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+                List<Map<String, Object>> schemas = Util.asStringObjectMapList(
+                        schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
+                for (Map<String, Object> subSchema : schemas) {
+                    mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
+                }
+            } else {
+                mergeSchemaProperties(schema, allProperties, allRequired, spec);
+            }
         }
 
         List<String> fieldNames = new ArrayList<>(allProperties.keySet());
@@ -1437,7 +1503,15 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
             // Add JAXB @XmlElement annotation
             String javaFieldName = toCamelCase(fieldName);
-            String fieldType = getJavaType(fieldSchema);
+            String fieldType;
+            
+            // If this is an array type schema and the field is "items", wrap in List
+            if (isArrayType && "items".equals(fieldName)) {
+                String itemType = getJavaType(fieldSchema);
+                fieldType = "List<" + itemType + ">";
+            } else {
+                fieldType = getJavaType(fieldSchema);
+            }
 
             // Handle arrays/lists with @XmlElementWrapper
             if (fieldType.startsWith("List<")) {
@@ -1474,7 +1548,16 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         for (Map.Entry<String, Object> property : allProperties.entrySet()) {
             String fieldName = property.getKey();
             Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
-            String fieldType = getJavaType(fieldSchema);
+            String fieldType;
+            
+            // If this is an array type schema and the field is "items", wrap in List
+            if (isArrayType && "items".equals(fieldName)) {
+                String itemType = getJavaType(fieldSchema);
+                fieldType = "List<" + itemType + ">";
+            } else {
+                fieldType = getJavaType(fieldSchema);
+            }
+            
             String javaFieldName = toCamelCase(fieldName);
             String capitalizedFieldName = capitalize(javaFieldName);
 
@@ -1611,7 +1694,16 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 String javaFieldName = toCamelCase(fieldName);
                 String capitalizedFieldName = capitalize(javaFieldName);
                 Map<String, Object> fieldSchema = Util.asStringObjectMap(allProperties.get(fieldName));
-                String fieldType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
+                String fieldType;
+                
+                // If this is an array type schema and the field is "items", wrap in List
+                if (isArrayType && "items".equals(fieldName)) {
+                    String itemType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
+                    fieldType = "List<" + itemType + ">";
+                } else {
+                    fieldType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
+                }
+                
                 content.append("            case \"").append(fieldName).append("\":\n");
                 content.append("                set").append(capitalizedFieldName).append("((").append(fieldType).append(") value);\n");
                 content.append("                return;\n");
