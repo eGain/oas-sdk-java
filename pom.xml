@@ -8,7 +8,7 @@
     <packaging>jar</packaging>
 
     <name>OAS SDK Java</name>
-    <description>A comprehensive Java SDK for OpenAPI-first development</description>
+    <description>A comprehensive Java SDK for OpenAPI first development</description>
     <url>https://github.com/egain/oas-sdk-java</url>
     
     <licenses>
