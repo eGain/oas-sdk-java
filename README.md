@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-A comprehensive Java SDK for generating applications, tests, mock data, SLA enforcement, and professional documentation from OpenAPI specifications. Built with modern libraries and best practices for enterprise-grade API development.
+A comprehensive Java SDK for generating applications, tests, mock data for tests, SLA enforcement, and professional documentation from OpenAPI specifications. Built with modern libraries and best practices for enterprise-grade API development.
 
 ## 📖 Table of Contents
 
