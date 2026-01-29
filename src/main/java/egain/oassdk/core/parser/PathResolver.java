@@ -119,10 +119,16 @@ public class PathResolver {
         // Check if file exists
         if (Files.exists(resolvedPath) && Files.isRegularFile(resolvedPath)) {
             // Validate path traversal protection
-            validatePathTraversal(baseDir, resolvedPath);
-            // Validate file size
-            validateFileSize(resolvedPath);
-            return resolvedPath;
+            // If validation fails, continue to search paths instead of throwing immediately
+            try {
+                validatePathTraversal(baseDir, resolvedPath);
+                // Validate file size
+                validateFileSize(resolvedPath);
+                return resolvedPath;
+            } catch (OASSDKException e) {
+                // Path traversal detected - continue to search paths
+                // Don't throw here, let search paths be tried
+            }
         }
 
         // Try search paths
