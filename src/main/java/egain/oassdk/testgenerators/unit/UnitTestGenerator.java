@@ -139,7 +139,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         sb.append("    private HttpClient httpClient;\n\n");
 
         sb.append("    @BeforeEach\n");
-        sb.append("    void setUp() {\n");
+        sb.append("    public void setUp() {\n");
         sb.append("        httpClient = HttpClient.newHttpClient();\n");
         sb.append("    }\n\n");
 
@@ -210,7 +210,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         // Test: Valid request
         sb.append("    @Test\n");
         sb.append("    @DisplayName(\"").append(summary != null ? summary : method + " " + path).append(" - Valid Request\")\n");
-        sb.append("    void test").append(capitalize(testMethodName)).append("_ValidRequest() {\n");
+        sb.append("    public void test").append(capitalize(testMethodName)).append("_ValidRequest() {\n");
         sb.append("        // Arrange\n");
 
         // Build path parameters
@@ -222,15 +222,23 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             if ("path".equals(paramIn)) {
                 String example = getParameterExample(param);
                 pathParams.put(paramName, example);
-                sb.append("        Map<String, String> pathParams = Map.of(\"").append(paramName).append("\", \"").append(example).append("\");\n");
             } else if ("query".equals(paramIn)) {
                 String example = getParameterExample(param);
                 queryParams.put(paramName, example);
             }
         }
 
+        // Always declare pathParams, even if empty
+        sb.append("        Map<String, String> pathParams = new HashMap<>();\n");
+        if (!pathParams.isEmpty()) {
+            for (Map.Entry<String, String> entry : pathParams.entrySet()) {
+                sb.append("        pathParams.put(\"").append(entry.getKey()).append("\", \"").append(entry.getValue()).append("\");\n");
+            }
+        }
+
+        // Always declare queryParams, even if empty
+        sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
         if (!queryParams.isEmpty()) {
-            sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
             for (Map.Entry<String, String> entry : queryParams.entrySet()) {
                 sb.append("        queryParams.put(\"").append(entry.getKey()).append("\", \"").append(entry.getValue()).append("\");\n");
             }
@@ -249,12 +257,23 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         sb.append("            .build();\n\n");
 
         sb.append("        // Act & Assert\n");
-        sb.append("        // Note: This is a unit test template. Replace with actual implementation:\n");
-        sb.append("        // 1. Mock the HTTP client or service layer\n");
-        sb.append("        // 2. Call the method under test\n");
-        sb.append("        // 3. Verify the response\n");
         sb.append("        assertNotNull(request, \"Request should not be null\");\n");
         sb.append("        assertEquals(\"").append(method).append("\", request.method(), \"HTTP method should match\");\n");
+        sb.append("        assertNotNull(uri, \"URI should not be null\");\n");
+        sb.append("        assertTrue(uri.toString().startsWith(BASE_URL), \"URI should start with base URL\");\n");
+        sb.append("        assertNotNull(path, \"Path should not be null\");\n");
+        if (!pathParams.isEmpty()) {
+            for (Map.Entry<String, String> entry : pathParams.entrySet()) {
+                sb.append("        assertTrue(path.contains(\"").append(entry.getValue()).append("\"), \"Path should contain path parameter ").append(entry.getKey()).append(" value\");\n");
+            }
+        }
+        if (!queryParams.isEmpty()) {
+            for (String paramName : queryParams.keySet()) {
+                sb.append("        assertTrue(uri.toString().contains(\"").append(paramName).append("=\"), \"URI should contain query parameter ").append(paramName).append("\");\n");
+            }
+        }
+        sb.append("        assertNotNull(request.headers(), \"Request headers should not be null\");\n");
+        sb.append("        assertTrue(request.headers().firstValue(\"Accept\").isPresent(), \"Request should have Accept header\");\n");
         sb.append("    }\n\n");
 
         // Test: Invalid parameters
@@ -268,12 +287,39 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                 sb.append("    @Test\n");
                 sb.append("    @DisplayName(\"").append(summary != null ? summary : method + " " + path)
                         .append(" - Missing Required Parameter: ").append(paramName).append("\")\n");
-                sb.append("    void test").append(capitalize(testMethodName)).append("_MissingRequiredParam_").append(capitalize(paramName)).append("() {\n");
+                sb.append("    public void test").append(capitalize(testMethodName)).append("_MissingRequiredParam_").append(capitalize(paramName)).append("() {\n");
                 sb.append("        // Arrange\n");
-                sb.append("        // Missing required parameter: ").append(paramName).append("\n");
+                sb.append("        Map<String, String> pathParams = new HashMap<>();\n");
+                // Add path params if any
+                for (Map<String, Object> p : parameters) {
+                    String pName = (String) p.get("name");
+                    String pIn = (String) p.get("in");
+                    if ("path".equals(pIn)) {
+                        String example = getParameterExample(p);
+                        sb.append("        pathParams.put(\"").append(pName).append("\", \"").append(example).append("\");\n");
+                    }
+                }
+                sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
+                // Add other query params except the missing one
+                for (Map<String, Object> p : parameters) {
+                    String pName = (String) p.get("name");
+                    String pIn = (String) p.get("in");
+                    if ("query".equals(pIn) && !pName.equals(paramName)) {
+                        String example = getParameterExample(p);
+                        sb.append("        queryParams.put(\"").append(pName).append("\", \"").append(example).append("\");\n");
+                    }
+                }
+                sb.append("        String path = replacePathParameters(\"").append(path).append("\", pathParams);\n");
+                sb.append("        URI uri = buildUri(path, queryParams);\n");
+                sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
+                sb.append("            .uri(uri)\n");
+                sb.append("            .method(\"").append(method).append("\", HttpRequest.BodyPublishers.noBody())\n");
+                sb.append("            .header(\"Accept\", \"application/json\")\n");
+                sb.append("            .build();\n\n");
                 sb.append("        // Act & Assert\n");
-                sb.append("        // Verify that the API returns 400 Bad Request\n");
-                sb.append("        assertTrue(true, \"Test placeholder - implement validation logic\");\n");
+                sb.append("        assertNotNull(request, \"Request should not be null\");\n");
+                sb.append("        assertFalse(uri.toString().contains(\"").append(paramName).append("=\"), \"URI should not contain missing required parameter ").append(paramName).append("\");\n");
+                sb.append("        // TODO: Mock HTTP client and verify 400 Bad Request response when ").append(paramName).append(" is missing\n");
                 sb.append("    }\n\n");
             }
 
@@ -285,16 +331,49 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             if (schema.containsKey("type")) {
                 String type = (String) schema.get("type");
                 if ("string".equals(type) && schema.containsKey("pattern")) {
+                    String pattern = (String) schema.get("pattern");
                     sb.append("    @ParameterizedTest\n");
                     sb.append("    @ValueSource(strings = {\"invalid\", \"test123\", \"\"})\n");
                     sb.append("    @DisplayName(\"").append(summary != null ? summary : method + " " + path)
                             .append(" - Invalid ").append(paramName).append(" Format\")\n");
-                    sb.append("    void test").append(capitalize(testMethodName)).append("_Invalid").append(capitalize(paramName)).append("Format(String invalidValue) {\n");
+                    sb.append("    public void test").append(capitalize(testMethodName)).append("_Invalid").append(capitalize(paramName)).append("Format(String invalidValue) {\n");
                     sb.append("        // Arrange\n");
-                    sb.append("        // Invalid ").append(paramName).append(" value: \" + invalidValue\n");
+                    sb.append("        Map<String, String> pathParams = new HashMap<>();\n");
+                    // Add path params if any
+                    for (Map<String, Object> p : parameters) {
+                        String pName = (String) p.get("name");
+                        String pIn = (String) p.get("in");
+                        if ("path".equals(pIn)) {
+                            String example = getParameterExample(p);
+                            sb.append("        pathParams.put(\"").append(pName).append("\", \"").append(example).append("\");\n");
+                        }
+                    }
+                    sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
+                    // Add all query params including the invalid one
+                    for (Map<String, Object> p : parameters) {
+                        String pName = (String) p.get("name");
+                        String pIn = (String) p.get("in");
+                        if ("query".equals(pIn)) {
+                            if (pName.equals(paramName)) {
+                                sb.append("        queryParams.put(\"").append(paramName).append("\", invalidValue);\n");
+                            } else {
+                                String example = getParameterExample(p);
+                                sb.append("        queryParams.put(\"").append(pName).append("\", \"").append(example).append("\");\n");
+                            }
+                        }
+                    }
+                    sb.append("        String path = replacePathParameters(\"").append(path).append("\", pathParams);\n");
+                    sb.append("        URI uri = buildUri(path, queryParams);\n");
+                    sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
+                    sb.append("            .uri(uri)\n");
+                    sb.append("            .method(\"").append(method).append("\", HttpRequest.BodyPublishers.noBody())\n");
+                    sb.append("            .header(\"Accept\", \"application/json\")\n");
+                    sb.append("            .build();\n\n");
                     sb.append("        // Act & Assert\n");
-                    sb.append("        // Verify that the API returns 400 Bad Request for invalid format\n");
-                    sb.append("        assertNotNull(invalidValue, \"Test value should not be null\");\n");
+                    sb.append("        assertNotNull(request, \"Request should not be null\");\n");
+                    sb.append("        assertTrue(uri.toString().contains(\"").append(paramName).append("=\"), \"URI should contain parameter ").append(paramName).append("\");\n");
+                    sb.append("        assertTrue(uri.toString().contains(invalidValue), \"URI should contain invalid value\");\n");
+                    sb.append("        // TODO: Mock HTTP client and verify 400 Bad Request response for invalid ").append(paramName).append(" format (pattern: ").append(pattern).append(")\n");
                     sb.append("    }\n\n");
                 }
             }
@@ -306,12 +385,45 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                 sb.append("    @Test\n");
                 sb.append("    @DisplayName(\"").append(summary != null ? summary : method + " " + path)
                         .append(" - Response Status ").append(statusCode).append("\")\n");
-                sb.append("    void test").append(capitalize(testMethodName)).append("_Status").append(statusCode).append("() {\n");
+                sb.append("    public void test").append(capitalize(testMethodName)).append("_Status").append(statusCode).append("() throws Exception {\n");
                 sb.append("        // Arrange\n");
-                sb.append("        // Setup request for ").append(statusCode).append(" response\n");
-                sb.append("        // Act & Assert\n");
-                sb.append("        // Verify response status is ").append(statusCode).append("\n");
-                sb.append("        assertTrue(true, \"Test placeholder - implement status code validation\");\n");
+                // Build request similar to valid request
+                sb.append("        Map<String, String> pathParams = new HashMap<>();\n");
+                for (Map<String, Object> param : parameters) {
+                    String paramName = (String) param.get("name");
+                    String paramIn = (String) param.get("in");
+                    if ("path".equals(paramIn)) {
+                        String example = getParameterExample(param);
+                        sb.append("        pathParams.put(\"").append(paramName).append("\", \"").append(example).append("\");\n");
+                    }
+                }
+                sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
+                for (Map<String, Object> param : parameters) {
+                    String paramName = (String) param.get("name");
+                    String paramIn = (String) param.get("in");
+                    if ("query".equals(paramIn)) {
+                        String example = getParameterExample(param);
+                        sb.append("        queryParams.put(\"").append(paramName).append("\", \"").append(example).append("\");\n");
+                    }
+                }
+                sb.append("        String path = replacePathParameters(\"").append(path).append("\", pathParams);\n");
+                if (!queryParams.isEmpty()) {
+                    sb.append("        URI uri = buildUri(path, queryParams);\n");
+                } else {
+                    sb.append("        URI uri = URI.create(BASE_URL + path);\n");
+                }
+                sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
+                sb.append("            .uri(uri)\n");
+                sb.append("            .method(\"").append(method).append("\", HttpRequest.BodyPublishers.noBody())\n");
+                sb.append("            .header(\"Accept\", \"application/json\")\n");
+                sb.append("            .build();\n\n");
+                sb.append("        // Act\n");
+                sb.append("        // TODO: Mock HTTP client to return ").append(statusCode).append(" status\n");
+                sb.append("        // HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());\n\n");
+                sb.append("        // Assert\n");
+                sb.append("        assertNotNull(request, \"Request should not be null\");\n");
+                sb.append("        // assertEquals(").append(statusCode).append(", response.statusCode(), \"Response status should be ").append(statusCode).append("\");\n");
+                sb.append("        // TODO: Add assertions for response body, headers, etc. based on OpenAPI response schema\n");
                 sb.append("    }\n\n");
             }
         }

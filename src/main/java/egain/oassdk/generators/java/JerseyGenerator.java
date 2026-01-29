@@ -67,6 +67,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             // Generate Validation classes automatically
             generateValidationClasses(outputDir);
 
+            // Generate executors
+            generateExecutors(spec, outputDir, packageName);
+
         } catch (Exception e) {
             logger.log(java.util.logging.Level.SEVERE, "Failed to generate Jersey application: " + e.getMessage(), e);
             throw new GenerationException("Failed to generate Jersey application: " + e.getMessage(), e);
@@ -117,6 +120,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 outputDir + "/src/main/java/" + packagePath + "/resources",
                 outputDir + "/src/main/java/" + packagePath + "/model",
                 outputDir + "/src/main/java/" + packagePath + "/service",
+                outputDir + "/src/main/java/" + packagePath + "/executor",
                 outputDir + "/src/main/java/" + packagePath + "/config",
                 outputDir + "/src/main/java/" + packagePath + "/exception",
                 outputDir + "/src/main/java/egain/ws/oas/gen",  // Validation package directory
@@ -1008,6 +1012,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         // Collect inline object schemas from schema properties
         collectInlinedSchemasFromProperties(schemas, spec);
 
+        // Collect schemas referenced in components/responses
+        Set<String> referencedInResponses = collectSchemasReferencedInResponses(spec);
+
         // Generate all models from schemas section
         for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
             String schemaName = schemaEntry.getKey();
@@ -1039,11 +1046,18 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     schema.containsKey("enum");
 
             // If it's a simple type (string, integer, etc.) without structure, skip it
+            // EXCEPT if it's an array type that's referenced in responses (needs a wrapper class)
             if (!hasStructure && schema.containsKey("type")) {
                 Object type = schema.get("type");
-                if (type instanceof String && !"object".equals(type)) {
-                    // Skip simple primitives without any structure
-                    continue;
+                if (type instanceof String) {
+                    String typeStr = (String) type;
+                    // Don't skip array types that are referenced in responses
+                    if ("array".equals(typeStr) && referencedInResponses.contains(schemaName)) {
+                        // Generate model for array type that's referenced in responses
+                    } else if (!"object".equals(typeStr)) {
+                        // Skip simple primitives without any structure
+                        continue;
+                    }
                 }
             }
 
@@ -1362,6 +1376,45 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     }
 
     /**
+     * Collect schemas that are referenced in components/responses
+     * This is needed to generate model classes for array types that are referenced in responses
+     */
+    private Set<String> collectSchemasReferencedInResponses(Map<String, Object> spec) {
+        Set<String> referencedSchemas = new java.util.HashSet<>();
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        if (components == null) {
+            return referencedSchemas;
+        }
+
+        Map<String, Object> responses = Util.asStringObjectMap(components.get("responses"));
+        if (responses == null) {
+            return referencedSchemas;
+        }
+
+        // Iterate through all response definitions
+        for (Map.Entry<String, Object> responseEntry : responses.entrySet()) {
+            Map<String, Object> response = Util.asStringObjectMap(responseEntry.getValue());
+            if (response == null) continue;
+
+            // Check content section
+            if (response.containsKey("content")) {
+                Map<String, Object> content = Util.asStringObjectMap(response.get("content"));
+                if (content != null) {
+                    for (Object mediaTypeObj : content.values()) {
+                        Map<String, Object> mediaType = Util.asStringObjectMap(mediaTypeObj);
+                        if (mediaType != null && mediaType.containsKey("schema")) {
+                            Object schemaObj = mediaType.get("schema");
+                            collectSchemasFromSchemaObject(schemaObj, referencedSchemas, spec);
+                        }
+                    }
+                }
+            }
+        }
+
+        return referencedSchemas;
+    }
+
+    /**
      * Generate individual model
      */
     private void generateModel(String schemaName, Map<String, Object> schema, String outputDir, String packagePath, Map<String, Object> spec) throws IOException {
@@ -1391,20 +1444,37 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         Map<String, Object> allProperties = new java.util.LinkedHashMap<>();
         List<String> allRequired = new ArrayList<>();
 
-        // Extract properties first to get field names
-        if (schema.containsKey("allOf")) {
-            List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
-            for (Map<String, Object> subSchema : allOfSchemas) {
-                mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
-            }
-        } else if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
-            List<Map<String, Object>> schemas = Util.asStringObjectMapList(
-                    schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
-            for (Map<String, Object> subSchema : schemas) {
-                mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
+        // Check if this is an array type schema
+        boolean isArrayType = schema.containsKey("type") && "array".equals(schema.get("type"));
+        
+        // Handle array types - create a wrapper class with a List field
+        if (isArrayType) {
+            // For array types, create a wrapper with a single "items" field of type List
+            // We'll handle the List type wrapping when generating the field
+            Object itemsObj = schema.get("items");
+            if (itemsObj != null) {
+                Map<String, Object> itemsSchema = Util.asStringObjectMap(itemsObj);
+                if (itemsSchema != null) {
+                    allProperties.put("items", itemsSchema);
+                    allRequired.add("items");
+                }
             }
         } else {
-            mergeSchemaProperties(schema, allProperties, allRequired, spec);
+            // Extract properties first to get field names
+            if (schema.containsKey("allOf")) {
+                List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
+                for (Map<String, Object> subSchema : allOfSchemas) {
+                    mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
+                }
+            } else if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+                List<Map<String, Object>> schemas = Util.asStringObjectMapList(
+                        schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
+                for (Map<String, Object> subSchema : schemas) {
+                    mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
+                }
+            } else {
+                mergeSchemaProperties(schema, allProperties, allRequired, spec);
+            }
         }
 
         List<String> fieldNames = new ArrayList<>(allProperties.keySet());
@@ -1437,7 +1507,15 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
             // Add JAXB @XmlElement annotation
             String javaFieldName = toCamelCase(fieldName);
-            String fieldType = getJavaType(fieldSchema);
+            String fieldType;
+            
+            // If this is an array type schema and the field is "items", wrap in List
+            if (isArrayType && "items".equals(fieldName)) {
+                String itemType = getJavaType(fieldSchema);
+                fieldType = "List<" + itemType + ">";
+            } else {
+                fieldType = getJavaType(fieldSchema);
+            }
 
             // Handle arrays/lists with @XmlElementWrapper
             if (fieldType.startsWith("List<")) {
@@ -1474,7 +1552,16 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         for (Map.Entry<String, Object> property : allProperties.entrySet()) {
             String fieldName = property.getKey();
             Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
-            String fieldType = getJavaType(fieldSchema);
+            String fieldType;
+            
+            // If this is an array type schema and the field is "items", wrap in List
+            if (isArrayType && "items".equals(fieldName)) {
+                String itemType = getJavaType(fieldSchema);
+                fieldType = "List<" + itemType + ">";
+            } else {
+                fieldType = getJavaType(fieldSchema);
+            }
+            
             String javaFieldName = toCamelCase(fieldName);
             String capitalizedFieldName = capitalize(javaFieldName);
 
@@ -1611,7 +1698,16 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 String javaFieldName = toCamelCase(fieldName);
                 String capitalizedFieldName = capitalize(javaFieldName);
                 Map<String, Object> fieldSchema = Util.asStringObjectMap(allProperties.get(fieldName));
-                String fieldType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
+                String fieldType;
+                
+                // If this is an array type schema and the field is "items", wrap in List
+                if (isArrayType && "items".equals(fieldName)) {
+                    String itemType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
+                    fieldType = "List<" + itemType + ">";
+                } else {
+                    fieldType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
+                }
+                
                 content.append("            case \"").append(fieldName).append("\":\n");
                 content.append("                set").append(capitalizedFieldName).append("((").append(fieldType).append(") value);\n");
                 content.append("                return;\n");
@@ -4156,6 +4252,485 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 """, packageName);
 
         writeFile(outputDir + "/IsAllowReservedValidator.java", content);
+    }
+
+    /**
+     * Generate executor files for all operations
+     */
+    private void generateExecutors(Map<String, Object> spec, String outputDir, String packageName) throws IOException, GenerationException {
+        Map<String, Object> paths = Util.asStringObjectMap(spec.get("paths"));
+        if (paths == null) return;
+
+        String packagePath = packageName != null ? packageName : "com.example.api";
+
+        // Iterate through all paths and operations
+        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+            String path = pathEntry.getKey();
+            Map<String, Object> pathItem = Util.asStringObjectMap(pathEntry.getValue());
+
+            if (pathItem == null) continue;
+
+            String[] methods = {"get", "post", "put", "delete", "patch"};
+            for (String method : methods) {
+                if (pathItem.containsKey(method)) {
+                    Map<String, Object> operation = Util.asStringObjectMap(pathItem.get(method));
+                    if (operation != null) {
+                        try {
+                            generateExecutorForOperation(path, method, operation, outputDir, packagePath, spec);
+                        } catch (GenerationException e) {
+                            throw new GenerationException("Failed to generate executor for " + method.toUpperCase(Locale.ROOT) + " " + path + ": " + e.getMessage(), e);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Generate executor for a single operation
+     */
+    private void generateExecutorForOperation(String path, String method, Map<String, Object> operation,
+                                               String outputDir, String packagePath, Map<String, Object> spec) throws IOException, GenerationException {
+        String operationId = (String) operation.get("operationId");
+        if (operationId == null || operationId.isEmpty()) {
+            // Generate operationId from path and method if not provided
+            operationId = generateOperationIdFromPath(path, method);
+        }
+
+        String executorClassName = toJavaClassName(operationId) + "BOExecutor";
+        String executorPackage = packagePath + ".executor";
+
+        // Determine executor base class and response/request types
+        String baseExecutorClass;
+        String responseType = null;
+        String requestBodyType = null;
+        boolean hasResponseBody = false;
+
+        if ("get".equalsIgnoreCase(method)) {
+            // GET operations use GetBOExecutor_2<ResponseType>
+            responseType = extractResponseType(operation, spec);
+            hasResponseBody = responseType != null && !"void".equals(responseType);
+            if (hasResponseBody && responseType != null) {
+                baseExecutorClass = "GetBOExecutor_2<" + responseType + ">";
+            } else {
+                baseExecutorClass = "GetBOExecutor_2<Object>";
+                responseType = "Object";
+                hasResponseBody = true; // Object is still a response body
+            }
+        } else if ("post".equalsIgnoreCase(method) || "put".equalsIgnoreCase(method) || "patch".equalsIgnoreCase(method)) {
+            // POST/PUT/PATCH operations use PostPutBOExecutorNoResponseBody_2 or PostPutBOExecutor_2
+            requestBodyType = extractRequestBodyType(operation, spec);
+            responseType = extractResponseType(operation, spec);
+            hasResponseBody = responseType != null && !"void".equals(responseType);
+            
+            if (hasResponseBody) {
+                baseExecutorClass = "PostPutBOExecutor_2<" + responseType + ">";
+            } else {
+                baseExecutorClass = "PostPutBOExecutorNoResponseBody_2";
+            }
+        } else {
+            // DELETE and others - use PostPutBOExecutorNoResponseBody_2 as default
+            baseExecutorClass = "PostPutBOExecutorNoResponseBody_2";
+        }
+
+        // Extract parameters
+        List<Map<String, Object>> params = Util.asStringObjectMapList(operation.get("parameters"));
+        
+        // Generate executor class
+        StringBuilder content = new StringBuilder();
+        content.append("package ").append(executorPackage).append(";\n\n");
+        
+        // Add imports
+        content.append("import java.util.List;\n");
+        content.append("import java.util.Locale;\n");
+        content.append("import java.util.Map;\n\n");
+        content.append("import javax.xml.bind.JAXBElement;\n");
+        content.append("import javax.xml.namespace.QName;\n\n");
+        content.append("import com.egain.platform.common.CallerContext;\n");
+        content.append("import com.egain.platform.common.exception.PlatformException;\n");
+        content.append("import com.egain.platform.util.logging.Level;\n");
+        content.append("import com.egain.platform.util.logging.LogSource;\n");
+        content.append("import com.egain.platform.util.logging.Logger;\n\n");
+        content.append("import egain.ws.common.authorization.AlwaysAuthorizedAuthorizerPartitionFactory;\n");
+        content.append("import egain.ws.common.authorization.Authorizer;\n");
+        content.append("import egain.ws.exception.BadRequestException;\n");
+        if ("get".equalsIgnoreCase(method)) {
+            content.append("import egain.ws.framework.GetBOExecutor_2;\n");
+        } else {
+            if (hasResponseBody) {
+                content.append("import egain.ws.framework.PostPutBOExecutor_2;\n");
+            } else {
+                content.append("import egain.ws.framework.PostPutBOExecutorNoResponseBody_2;\n");
+            }
+        }
+        content.append("import egain.ws.util.WsUtil;\n");
+        content.append("import com.egain.platform.util.Util;\n");
+        content.append("import ").append(packagePath).append(".model.*;\n\n");
+        content.append("import static javax.ws.rs.core.Response.Status.BAD_REQUEST;\n\n");
+
+        // Generate class declaration
+        content.append("public class ").append(executorClassName).append(" extends ").append(baseExecutorClass);
+        content.append("\n{\n");
+        content.append("\tprivate static final String CLASS_NAME = \"").append(executorPackage).append(".").append(executorClassName).append("\";\n");
+        content.append("\tprivate static final String FILE_NAME = \"").append(executorClassName).append(".java\";\n");
+        content.append("\tprivate static final Logger mLogger = Logger.getLogger(CLASS_NAME);\n\n");
+        content.append("\tprivate final Map<String, String> solveHeaderMap;\n\n");
+
+        // Generate field declarations for parameters
+        if (params != null) {
+            for (Map<String, Object> param : params) {
+                String name = (String) param.get("name");
+                String in = (String) param.get("in");
+                Map<String, Object> schema = Util.asStringObjectMap(param.get("schema"));
+                
+                // Skip header parameters as they are handled by the framework
+                if ("header".equals(in)) {
+                    continue;
+                }
+                
+                if (name != null && schema != null) {
+                    String sanitizedName = sanitizeParameterName(name);
+                    if (sanitizedName != null) {
+                        String javaType = getJavaType(schema);
+                        content.append("\tprivate ").append(javaType).append(" m").append(capitalize(sanitizedName)).append(";\n");
+                    }
+                }
+            }
+        }
+
+        // Generate field for request body if present
+        if (requestBodyType != null) {
+            String requestBodyFieldName = extractRequestBodyFieldName(operation, spec);
+            content.append("\tprivate ").append(requestBodyType).append(" m").append(capitalize(requestBodyFieldName)).append(";\n");
+        }
+
+        // Generate field for response data (for GET operations)
+        if ("get".equalsIgnoreCase(method) && hasResponseBody) {
+            content.append("\tprivate ").append(responseType).append(" mResponseData;\n");
+        }
+
+        content.append("\n");
+
+        // Generate constructor
+        content.append("\tpublic ").append(executorClassName).append("(");
+        List<String> constructorParams = new ArrayList<>();
+        
+        // Add solveHeaderMap parameter
+        constructorParams.add("Map<String, String> solveHeaderMap");
+        
+        // Add request body parameter if present
+        if (requestBodyType != null) {
+            String requestBodyFieldName = extractRequestBodyFieldName(operation, spec);
+            constructorParams.add(requestBodyType + " " + requestBodyFieldName);
+        }
+        
+        // Add path parameters
+        if (params != null) {
+            for (Map<String, Object> param : params) {
+                String name = (String) param.get("name");
+                String in = (String) param.get("in");
+                Map<String, Object> schema = Util.asStringObjectMap(param.get("schema"));
+                
+                if ("path".equals(in) && name != null && schema != null) {
+                    String sanitizedName = sanitizeParameterName(name);
+                    if (sanitizedName != null) {
+                        String javaType = getJavaType(schema);
+                        constructorParams.add(javaType + " " + sanitizedName);
+                    }
+                }
+            }
+        }
+        
+        // Write constructor parameters
+        for (int i = 0; i < constructorParams.size(); i++) {
+            if (i > 0) {
+                content.append(",\n\t\t\t");
+            } else {
+                content.append("\n\t\t\t");
+            }
+            content.append(constructorParams.get(i));
+        }
+        content.append("\n\t)\n");
+        content.append("\t{\n");
+        content.append("\t\tthis.solveHeaderMap = solveHeaderMap;\n");
+        
+        // Initialize request body
+        if (requestBodyType != null) {
+            String requestBodyFieldName = extractRequestBodyFieldName(operation, spec);
+            content.append("\t\tthis.m").append(capitalize(requestBodyFieldName)).append(" = ").append(requestBodyFieldName).append(";\n");
+        }
+        
+        // Initialize path parameters
+        if (params != null) {
+            for (Map<String, Object> param : params) {
+                String name = (String) param.get("name");
+                String in = (String) param.get("in");
+                Map<String, Object> schema = Util.asStringObjectMap(param.get("schema"));
+                
+                if ("path".equals(in) && name != null && schema != null) {
+                    String sanitizedName = sanitizeParameterName(name);
+                    if (sanitizedName != null) {
+                        content.append("\t\tthis.m").append(capitalize(sanitizedName)).append(" = ").append(sanitizedName).append(";\n");
+                    }
+                }
+            }
+        }
+        
+        content.append("\t}\n\n");
+
+        // Generate validateRequestSyntaxImpl method
+        content.append("\t@Override\n");
+        content.append("\tprotected void validateRequestSyntaxImpl(CallerContext callerContext, Locale locale)\n");
+        content.append("\t{\n");
+        content.append("\t\t// TODO: Implement request syntax validation\n");
+        content.append("\t\t// Validate required query parameters\n");
+        
+        if (params != null) {
+            for (Map<String, Object> param : params) {
+                String name = (String) param.get("name");
+                String in = (String) param.get("in");
+                Boolean required = (Boolean) param.get("required");
+                Map<String, Object> schema = Util.asStringObjectMap(param.get("schema"));
+                
+                if ("query".equals(in) && Boolean.TRUE.equals(required) && name != null && schema != null) {
+                    String sanitizedName = sanitizeParameterName(name);
+                    if (sanitizedName != null) {
+                        String javaType = getJavaType(schema);
+                        content.append("\t\tString ").append(sanitizedName).append("Str = uriInfo.getQueryParameters().getFirst(\"").append(name).append("\");\n");
+                        content.append("\t\tif (Util.isEmpty(").append(sanitizedName).append("Str))\n");
+                        content.append("\t\t{\n");
+                        content.append("\t\t\tthrow new egain.ws.framework.WsApiException(egain.ws.framework.WSConstants.COMMON_ERROR_MSG_FILE_PATH,\n");
+                        content.append("\t\t\t\t\"L10N_REQUIRED_QUERY_PARAM_MISSING\", new String[] { \"").append(name).append("\" },\n");
+                        content.append("\t\t\t\tBAD_REQUEST);\n");
+                        content.append("\t\t}\n\n");
+                        
+                        if (javaType.equals("long") || javaType.equals("Long")) {
+                            content.append("\t\tm").append(capitalize(sanitizedName)).append(" = WsUtil.validateId(").append(sanitizedName).append("Str);\n");
+                        } else {
+                            content.append("\t\tm").append(capitalize(sanitizedName)).append(" = ").append(sanitizedName).append("Str;\n");
+                        }
+                        content.append("\n");
+                    }
+                }
+            }
+        }
+        
+        content.append("\t\tWsUtil.validateSolveHeaderValues(solveHeaderMap, true, locale, callerContext);\n");
+        content.append("\t}\n\n");
+
+        // Generate createAuthorizer method
+        content.append("\t@Override\n");
+        content.append("\tprotected Authorizer createAuthorizer(CallerContext callerContext)\n");
+        content.append("\t{\n");
+        content.append("\t\treturn AlwaysAuthorizedAuthorizerPartitionFactory.getInstance().getAuth(callerContext);\n");
+        content.append("\t}\n\n");
+
+        // Generate executeBusinessOperationImpl method
+        content.append("\t@Override\n");
+        content.append("\tprotected void executeBusinessOperationImpl(CallerContext callerContext, Locale locale, LogSource logSource)\n");
+        content.append("\t\tthrows Exception\n");
+        content.append("\t{\n");
+        content.append("\t\tmLogger.log(Level.TRACE, callerContext, logSource, \"Executing business operation\");\n");
+        content.append("\t\t// TODO: Implement business logic\n");
+        if ("get".equalsIgnoreCase(method) && hasResponseBody) {
+            content.append("\t\t// Set mResponseData with the result\n");
+        } else if (!"get".equalsIgnoreCase(method)) {
+            content.append("\t\t// Perform the create/update/delete operation\n");
+        }
+        content.append("\t}\n\n");
+
+        // Generate convertDataObjectToJaxbBeanImpl for GET operations
+        if ("get".equalsIgnoreCase(method) && hasResponseBody) {
+            content.append("\t@Override\n");
+            content.append("\tprotected JAXBElement<").append(responseType).append("> convertDataObjectToJaxbBeanImpl(CallerContext callerContext, Locale locale,\n");
+            content.append("\t\tLogSource logSource) throws PlatformException\n");
+            content.append("\t{\n");
+            content.append("\t\tmLogger.log(Level.TRACE, callerContext, logSource, \"Converting data object to JAXB bean\");\n");
+            content.append("\n");
+            content.append("\t\t// TODO: Convert mResponseData to JAXBElement\n");
+            
+            // Handle List types specially (like in ArticleTypeBOExecutor example)
+            if (responseType != null && responseType.startsWith("List<")) {
+                String innerType = responseType.substring(5, responseType.length() - 1);
+                content.append("\t\tif (Util.isEmpty(mResponseData))\n");
+                content.append("\t\t{\n");
+                content.append("\t\t\tmResponseData = new java.util.ArrayList<>();\n");
+                content.append("\t\t}\n");
+                content.append("\n");
+                content.append("\t\t// Create JAXBElement for the list - GSON will serialize the value (the list) as a direct array in JSON\n");
+                content.append("\t\tQName qName = new QName(\"http://bindings.egain.com/ws/model/xsds/common/v4\", \"").append(innerType).append("s\");\n");
+                content.append("\t\t@SuppressWarnings(\"unchecked\")\n");
+                content.append("\t\tJAXBElement<").append(responseType).append("> element = new JAXBElement<>(qName, (Class<").append(responseType).append(">)(Class<?>)java.util.ArrayList.class, mResponseData);\n");
+            } else if (responseType != null) {
+                content.append("\t\tQName qName = new QName(\"http://bindings.egain.com/ws/model/xsds/common/v4\", \"").append(responseType).append("\");\n");
+                content.append("\t\t@SuppressWarnings(\"unchecked\")\n");
+                content.append("\t\tJAXBElement<").append(responseType).append("> element = new JAXBElement<>(qName, ").append(responseType).append(".class, mResponseData);\n");
+            } else {
+                content.append("\t\t// Response type is null, using Object as fallback\n");
+                content.append("\t\tQName qName = new QName(\"http://bindings.egain.com/ws/model/xsds/common/v4\", \"Object\");\n");
+                content.append("\t\t@SuppressWarnings(\"unchecked\")\n");
+                content.append("\t\tJAXBElement<Object> element = new JAXBElement<>(qName, Object.class, mResponseData);\n");
+            }
+            content.append("\t\treturn element;\n");
+            content.append("\t}\n\n");
+        }
+
+        // Generate convertJaxbBeanToDataObject for POST/PUT/PATCH operations
+        if (!"get".equalsIgnoreCase(method) && requestBodyType != null) {
+            content.append("\t@Override\n");
+            content.append("\tprotected void convertJaxbBeanToDataObject(CallerContext callerContext, Locale locale)\n");
+            content.append("\t{\n");
+            content.append("\t\tLogSource logSource = LogSource.getObject(CLASS_NAME, \"convertJaxbBeanToDataObject()\", FILE_NAME);\n");
+            content.append("\t\tmLogger.log(Level.TRACE, callerContext, logSource, \"Converting JAXB bean to data object\");\n");
+            content.append("\t\t// TODO: Convert request body to data object\n");
+            content.append("\t}\n\n");
+        }
+
+        // Generate composeLocationHeader for POST/PUT/PATCH operations without response body
+        if (!"get".equalsIgnoreCase(method) && !hasResponseBody) {
+            content.append("\t@Override\n");
+            content.append("\tprotected String composeLocationHeader()\n");
+            content.append("\t{\n");
+            content.append("\t\t// TODO: Compose location header for created resource\n");
+            content.append("\t\treturn null;\n");
+            content.append("\t}\n");
+
+            content.append("}\n");
+        } else {
+            content.append("}\n");
+        }
+
+        // Write executor file
+        String executorDir = outputDir + "/src/main/java/" + executorPackage.replace(".", "/");
+        writeFile(executorDir + "/" + executorClassName + ".java", content.toString());
+    }
+
+    /**
+     * Extract response type from operation
+     */
+    private String extractResponseType(Map<String, Object> operation, Map<String, Object> spec) {
+        if (operation == null || !operation.containsKey("responses")) {
+            return null;
+        }
+
+        Map<String, Object> responses = Util.asStringObjectMap(operation.get("responses"));
+        if (responses == null) {
+            return null;
+        }
+
+        // Look for 200 or 201 response
+        String[] successCodes = {"200", "201", "202", "204"};
+        for (String code : successCodes) {
+            Object responseObj = responses.get(code);
+            if (responseObj == null) continue;
+
+            Map<String, Object> response = Util.asStringObjectMap(responseObj);
+            if (response == null || !response.containsKey("content")) {
+                continue;
+            }
+
+            Map<String, Object> content = Util.asStringObjectMap(response.get("content"));
+            if (content == null) {
+                continue;
+            }
+
+            // Look for application/json or application/xml
+            for (String mediaType : new String[]{"application/json", "application/xml"}) {
+                Object mediaTypeObj = content.get(mediaType);
+                if (mediaTypeObj == null) continue;
+
+                Map<String, Object> mediaTypeMap = Util.asStringObjectMap(mediaTypeObj);
+                if (mediaTypeMap == null) continue;
+
+                Object schemaObj = mediaTypeMap.get("schema");
+                if (schemaObj == null) continue;
+
+                Map<String, Object> schema = Util.asStringObjectMap(schemaObj);
+                if (schema != null) {
+                    String javaType = getJavaType(schema);
+                    if (javaType != null && !"Object".equals(javaType)) {
+                        return javaType;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract request body type from operation
+     */
+    private String extractRequestBodyType(Map<String, Object> operation, Map<String, Object> spec) {
+        if (operation == null || !operation.containsKey("requestBody")) {
+            return null;
+        }
+
+        Map<String, Object> requestBody = Util.asStringObjectMap(operation.get("requestBody"));
+        if (requestBody == null || !requestBody.containsKey("content")) {
+            return null;
+        }
+
+        Map<String, Object> content = Util.asStringObjectMap(requestBody.get("content"));
+        if (content == null) {
+            return null;
+        }
+
+        // Look for application/json or application/xml
+        for (String mediaType : new String[]{"application/json", "application/xml"}) {
+            Object mediaTypeObj = content.get(mediaType);
+            if (mediaTypeObj == null) continue;
+
+            Map<String, Object> mediaTypeMap = Util.asStringObjectMap(mediaTypeObj);
+            if (mediaTypeMap == null) continue;
+
+            Object schemaObj = mediaTypeMap.get("schema");
+            if (schemaObj == null) continue;
+
+            Map<String, Object> schema = Util.asStringObjectMap(schemaObj);
+            if (schema != null) {
+                String javaType = getJavaType(schema);
+                if (javaType != null && !"Object".equals(javaType)) {
+                    return javaType;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract request body field name from operation
+     */
+    private String extractRequestBodyFieldName(Map<String, Object> operation, Map<String, Object> spec) {
+        String operationId = (String) operation.get("operationId");
+        if (operationId != null && !operationId.isEmpty()) {
+            // Try to extract a meaningful name from operationId
+            // e.g., "createSuggestionComment" -> "comment"
+            String lowerId = operationId.toLowerCase(Locale.ROOT);
+            if (lowerId.startsWith("create")) {
+                return lowerId.substring(6); // Remove "create"
+            } else if (lowerId.startsWith("update")) {
+                return lowerId.substring(6); // Remove "update"
+            } else if (lowerId.endsWith("comment")) {
+                return "comment";
+            } else if (lowerId.endsWith("suggestion")) {
+                return "suggestion";
+            }
+        }
+        return "requestBody";
+    }
+
+    /**
+     * Generate operationId from path and method if not provided
+     */
+    private String generateOperationIdFromPath(String path, String method) {
+        // Clean path and convert to camelCase
+        String cleanPath = path.replaceAll("[^a-zA-Z0-9]", "");
+        if (cleanPath.isEmpty()) {
+            cleanPath = "root";
+        }
+        return method.toLowerCase(Locale.ROOT) + capitalize(cleanPath);
     }
 
     /**
