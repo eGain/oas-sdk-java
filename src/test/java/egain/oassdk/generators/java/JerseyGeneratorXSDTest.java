@@ -158,6 +158,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 SimpleUser:
@@ -197,6 +198,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 TestSchema:
@@ -233,6 +235,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
@@ -281,6 +284,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
@@ -327,6 +331,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
@@ -374,6 +379,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
@@ -430,6 +436,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
@@ -486,6 +493,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
@@ -531,6 +539,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 Base:
@@ -577,6 +586,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
@@ -634,6 +644,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
@@ -675,6 +686,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
@@ -729,6 +741,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 EmptyObject:
@@ -766,6 +779,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 Base1:
@@ -814,6 +828,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
@@ -868,6 +883,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
@@ -909,6 +925,7 @@ public class JerseyGeneratorXSDTest {
             info:
               title: Test API
               version: 1.0.0
+            paths: {}
             components:
               schemas:
                 User:
