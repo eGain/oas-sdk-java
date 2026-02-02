@@ -1083,6 +1083,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
         // Generate ObjectFactory for JAXB support
         generateObjectFactory(schemas, outputDir, packagePath);
+
+        // Generate XSD files
+        generateXSDs(spec, outputDir, packagePath);
     }
 
     /**
@@ -2018,6 +2021,654 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             Files.createDirectories(parent);
         }
         Files.writeString(path, content);
+    }
+
+    /**
+     * Generate XSD files for all schemas
+     */
+    private void generateXSDs(Map<String, Object> spec, String outputDir, String packagePath) throws IOException {
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        if (components == null) return;
+
+        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+        if (schemas == null) return;
+
+        // Create XSD directory
+        String xsdDir = outputDir + "/src/main/resources/xsd";
+        Files.createDirectories(Paths.get(xsdDir));
+
+        // Generate XSD for each schema
+        for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
+            String schemaName = schemaEntry.getKey();
+            Map<String, Object> schema = Util.asStringObjectMap(schemaEntry.getValue());
+            if (schema == null) continue;
+
+            // Filter out error schemas
+            if (isErrorSchema(schemaName)) {
+                continue;
+            }
+
+            // Generate XSD for schemas with structure
+            boolean hasStructure = schema.containsKey("properties") ||
+                    schema.containsKey("allOf") ||
+                    schema.containsKey("oneOf") ||
+                    schema.containsKey("anyOf") ||
+                    schema.containsKey("enum");
+
+            if (hasStructure || (schema.containsKey("type") && "array".equals(schema.get("type")))) {
+                String xsdContent = generateXSD(schemaName, schema, spec, schemas);
+                writeFile(xsdDir + "/" + schemaName + ".xsd", xsdContent);
+            }
+        }
+
+        // Generate XSD for in-lined schemas
+        for (Map.Entry<Object, String> entry : inlinedSchemas.entrySet()) {
+            Object schemaObj = entry.getKey();
+            String modelName = entry.getValue();
+
+            Map<String, Object> schema = Util.asStringObjectMap(schemaObj);
+            if (schema != null) {
+                String xsdContent = generateXSD(modelName, schema, spec, schemas);
+                writeFile(xsdDir + "/" + modelName + ".xsd", xsdContent);
+            }
+        }
+    }
+
+    /**
+     * Generate XSD for a single schema
+     */
+    private String generateXSD(String schemaName, Map<String, Object> schema, Map<String, Object> spec, Map<String, Object> allSchemas) {
+        StringBuilder xsd = new StringBuilder();
+        xsd.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n");
+        
+        // Build namespace declarations
+        String targetNamespace = "http://bindings.egain.com/ws/model/xsds/common/v4/" + schemaName;
+        Set<String> referencedNamespaces = new LinkedHashSet<>();
+        
+        // Check for top-level $ref first
+        String ref = (String) schema.get("$ref");
+        if (ref != null && ref.startsWith("#/components/schemas/")) {
+            String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+            referencedNamespaces.add(refSchemaName);
+            // For $ref schemas, we don't need to collect further references
+            // as we're just wrapping the referenced schema
+        } else {
+            // Collect referenced schemas for imports
+            collectReferencedSchemasForXSD(schema, allSchemas, referencedNamespaces, new HashSet<>());
+        }
+        
+        xsd.append("<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"\n");
+        xsd.append("           xmlns:").append(schemaName).append("=\"").append(targetNamespace).append("\"\n");
+        
+        // Add namespace declarations for referenced schemas
+        for (String refSchema : referencedNamespaces) {
+            if (!refSchema.equals(schemaName)) {
+                String refNamespace = "http://bindings.egain.com/ws/model/xsds/common/v4/" + refSchema;
+                xsd.append("           xmlns:").append(refSchema).append("=\"").append(refNamespace).append("\"\n");
+            }
+        }
+        
+        xsd.append("           xmlns:jaxb=\"http://java.sun.com/xml/ns/jaxb\"\n");
+        xsd.append("           jaxb:version=\"2.0\"\n");
+        xsd.append("           targetNamespace=\"").append(targetNamespace).append("\">\n");
+        
+        // Add imports for referenced schemas
+        for (String refSchema : referencedNamespaces) {
+            if (!refSchema.equals(schemaName)) {
+                xsd.append("    <xs:import namespace=\"http://bindings.egain.com/ws/model/xsds/common/v4/").append(refSchema).append("\" schemaLocation=\"./").append(refSchema).append(".xsd\"/>\n");
+            }
+        }
+        
+        if (!referencedNamespaces.isEmpty()) {
+            xsd.append("\n");
+        }
+
+        // Handle $ref schemas (like EditNonIntegratedUser)
+        if (ref != null && ref.startsWith("#/components/schemas/")) {
+            String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+            xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
+            xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
+            xsd.append("        <xs:sequence>\n");
+            xsd.append("            <xs:element name=\"").append(schemaName).append("\" type=\"").append(refSchemaName).append(":").append(refSchemaName).append("\"/>\n");
+            xsd.append("        </xs:sequence>\n");
+            xsd.append("    </xs:complexType>\n");
+        } else {
+            // Generate complex type or element
+            if (schema.containsKey("type") && "array".equals(schema.get("type"))) {
+                // Handle array types
+                generateXSDArrayType(xsd, schemaName, schema, spec, allSchemas);
+            } else {
+                // Handle complex types
+                generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+            }
+        }
+
+        xsd.append("</xs:schema>\n");
+        return xsd.toString();
+    }
+    
+    /**
+     * Collect referenced schemas for XSD imports
+     */
+    private void collectReferencedSchemasForXSD(Map<String, Object> schema, Map<String, Object> allSchemas, 
+                                                 Set<String> referencedSchemas, Set<Object> visited) {
+        if (schema == null || visited.contains(schema)) {
+            return;
+        }
+        visited.add(schema);
+        
+        // Check for $ref
+        String ref = (String) schema.get("$ref");
+        if (ref != null && ref.startsWith("#/components/schemas/")) {
+            String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+            if (allSchemas.containsKey(refSchemaName) && !referencedSchemas.contains(refSchemaName)) {
+                referencedSchemas.add(refSchemaName);
+                Map<String, Object> refSchema = Util.asStringObjectMap(allSchemas.get(refSchemaName));
+                if (refSchema != null) {
+                    collectReferencedSchemasForXSD(refSchema, allSchemas, referencedSchemas, visited);
+                }
+            }
+        }
+        
+        // Check properties
+        if (schema.containsKey("properties")) {
+            Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+            if (properties != null) {
+                for (Map.Entry<String, Object> property : properties.entrySet()) {
+                    Map<String, Object> propertySchema = Util.asStringObjectMap(property.getValue());
+                    if (propertySchema != null) {
+                        collectReferencedSchemasForXSD(propertySchema, allSchemas, referencedSchemas, visited);
+                    }
+                }
+            }
+        }
+        
+        // Check items for arrays
+        if (schema.containsKey("items")) {
+            Map<String, Object> itemsSchema = Util.asStringObjectMap(schema.get("items"));
+            if (itemsSchema != null) {
+                collectReferencedSchemasForXSD(itemsSchema, allSchemas, referencedSchemas, visited);
+            }
+        }
+        
+        // Check allOf, oneOf, anyOf
+        if (schema.containsKey("allOf")) {
+            List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
+            if (allOfSchemas != null) {
+                for (Map<String, Object> subSchema : allOfSchemas) {
+                    collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+                }
+            }
+        }
+        if (schema.containsKey("oneOf")) {
+            List<Map<String, Object>> oneOfSchemas = Util.asStringObjectMapList(schema.get("oneOf"));
+            if (oneOfSchemas != null) {
+                for (Map<String, Object> subSchema : oneOfSchemas) {
+                    collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+                }
+            }
+        }
+        if (schema.containsKey("anyOf")) {
+            List<Map<String, Object>> anyOfSchemas = Util.asStringObjectMapList(schema.get("anyOf"));
+            if (anyOfSchemas != null) {
+                for (Map<String, Object> subSchema : anyOfSchemas) {
+                    collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+                }
+            }
+        }
+    }
+
+    /**
+     * Generate XSD for array type
+     */
+    private void generateXSDArrayType(StringBuilder xsd, String schemaName, Map<String, Object> schema, 
+                                      Map<String, Object> spec, Map<String, Object> allSchemas) {
+        xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
+        xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
+        xsd.append("        <xs:sequence>\n");
+        xsd.append("            <xs:element name=\"item\"");
+        
+        Object itemsObj = schema.get("items");
+        if (itemsObj != null) {
+            Map<String, Object> itemsSchema = Util.asStringObjectMap(itemsObj);
+            if (itemsSchema != null) {
+                generateXSDPropertyType(xsd, itemsSchema, allSchemas, "item");
+                
+                // Handle minOccurs and maxOccurs (from array schema, not items schema)
+                Object minItems = schema.get("minItems");
+                if (minItems != null) {
+                    xsd.append(" minOccurs=\"").append(minItems).append("\"");
+                }
+                Object maxItems = schema.get("maxItems");
+                if (maxItems != null) {
+                    xsd.append(" maxOccurs=\"").append(maxItems).append("\"");
+                } else {
+                    xsd.append(" maxOccurs=\"unbounded\"");
+                }
+            }
+        } else {
+            xsd.append(" type=\"xs:anyType\" maxOccurs=\"unbounded\"");
+        }
+        
+        xsd.append("/>\n");
+        xsd.append("        </xs:sequence>\n");
+        xsd.append("    </xs:complexType>\n");
+    }
+
+    /**
+     * Generate XSD for complex type
+     */
+    private void generateXSDComplexType(StringBuilder xsd, String schemaName, Map<String, Object> schema, 
+                                       Map<String, Object> spec, Map<String, Object> allSchemas) {
+        xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
+        xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
+        xsd.append("        <xs:sequence>\n");
+
+        Map<String, Object> allProperties = new LinkedHashMap<>();
+        List<String> allRequired = new ArrayList<>();
+
+        // Handle allOf, oneOf, anyOf
+        if (schema.containsKey("allOf")) {
+            List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
+            for (Map<String, Object> subSchema : allOfSchemas) {
+                mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
+            }
+        } else if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+            List<Map<String, Object>> schemas = Util.asStringObjectMapList(
+                    schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
+            for (Map<String, Object> subSchema : schemas) {
+                mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
+            }
+        } else {
+            mergeSchemaProperties(schema, allProperties, allRequired, spec);
+        }
+
+        // Generate elements for each property
+        for (Map.Entry<String, Object> property : allProperties.entrySet()) {
+            String propertyName = property.getKey();
+            Map<String, Object> propertySchema = Util.asStringObjectMap(property.getValue());
+            
+            xsd.append("            <xs:element");
+            
+            // Handle minOccurs for required fields
+            if (allRequired.contains(propertyName)) {
+                xsd.append(" minOccurs=\"1\"");
+            } else {
+                xsd.append(" minOccurs=\"0\"");
+            }
+            
+            xsd.append(" name=\"").append(propertyName).append("\"");
+            
+            // Handle array types
+            if (propertySchema != null && "array".equals(propertySchema.get("type"))) {
+                Object itemsObj = propertySchema.get("items");
+                if (itemsObj != null) {
+                    Map<String, Object> itemsSchema = Util.asStringObjectMap(itemsObj);
+                    if (itemsSchema != null) {
+                        generateXSDPropertyType(xsd, itemsSchema, allSchemas, propertyName);
+                    } else {
+                        xsd.append(" type=\"xs:anyType\"");
+                    }
+                } else {
+                    xsd.append(" type=\"xs:anyType\"");
+                }
+                
+                // Handle maxOccurs for arrays
+                Object maxItems = propertySchema.get("maxItems");
+                if (maxItems != null) {
+                    xsd.append(" maxOccurs=\"").append(maxItems).append("\"");
+                } else {
+                    xsd.append(" maxOccurs=\"unbounded\"");
+                }
+            } else {
+                // Handle non-array types
+                // Check if propertySchema is an object type (which will append >\n internally)
+                boolean isObjectType = propertySchema != null && "object".equals(propertySchema.get("type"));
+                Map<String, Object> properties = null;
+                boolean hasProperties = false;
+                if (isObjectType && propertySchema != null) {
+                    properties = Util.asStringObjectMap(propertySchema.get("properties"));
+                    hasProperties = properties != null && !properties.isEmpty();
+                }
+                
+                generateXSDPropertyType(xsd, propertySchema, allSchemas, propertyName);
+                
+                if (!isObjectType || !hasProperties) {
+                    // Not an object type, or object with no properties - need to close
+                    xsd.append(">\n");
+                    
+                    // Generate simple type with restrictions if needed
+                    if (propertySchema != null && needsSimpleTypeRestriction(propertySchema)) {
+                        generateXSDSimpleTypeRestriction(xsd, propertySchema);
+                    }
+                }
+                
+                xsd.append("            </xs:element>\n");
+            }
+        }
+
+        xsd.append("        </xs:sequence>\n");
+        xsd.append("    </xs:complexType>\n");
+    }
+    
+    /**
+     * Generate XSD property type (inline or reference)
+     */
+    private void generateXSDPropertyType(StringBuilder xsd, Map<String, Object> propertySchema, 
+                                         Map<String, Object> allSchemas, String propertyName) {
+        if (propertySchema == null) {
+            xsd.append(" type=\"xs:anyType\"");
+            return;
+        }
+        
+        // Check for $ref
+        String ref = (String) propertySchema.get("$ref");
+        if (ref != null && ref.startsWith("#/components/schemas/")) {
+            String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+            xsd.append(" type=\"").append(refSchemaName).append(":").append(refSchemaName).append("\"");
+            return;
+        }
+        
+        String type = (String) propertySchema.get("type");
+        
+        // Handle object types - create nested complex type
+        if ("object".equals(type)) {
+            Map<String, Object> properties = Util.asStringObjectMap(propertySchema.get("properties"));
+            
+            // If object has no properties, use anyType
+            if (properties == null || properties.isEmpty()) {
+                xsd.append(" type=\"xs:anyType\"");
+                return;
+            }
+            
+            xsd.append(">\n");
+            xsd.append("                <xs:complexType>\n");
+            xsd.append("                    <xs:sequence>\n");
+            
+            List<String> required = Util.asStringList(propertySchema.getOrDefault("required", new ArrayList<String>()));
+            
+            if (properties != null) {
+                for (Map.Entry<String, Object> prop : properties.entrySet()) {
+                    String propName = prop.getKey();
+                    Map<String, Object> propSchema = Util.asStringObjectMap(prop.getValue());
+                    
+                    xsd.append("                        <xs:element");
+                    if (required.contains(propName)) {
+                        xsd.append(" minOccurs=\"1\"");
+                    } else {
+                        xsd.append(" minOccurs=\"0\"");
+                    }
+                    xsd.append(" name=\"").append(propName).append("\"");
+                    
+                    if (propSchema != null && "array".equals(propSchema.get("type"))) {
+                        Object itemsObj = propSchema.get("items");
+                        if (itemsObj != null) {
+                            Map<String, Object> itemsSchema = Util.asStringObjectMap(itemsObj);
+                            if (itemsSchema != null) {
+                                // Check if items schema is an object type (which will append >\n internally)
+                                boolean isItemsObjectType = "object".equals(itemsSchema.get("type"));
+                                Map<String, Object> itemsProps = isItemsObjectType ? Util.asStringObjectMap(itemsSchema.get("properties")) : null;
+                                boolean itemsHasProperties = itemsProps != null && !itemsProps.isEmpty();
+                                
+                                generateXSDPropertyType(xsd, itemsSchema, allSchemas, propName);
+                                
+                                // Handle minOccurs and maxOccurs for arrays
+                                Object minItems = propSchema.get("minItems");
+                                if (minItems != null) {
+                                    xsd.append(" minOccurs=\"").append(minItems).append("\"");
+                                }
+                                Object maxItems = propSchema.get("maxItems");
+                                if (maxItems != null) {
+                                    xsd.append(" maxOccurs=\"").append(maxItems).append("\"");
+                                } else {
+                                    xsd.append(" maxOccurs=\"unbounded\"");
+                                }
+                                
+                                if (!isItemsObjectType || !itemsHasProperties) {
+                                    // Not an object type, or object with no properties - need to close
+                                    xsd.append(">\n");
+                                    if (needsSimpleTypeRestriction(itemsSchema)) {
+                                        generateXSDSimpleTypeRestriction(xsd, itemsSchema);
+                                    }
+                                }
+                            } else {
+                                xsd.append(" type=\"xs:anyType\"");
+                                Object maxItems = propSchema.get("maxItems");
+                                if (maxItems != null) {
+                                    xsd.append(" maxOccurs=\"").append(maxItems).append("\"");
+                                } else {
+                                    xsd.append(" maxOccurs=\"unbounded\"");
+                                }
+                                xsd.append(">\n");
+                            }
+                        } else {
+                            xsd.append(" type=\"xs:anyType\"");
+                            Object maxItems = propSchema.get("maxItems");
+                            if (maxItems != null) {
+                                xsd.append(" maxOccurs=\"").append(maxItems).append("\"");
+                            } else {
+                                xsd.append(" maxOccurs=\"unbounded\"");
+                            }
+                            xsd.append(">\n");
+                        }
+                    } else {
+                        // Handle non-array types
+                        // Check if propertySchema is an object type (which will append >\n internally)
+                        boolean isObjectType = propSchema != null && "object".equals(propSchema.get("type"));
+                        Map<String, Object> propProps = null;
+                        boolean hasProperties = false;
+                        if (isObjectType && propSchema != null) {
+                            propProps = Util.asStringObjectMap(propSchema.get("properties"));
+                            hasProperties = propProps != null && !propProps.isEmpty();
+                        }
+                        
+                        generateXSDPropertyType(xsd, propSchema, allSchemas, propName);
+                        
+                        if (!isObjectType || !hasProperties) {
+                            // Not an object type, or object with no properties - need to close
+                            xsd.append(">\n");
+                            if (propSchema != null && needsSimpleTypeRestriction(propSchema)) {
+                                generateXSDSimpleTypeRestriction(xsd, propSchema);
+                            }
+                        }
+                    }
+                    
+                    xsd.append("                        </xs:element>\n");
+                }
+            }
+            
+            xsd.append("                    </xs:sequence>\n");
+            xsd.append("                </xs:complexType>\n");
+            return;
+        }
+        
+        // For simple types, we'll generate the type inline if it needs restrictions
+        // Otherwise, just use the base type
+        if (needsSimpleTypeRestriction(propertySchema)) {
+            // Type will be generated in simpleType restriction
+            return;
+        }
+        
+        // Use base XSD type
+        String xsdType = getXSDType(propertySchema, allSchemas);
+        if (xsdType.startsWith("xs:")) {
+            xsd.append(" type=\"").append(xsdType).append("\"");
+        } else {
+            xsd.append(" type=\"").append(xsdType).append("Type\"");
+        }
+    }
+    
+    /**
+     * Check if a schema needs a simple type with restrictions
+     */
+    private boolean needsSimpleTypeRestriction(Map<String, Object> schema) {
+        if (schema == null) return false;
+        
+        // Check for enum
+        if (schema.containsKey("enum")) {
+            return true;
+        }
+        
+        // Check for string with pattern, minLength, maxLength
+        String type = (String) schema.get("type");
+        if ("string".equals(type)) {
+            return schema.containsKey("pattern") || 
+                   schema.containsKey("minLength") || 
+                   schema.containsKey("maxLength");
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Generate XSD simple type with restrictions
+     */
+    private void generateXSDSimpleTypeRestriction(StringBuilder xsd, Map<String, Object> schema) {
+        if (schema == null) return;
+        
+        String type = (String) schema.get("type");
+        String baseType = "xs:string";
+        
+        if ("integer".equals(type)) {
+            baseType = "xs:int";
+        } else if ("number".equals(type)) {
+            baseType = "xs:double";
+        }
+        
+        xsd.append("                <xs:simpleType>\n");
+        xsd.append("                    <xs:restriction base=\"").append(baseType).append("\">\n");
+        
+        // Handle enum
+        if (schema.containsKey("enum")) {
+            List<Object> enumValues = Util.asObjectList(schema.get("enum"));
+            if (enumValues != null) {
+                for (Object enumValue : enumValues) {
+                    xsd.append("                        <xs:enumeration value=\"").append(escapeXml(enumValue.toString())).append("\"/>\n");
+                }
+            }
+        } else {
+            // Handle minLength
+            Object minLength = schema.get("minLength");
+            if (minLength != null) {
+                xsd.append("                        <xs:minLength value=\"").append(minLength).append("\"/>\n");
+            }
+            
+            // Handle maxLength
+            Object maxLength = schema.get("maxLength");
+            if (maxLength != null) {
+                xsd.append("                        <xs:maxLength value=\"").append(maxLength).append("\"/>\n");
+            }
+            
+            // Handle pattern
+            Object pattern = schema.get("pattern");
+            if (pattern != null) {
+                xsd.append("                        <xs:pattern value=\"").append(escapeXml(pattern.toString())).append("\"/>\n");
+            }
+        }
+        
+        xsd.append("                    </xs:restriction>\n");
+        xsd.append("                </xs:simpleType>\n");
+    }
+
+    /**
+     * Get XSD type from OpenAPI schema
+     */
+    private String getXSDType(Map<String, Object> schema, Map<String, Object> allSchemas) {
+        if (schema == null) {
+            return "xs:anyType";
+        }
+
+        // Check for $ref
+        String ref = (String) schema.get("$ref");
+        if (ref != null && ref.startsWith("#/components/schemas/")) {
+            String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
+            return schemaRef;
+        }
+
+        // Check for enum
+        if (schema.containsKey("enum")) {
+            // Return a placeholder - the enum type will be defined separately
+            return "xs:string";
+        }
+
+        String type = (String) schema.get("type");
+        String format = (String) schema.get("format");
+
+        if (type == null) {
+            return "xs:anyType";
+        }
+
+        switch (type) {
+            case "string" -> {
+                if ("date".equals(format)) {
+                    return "xs:date";
+                } else if ("date-time".equals(format) || "DateAndTime".equals(format)) {
+                    // If there are restrictions (pattern, minLength, maxLength), 
+                    // we'll generate simple type restriction instead
+                    if (schema.containsKey("pattern") || schema.containsKey("minLength") || schema.containsKey("maxLength")) {
+                        return "xs:string"; // Will be handled as simple type restriction
+                    }
+                    return "xs:dateTime";
+                } else if ("byte".equals(format)) {
+                    return "xs:base64Binary";
+                } else {
+                    return "xs:string";
+                }
+            }
+            case "integer" -> {
+                if ("int64".equals(format)) {
+                    return "xs:long";
+                } else {
+                    return "xs:int";
+                }
+            }
+            case "number" -> {
+                if ("float".equals(format)) {
+                    return "xs:float";
+                } else {
+                    return "xs:double";
+                }
+            }
+            case "boolean" -> {
+                return "xs:boolean";
+            }
+            case "array" -> {
+                Object itemsObj = schema.get("items");
+                if (itemsObj != null) {
+                    Map<String, Object> itemsSchema = Util.asStringObjectMap(itemsObj);
+                    if (itemsSchema != null) {
+                        String itemType = getXSDType(itemsSchema, allSchemas);
+                        // For arrays, we'll handle the type in the element definition
+                        return itemType;
+                    }
+                }
+                return "xs:anyType";
+            }
+            case "object" -> {
+                // Check if this is an in-lined schema
+                if (inlinedSchemas.containsKey(schema)) {
+                    return inlinedSchemas.get(schema);
+                }
+                return "xs:anyType";
+            }
+            default -> {
+                return "xs:anyType";
+            }
+        }
+    }
+
+    /**
+     * Escape XML special characters
+     */
+    private String escapeXml(String str) {
+        if (str == null) {
+            return "";
+        }
+        return str.replace("&", "&amp;")
+                  .replace("<", "&lt;")
+                  .replace(">", "&gt;")
+                  .replace("\"", "&quot;")
+                  .replace("'", "&apos;");
     }
 
     /**
