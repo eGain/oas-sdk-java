@@ -2056,7 +2056,10 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     schema.containsKey("enum") ||
                     schema.containsKey("$ref");
 
-            if (hasStructure || (schema.containsKey("type") && "array".equals(schema.get("type")))) {
+            // Also generate XSD for schemas with $ref (like EditNonIntegratedUser)
+            boolean hasRef = schema.containsKey("$ref");
+
+            if (hasStructure || hasRef || (schema.containsKey("type") && "array".equals(schema.get("type")))) {
                 String xsdContent = generateXSD(schemaName, schema, spec, schemas);
                 writeFile(xsdDir + "/" + schemaName + ".xsd", xsdContent);
             }
