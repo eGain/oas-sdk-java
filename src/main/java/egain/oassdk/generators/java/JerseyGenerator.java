@@ -1803,7 +1803,18 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             
             // If this is an array type schema and the field is "items", wrap in List
             if (isArrayType && "items".equals(fieldName)) {
-                String itemType = getJavaType(fieldSchema);
+                // For array items, resolve $ref if present
+                String itemType = null;
+                if (fieldSchema != null && fieldSchema.containsKey("$ref")) {
+                    String ref = (String) fieldSchema.get("$ref");
+                    if (ref != null && ref.startsWith("#/components/schemas/")) {
+                        String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
+                        itemType = toJavaClassName(schemaRef);
+                    }
+                }
+                if (itemType == null) {
+                    itemType = getJavaType(fieldSchema);
+                }
                 fieldType = "List<" + itemType + ">";
             } else {
                 fieldType = getJavaType(fieldSchema);
@@ -1949,7 +1960,18 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 
                 // If this is an array type schema and the field is "items", wrap in List
                 if (isArrayType && "items".equals(fieldName)) {
-                    String itemType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
+                    // For array items, resolve $ref if present
+                    String itemType = null;
+                    if (fieldSchema != null && fieldSchema.containsKey("$ref")) {
+                        String ref = (String) fieldSchema.get("$ref");
+                        if (ref != null && ref.startsWith("#/components/schemas/")) {
+                            String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
+                            itemType = toJavaClassName(schemaRef);
+                        }
+                    }
+                    if (itemType == null) {
+                        itemType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
+                    }
                     fieldType = "List<" + itemType + ">";
                 } else {
                     fieldType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
@@ -2544,69 +2566,94 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      */
     private void collectReferencedSchemasForXSD(Map<String, Object> schema, Map<String, Object> allSchemas, 
                                                  Set<String> referencedSchemas, Set<Object> visited) {
-        if (schema == null || visited.contains(schema)) {
+        if (schema == null) {
+            return;
+        }
+        
+        // Use IdentityHashMap-based visited set to prevent cycles
+        if (visited.contains(schema)) {
             return;
         }
         visited.add(schema);
         
-        // Check for $ref
-        String ref = (String) schema.get("$ref");
-        if (ref != null && ref.startsWith("#/components/schemas/")) {
-            String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
-            if (allSchemas.containsKey(refSchemaName) && !referencedSchemas.contains(refSchemaName)) {
-                referencedSchemas.add(refSchemaName);
-                Map<String, Object> refSchema = Util.asStringObjectMap(allSchemas.get(refSchemaName));
-                if (refSchema != null) {
-                    collectReferencedSchemasForXSD(refSchema, allSchemas, referencedSchemas, visited);
+        try {
+            // Check for $ref
+            String ref = (String) schema.get("$ref");
+            if (ref != null && ref.startsWith("#/components/schemas/")) {
+                String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+                if (allSchemas.containsKey(refSchemaName) && !referencedSchemas.contains(refSchemaName)) {
+                    referencedSchemas.add(refSchemaName);
+                    Map<String, Object> refSchema = Util.asStringObjectMap(allSchemas.get(refSchemaName));
+                    if (refSchema != null && !visited.contains(refSchema)) {
+                        collectReferencedSchemasForXSD(refSchema, allSchemas, referencedSchemas, visited);
+                    }
                 }
+                return; // Don't process further if this is just a $ref
             }
-        }
-        
-        // Check properties
-        if (schema.containsKey("properties")) {
-            Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
-            if (properties != null) {
-                for (Map.Entry<String, Object> property : properties.entrySet()) {
-                    Map<String, Object> propertySchema = Util.asStringObjectMap(property.getValue());
-                    if (propertySchema != null) {
-                        collectReferencedSchemasForXSD(propertySchema, allSchemas, referencedSchemas, visited);
+            
+            // Check properties
+            if (schema.containsKey("properties")) {
+                Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+                if (properties != null) {
+                    for (Map.Entry<String, Object> property : properties.entrySet()) {
+                        Map<String, Object> propertySchema = Util.asStringObjectMap(property.getValue());
+                        if (propertySchema != null && !visited.contains(propertySchema)) {
+                            collectReferencedSchemasForXSD(propertySchema, allSchemas, referencedSchemas, visited);
+                        }
                     }
                 }
             }
-        }
-        
-        // Check items for arrays
-        if (schema.containsKey("items")) {
-            Map<String, Object> itemsSchema = Util.asStringObjectMap(schema.get("items"));
-            if (itemsSchema != null) {
-                collectReferencedSchemasForXSD(itemsSchema, allSchemas, referencedSchemas, visited);
-            }
-        }
-        
-        // Check allOf, oneOf, anyOf
-        if (schema.containsKey("allOf")) {
-            List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
-            if (allOfSchemas != null) {
-                for (Map<String, Object> subSchema : allOfSchemas) {
-                    collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+            
+            // Check items for arrays - this is important for collecting array item references
+            if (schema.containsKey("items")) {
+                Map<String, Object> itemsSchema = Util.asStringObjectMap(schema.get("items"));
+                if (itemsSchema != null && !visited.contains(itemsSchema)) {
+                    // First, check if items has a $ref and add it to referencedSchemas
+                    String itemsRef = (String) itemsSchema.get("$ref");
+                    if (itemsRef != null && itemsRef.startsWith("#/components/schemas/")) {
+                        String refSchemaName = itemsRef.substring(itemsRef.lastIndexOf("/") + 1);
+                        if (allSchemas.containsKey(refSchemaName) && !referencedSchemas.contains(refSchemaName)) {
+                            referencedSchemas.add(refSchemaName);
+                        }
+                    }
+                    collectReferencedSchemasForXSD(itemsSchema, allSchemas, referencedSchemas, visited);
                 }
             }
-        }
-        if (schema.containsKey("oneOf")) {
-            List<Map<String, Object>> oneOfSchemas = Util.asStringObjectMapList(schema.get("oneOf"));
-            if (oneOfSchemas != null) {
-                for (Map<String, Object> subSchema : oneOfSchemas) {
-                    collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+            
+            // Check allOf, oneOf, anyOf
+            if (schema.containsKey("allOf")) {
+                List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
+                if (allOfSchemas != null) {
+                    for (Map<String, Object> subSchema : allOfSchemas) {
+                        if (subSchema != null && !visited.contains(subSchema)) {
+                            collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+                        }
+                    }
                 }
             }
-        }
-        if (schema.containsKey("anyOf")) {
-            List<Map<String, Object>> anyOfSchemas = Util.asStringObjectMapList(schema.get("anyOf"));
-            if (anyOfSchemas != null) {
-                for (Map<String, Object> subSchema : anyOfSchemas) {
-                    collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+            if (schema.containsKey("oneOf")) {
+                List<Map<String, Object>> oneOfSchemas = Util.asStringObjectMapList(schema.get("oneOf"));
+                if (oneOfSchemas != null) {
+                    for (Map<String, Object> subSchema : oneOfSchemas) {
+                        if (subSchema != null && !visited.contains(subSchema)) {
+                            collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+                        }
+                    }
                 }
             }
+            if (schema.containsKey("anyOf")) {
+                List<Map<String, Object>> anyOfSchemas = Util.asStringObjectMapList(schema.get("anyOf"));
+                if (anyOfSchemas != null) {
+                    for (Map<String, Object> subSchema : anyOfSchemas) {
+                        if (subSchema != null && !visited.contains(subSchema)) {
+                            collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+                        }
+                    }
+                }
+            }
+        } finally {
+            // Don't remove from visited - we want to prevent revisiting the same schema object
+            // This prevents infinite recursion in circular references
         }
     }
 
@@ -2718,13 +2765,6 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             xsd.append("            <xs:element");
             xsd.append(" name=\"").append(propertyName).append("\"");
             
-            // Handle minOccurs for required fields
-            if (allRequired.contains(propertyName)) {
-                xsd.append(" minOccurs=\"1\"");
-            } else {
-                xsd.append(" minOccurs=\"0\"");
-            }
-            
             // Handle array types
             if (propertySchema != null && "array".equals(propertySchema.get("type"))) {
                 Object itemsObj = propertySchema.get("items");
@@ -2747,9 +2787,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 }
                 
                 // Handle minOccurs and maxOccurs for arrays
+                // For arrays, minOccurs comes from minItems, not from required field check
                 Object minItems = propertySchema.get("minItems");
                 if (minItems != null) {
                     xsd.append(" minOccurs=\"").append(minItems).append("\"");
+                } else if (allRequired.contains(propertyName)) {
+                    xsd.append(" minOccurs=\"1\"");
+                } else {
+                    xsd.append(" minOccurs=\"0\"");
                 }
                 Object maxItems = propertySchema.get("maxItems");
                 if (maxItems != null) {
@@ -2757,7 +2802,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 } else {
                     xsd.append(" maxOccurs=\"unbounded\"");
                 }
+                xsd.append("/>\n");
             } else {
+                // Handle minOccurs for non-array required fields
+                if (allRequired.contains(propertyName)) {
+                    xsd.append(" minOccurs=\"1\"");
+                } else {
+                    xsd.append(" minOccurs=\"0\"");
+                }
                 // Handle non-array types
                 // Check if propertySchema is an object type (which will append >\n internally)
                 boolean isObjectType = propertySchema != null && "object".equals(propertySchema.get("type"));
