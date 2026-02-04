@@ -1323,7 +1323,24 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             String ref = (String) schema.get("$ref");
             if (ref != null && ref.startsWith("#/components/schemas/")) {
                 String schemaName = ref.substring(ref.lastIndexOf("/") + 1);
-                addSchemaAndCollectNested(schemaName, referencedSchemas, spec, visited);
+                // Add the schema name first
+                if (!referencedSchemas.contains(schemaName)) {
+                    referencedSchemas.add(schemaName);
+                    // Then collect nested schemas with proper cycle detection
+                    Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+                    if (components != null) {
+                        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+                        if (schemas != null && schemas.containsKey(schemaName)) {
+                            Map<String, Object> referencedSchema = Util.asStringObjectMap(schemas.get(schemaName));
+                            if (referencedSchema != null) {
+                                // Mark this schema object as visited to prevent cycles
+                                java.util.Map<Object, Boolean> nestedVisited = new java.util.IdentityHashMap<>(visited);
+                                nestedVisited.put(referencedSchema, Boolean.TRUE);
+                                collectSchemasFromSchemaObject(referencedSchema, referencedSchemas, spec, nestedVisited);
+                            }
+                        }
+                    }
+                }
             }
             return;
         }
@@ -1439,7 +1456,10 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             if (schemas != null && schemas.containsKey(schemaName)) {
                 Map<String, Object> referencedSchema = Util.asStringObjectMap(schemas.get(schemaName));
                 if (referencedSchema != null) {
-                    collectSchemasFromSchemaObject(referencedSchema, referencedSchemas, spec, visited);
+                    // Create a new visited map for nested collection to prevent cycles
+                    java.util.Map<Object, Boolean> nestedVisited = new java.util.IdentityHashMap<>(visited);
+                    nestedVisited.put(referencedSchema, Boolean.TRUE);
+                    collectSchemasFromSchemaObject(referencedSchema, referencedSchemas, spec, nestedVisited);
                 }
             }
         }
@@ -1543,38 +1563,64 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                                     // Also check if this schema object itself is an array type that needs to be added
                                                     // This handles cases where the parser has already resolved the $ref
                                                     Map<String, Object> schemaMap = Util.asStringObjectMap(schemaObj);
-                                                    if (schemaMap != null && !schemaMap.containsKey("$ref") && 
-                                                        schemaMap.containsKey("type") && "array".equals(schemaMap.get("type"))) {
-                                                        // This is a resolved array type schema - find its name by matching structure
-                                                        // The parser replaces map content in place, so we can't use identity comparison
-                                                        // Instead, match by comparing the items $ref if both have one
-                                                        Map<String, Object> schemas = components != null ? 
-                                                            Util.asStringObjectMap(components.get("schemas")) : null;
-                                                        if (schemas != null) {
-                                                            Object responseItems = schemaMap.get("items");
-                                                            String responseItemsRef = null;
-                                                            if (responseItems != null) {
-                                                                Map<String, Object> responseItemsMap = Util.asStringObjectMap(responseItems);
-                                                                if (responseItemsMap != null) {
-                                                                    responseItemsRef = (String) responseItemsMap.get("$ref");
+                                                    if (schemaMap != null) {
+                                                        // Check if it's a $ref to an array type schema
+                                                        if (schemaMap.containsKey("$ref")) {
+                                                            String ref = (String) schemaMap.get("$ref");
+                                                            if (ref != null && ref.startsWith("#/components/schemas/")) {
+                                                                String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+                                                                // Check if the referenced schema is an array type
+                                                                Map<String, Object> schemas = components != null ? 
+                                                                    Util.asStringObjectMap(components.get("schemas")) : null;
+                                                                if (schemas != null && schemas.containsKey(refSchemaName)) {
+                                                                    Map<String, Object> refSchema = Util.asStringObjectMap(schemas.get(refSchemaName));
+                                                                    if (refSchema != null && refSchema.containsKey("type") && 
+                                                                        "array".equals(refSchema.get("type"))) {
+                                                                        // This is a $ref to an array type - add it
+                                                                        referencedSchemas.add(refSchemaName);
+                                                                    }
                                                                 }
                                                             }
-                                                            
-                                                            // Find array schema with matching items $ref
-                                                            for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
-                                                                Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
-                                                                if (candidateSchema != null && 
-                                                                    candidateSchema.containsKey("type") && 
-                                                                    "array".equals(candidateSchema.get("type"))) {
-                                                                    Object candidateItems = candidateSchema.get("items");
-                                                                    if (candidateItems != null && responseItemsRef != null) {
-                                                                        Map<String, Object> candidateItemsMap = Util.asStringObjectMap(candidateItems);
-                                                                        if (candidateItemsMap != null) {
-                                                                            String candidateItemsRef = (String) candidateItemsMap.get("$ref");
-                                                                            if (responseItemsRef.equals(candidateItemsRef)) {
-                                                                                // Items $ref matches - this is the schema
-                                                                                referencedSchemas.add(schemaEntry.getKey());
-                                                                                break;
+                                                        } else if (!schemaMap.containsKey("$ref") && 
+                                                                   schemaMap.containsKey("type") && 
+                                                                   "array".equals(schemaMap.get("type"))) {
+                                                            // This is a resolved array type schema - find its name by matching structure
+                                                            Map<String, Object> schemas = components != null ? 
+                                                                Util.asStringObjectMap(components.get("schemas")) : null;
+                                                            if (schemas != null) {
+                                                                Object responseItems = schemaMap.get("items");
+                                                                String responseItemsRef = null;
+                                                                if (responseItems != null) {
+                                                                    Map<String, Object> responseItemsMap = Util.asStringObjectMap(responseItems);
+                                                                    if (responseItemsMap != null) {
+                                                                        responseItemsRef = (String) responseItemsMap.get("$ref");
+                                                                    }
+                                                                }
+                                                                
+                                                                // Find array schema with matching items $ref or structure
+                                                                for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
+                                                                    Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                                                    if (candidateSchema != null && 
+                                                                        candidateSchema.containsKey("type") && 
+                                                                        "array".equals(candidateSchema.get("type"))) {
+                                                                        // Try identity match first (parser might replace in place)
+                                                                        if (candidateSchema == schemaMap) {
+                                                                            referencedSchemas.add(schemaEntry.getKey());
+                                                                            break;
+                                                                        }
+                                                                        // Try items $ref match
+                                                                        if (responseItemsRef != null) {
+                                                                            Object candidateItems = candidateSchema.get("items");
+                                                                            if (candidateItems != null) {
+                                                                                Map<String, Object> candidateItemsMap = Util.asStringObjectMap(candidateItems);
+                                                                                if (candidateItemsMap != null) {
+                                                                                    String candidateItemsRef = (String) candidateItemsMap.get("$ref");
+                                                                                    if (responseItemsRef.equals(candidateItemsRef)) {
+                                                                                        // Items $ref matches - this is the schema
+                                                                                        referencedSchemas.add(schemaEntry.getKey());
+                                                                                        break;
+                                                                                    }
+                                                                                }
                                                                             }
                                                                         }
                                                                     }
