@@ -1501,7 +1501,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                 Map<String, Object> mediaType = Util.asStringObjectMap(mediaTypeObj);
                                 if (mediaType != null && mediaType.containsKey("schema")) {
                                     Object schemaObj = mediaType.get("schema");
-                                    collectSchemasFromSchemaObject(schemaObj, referencedSchemas, spec);
+                                    collectSchemasFromSchemaObject(schemaObj, referencedSchemas, spec, new java.util.IdentityHashMap<>());
                                 }
                             }
                         }
@@ -1557,8 +1557,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                                 Map<String, Object> mediaType = Util.asStringObjectMap(mediaTypeObj);
                                                 if (mediaType != null && mediaType.containsKey("schema")) {
                                                     Object schemaObj = mediaType.get("schema");
-                                                    // Collect schemas from this schema object
-                                                    collectSchemasFromSchemaObject(schemaObj, referencedSchemas, spec);
+                                                    // Collect schemas from this schema object with cycle detection
+                                                    collectSchemasFromSchemaObject(schemaObj, referencedSchemas, spec, new java.util.IdentityHashMap<>());
                                                     
                                                     // Also check if this schema object itself is an array type that needs to be added
                                                     // This handles cases where the parser has already resolved the $ref
@@ -1598,6 +1598,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                                                 }
                                                                 
                                                                 // Find array schema with matching items $ref or structure
+                                                                boolean found = false;
                                                                 for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
                                                                     Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
                                                                     if (candidateSchema != null && 
@@ -1606,6 +1607,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                                                         // Try identity match first (parser might replace in place)
                                                                         if (candidateSchema == schemaMap) {
                                                                             referencedSchemas.add(schemaEntry.getKey());
+                                                                            found = true;
                                                                             break;
                                                                         }
                                                                         // Try items $ref match
@@ -1618,10 +1620,23 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                                                                     if (responseItemsRef.equals(candidateItemsRef)) {
                                                                                         // Items $ref matches - this is the schema
                                                                                         referencedSchemas.add(schemaEntry.getKey());
+                                                                                        found = true;
                                                                                         break;
                                                                                     }
                                                                                 }
                                                                             }
+                                                                        }
+                                                                    }
+                                                                }
+                                                                // If no match found, add all array type schemas as fallback
+                                                                // This ensures array types are generated even if matching fails
+                                                                if (!found) {
+                                                                    for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
+                                                                        Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                                                        if (candidateSchema != null && 
+                                                                            candidateSchema.containsKey("type") && 
+                                                                            "array".equals(candidateSchema.get("type"))) {
+                                                                            referencedSchemas.add(schemaEntry.getKey());
                                                                         }
                                                                     }
                                                                 }
@@ -2349,13 +2364,21 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 // Internal schema reference
                 String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
                 referencedNamespaces.add(refSchemaName);
-                // For $ref schemas, we don't need to collect further references
-                // as we're just wrapping the referenced schema
+                // For $ref schemas, we still need to collect references from the referenced schema
+                // (e.g., EditNonIntegratedUser $ref User, and User might reference other schemas)
+                Map<String, Object> refSchema = Util.asStringObjectMap(allSchemas.get(refSchemaName));
+                if (refSchema != null) {
+                    collectReferencedSchemasForXSD(refSchema, allSchemas, referencedNamespaces, new HashSet<>());
+                }
             } else if (ref.contains("#/components/schemas/")) {
                 // External file with schema path - extract schema name
                 String schemaPath = ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length());
                 String refSchemaName = schemaPath.contains("/") ? schemaPath.substring(schemaPath.lastIndexOf("/") + 1) : schemaPath;
                 referencedNamespaces.add(refSchemaName);
+                Map<String, Object> refSchema = Util.asStringObjectMap(allSchemas.get(refSchemaName));
+                if (refSchema != null) {
+                    collectReferencedSchemasForXSD(refSchema, allSchemas, referencedNamespaces, new HashSet<>());
+                }
             } else {
                 // External file reference without schema path - try to find the schema
                 // The parser should have resolved this, but if not, collect references normally
@@ -2693,7 +2716,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 if (itemsObj != null) {
                     Map<String, Object> itemsSchema = Util.asStringObjectMap(itemsObj);
                     if (itemsSchema != null) {
-                        generateXSDPropertyType(xsd, itemsSchema, allSchemas, propertyName);
+                        // Check if items schema has a $ref - if so, reference it directly
+                        String itemsRef = (String) itemsSchema.get("$ref");
+                        if (itemsRef != null && itemsRef.startsWith("#/components/schemas/")) {
+                            String refSchemaName = itemsRef.substring(itemsRef.lastIndexOf("/") + 1);
+                            xsd.append(" type=\"").append(refSchemaName).append(":").append(refSchemaName).append("\"");
+                        } else {
+                            generateXSDPropertyType(xsd, itemsSchema, allSchemas, propertyName);
+                        }
                     } else {
                         xsd.append(" type=\"xs:anyType\"");
                     }
@@ -2701,7 +2731,11 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     xsd.append(" type=\"xs:anyType\"");
                 }
                 
-                // Handle maxOccurs for arrays
+                // Handle minOccurs and maxOccurs for arrays
+                Object minItems = propertySchema.get("minItems");
+                if (minItems != null) {
+                    xsd.append(" minOccurs=\"").append(minItems).append("\"");
+                }
                 Object maxItems = propertySchema.get("maxItems");
                 if (maxItems != null) {
                     xsd.append(" maxOccurs=\"").append(maxItems).append("\"");
