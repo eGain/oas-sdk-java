@@ -2041,6 +2041,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
             String schemaName = schemaEntry.getKey();
             Map<String, Object> schema = Util.asStringObjectMap(schemaEntry.getValue());
+            
             if (schema == null) continue;
 
             // Filter out error schemas
@@ -2061,7 +2062,20 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
             if (hasStructure || hasRef || (schema.containsKey("type") && "array".equals(schema.get("type")))) {
                 String xsdContent = generateXSD(schemaName, schema, spec, schemas);
-                writeFile(xsdDir + "/" + schemaName + ".xsd", xsdContent);
+                // Validate XSD content is not empty and has minimum required structure
+                if (xsdContent != null && !xsdContent.trim().isEmpty() && 
+                    xsdContent.contains("<?xml") && xsdContent.contains("<xs:schema") && 
+                    xsdContent.contains("</xs:schema>")) {
+                    writeFile(xsdDir + "/" + schemaName + ".xsd", xsdContent);
+                } else {
+                    // Log warning but still write to ensure we don't silently fail
+                    System.err.println("Warning: Generated XSD for " + schemaName + " appears invalid, but writing anyway");
+                    if (xsdContent == null || xsdContent.trim().isEmpty()) {
+                        // Generate minimal valid XSD if content is empty
+                        xsdContent = generateMinimalXSD(schemaName);
+                    }
+                    writeFile(xsdDir + "/" + schemaName + ".xsd", xsdContent);
+                }
             }
         }
 
@@ -2073,7 +2087,20 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             Map<String, Object> schema = Util.asStringObjectMap(schemaObj);
             if (schema != null) {
                 String xsdContent = generateXSD(modelName, schema, spec, schemas);
-                writeFile(xsdDir + "/" + modelName + ".xsd", xsdContent);
+                // Validate XSD content is not empty and has minimum required structure
+                if (xsdContent != null && !xsdContent.trim().isEmpty() && 
+                    xsdContent.contains("<?xml") && xsdContent.contains("<xs:schema") && 
+                    xsdContent.contains("</xs:schema>")) {
+                    writeFile(xsdDir + "/" + modelName + ".xsd", xsdContent);
+                } else {
+                    // Log warning but still write to ensure we don't silently fail
+                    System.err.println("Warning: Generated XSD for inlined schema " + modelName + " appears invalid, but writing anyway");
+                    if (xsdContent == null || xsdContent.trim().isEmpty()) {
+                        // Generate minimal valid XSD if content is empty
+                        xsdContent = generateMinimalXSD(modelName);
+                    }
+                    writeFile(xsdDir + "/" + modelName + ".xsd", xsdContent);
+                }
             }
         }
     }
@@ -2091,11 +2118,23 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         
         // Check for top-level $ref first
         String ref = (String) schema.get("$ref");
-        if (ref != null && ref.startsWith("#/components/schemas/")) {
-            String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
-            referencedNamespaces.add(refSchemaName);
-            // For $ref schemas, we don't need to collect further references
-            // as we're just wrapping the referenced schema
+        if (ref != null) {
+            if (ref.startsWith("#/components/schemas/")) {
+                // Internal schema reference
+                String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+                referencedNamespaces.add(refSchemaName);
+                // For $ref schemas, we don't need to collect further references
+                // as we're just wrapping the referenced schema
+            } else if (ref.contains("#/components/schemas/")) {
+                // External file with schema path - extract schema name
+                String schemaPath = ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length());
+                String refSchemaName = schemaPath.contains("/") ? schemaPath.substring(schemaPath.lastIndexOf("/") + 1) : schemaPath;
+                referencedNamespaces.add(refSchemaName);
+            } else {
+                // External file reference without schema path - try to find the schema
+                // The parser should have resolved this, but if not, collect references normally
+                collectReferencedSchemasForXSD(schema, allSchemas, referencedNamespaces, new HashSet<>());
+            }
         } else {
             // Collect referenced schemas for imports
             collectReferencedSchemasForXSD(schema, allSchemas, referencedNamespaces, new HashSet<>());
@@ -2128,14 +2167,79 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         }
 
         // Handle $ref schemas (like EditNonIntegratedUser)
-        if (ref != null && ref.startsWith("#/components/schemas/")) {
-            String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
-            xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
-            xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
-            xsd.append("        <xs:sequence>\n");
-            xsd.append("            <xs:element name=\"").append(schemaName).append("\" type=\"").append(refSchemaName).append(":").append(refSchemaName).append("\"/>\n");
-            xsd.append("        </xs:sequence>\n");
-            xsd.append("    </xs:complexType>\n");
+        // Note: External file $refs should have been resolved by the parser, so if we still see $ref,
+        // it's likely an internal schema reference. However, if the parser resolved an external file
+        // that contains a schema definition directly, the $ref will be replaced with the schema content.
+        if (ref != null) {
+            // Check if this is an external file reference (not starting with #)
+            if (!ref.startsWith("#")) {
+                // External file reference (e.g., ../../../models/v4/User.yaml)
+                // The parser should have resolved this by replacing $ref with the file content.
+                // After resolution, the schema map should contain the schema definition directly.
+                // However, if the schema still has $ref, the resolution might have failed.
+                // Check if the schema has properties (indicating it was resolved)
+                if (schema.containsKey("properties") || (schema.containsKey("type") && !schema.containsKey("$ref"))) {
+                    // Schema was resolved - use it directly
+                    generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+                } else {
+                    // Schema still has $ref - the resolution might have failed
+                    // Try to generate anyway - mergeSchemaProperties should handle it
+                    // But first, check if we can find the resolved content by removing $ref
+                    Map<String, Object> schemaWithoutRef = new HashMap<>(schema);
+                    schemaWithoutRef.remove("$ref");
+                    if (schemaWithoutRef.containsKey("properties") || schemaWithoutRef.containsKey("type")) {
+                        // Schema has content after removing $ref - use it
+                        generateXSDComplexType(xsd, schemaName, schemaWithoutRef, spec, allSchemas);
+                    } else {
+                        // No properties found - generate as regular complex type anyway
+                        generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+                    }
+                }
+            } else if (ref.startsWith("#/components/schemas/")) {
+                // Internal schema reference
+                String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+                Map<String, Object> refSchema = Util.asStringObjectMap(allSchemas.get(refSchemaName));
+                
+                if (refSchema != null && !refSchema.isEmpty()) {
+                    // Generate element and complexType, expanding the referenced schema's properties
+                    xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
+                    xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
+                    xsd.append("        <xs:sequence>\n");
+                    
+                    // Expand the referenced schema's properties by generating its content
+                    generateXSDComplexTypeContent(xsd, refSchema, spec, allSchemas);
+                    
+                    xsd.append("        </xs:sequence>\n");
+                    xsd.append("    </xs:complexType>\n");
+                } else {
+                    // Referenced schema not found - use type reference
+                    xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
+                    xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
+                    xsd.append("        <xs:sequence>\n");
+                    xsd.append("            <xs:element name=\"").append(schemaName).append("\" type=\"").append(refSchemaName).append(":").append(refSchemaName).append("\"/>\n");
+                    xsd.append("        </xs:sequence>\n");
+                    xsd.append("    </xs:complexType>\n");
+                }
+            } else if (ref.contains("#/components/schemas/")) {
+                // External file with schema path
+                String schemaPath = ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length());
+                String refSchemaName = schemaPath.contains("/") ? schemaPath.substring(schemaPath.lastIndexOf("/") + 1) : schemaPath;
+                Map<String, Object> refSchema = Util.asStringObjectMap(allSchemas.get(refSchemaName));
+                
+                if (refSchema != null && !refSchema.isEmpty()) {
+                    xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
+                    xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
+                    xsd.append("        <xs:sequence>\n");
+                    generateXSDComplexTypeContent(xsd, refSchema, spec, allSchemas);
+                    xsd.append("        </xs:sequence>\n");
+                    xsd.append("    </xs:complexType>\n");
+                } else {
+                    generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+                }
+            } else {
+                // Other $ref format - generate as regular complex type
+                generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+            }
         } else {
             // Generate complex type or element
             if (schema.containsKey("type") && "array".equals(schema.get("type"))) {
@@ -2147,6 +2251,26 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             }
         }
 
+        xsd.append("</xs:schema>\n");
+        return xsd.toString();
+    }
+    
+    /**
+     * Generate a minimal valid XSD for a schema (fallback if main generation fails)
+     */
+    private String generateMinimalXSD(String schemaName) {
+        StringBuilder xsd = new StringBuilder();
+        xsd.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n");
+        String targetNamespace = "http://bindings.egain.com/ws/model/xsds/common/v4/" + schemaName;
+        xsd.append("<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"\n");
+        xsd.append("           xmlns:").append(schemaName).append("=\"").append(targetNamespace).append("\"\n");
+        xsd.append("           xmlns:jaxb=\"http://java.sun.com/xml/ns/jaxb\"\n");
+        xsd.append("           jaxb:version=\"2.0\"\n");
+        xsd.append("           targetNamespace=\"").append(targetNamespace).append("\">\n");
+        xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
+        xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
+        xsd.append("        <xs:sequence/>\n");
+        xsd.append("    </xs:complexType>\n");
         xsd.append("</xs:schema>\n");
         return xsd.toString();
     }
@@ -2260,14 +2384,11 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     }
 
     /**
-     * Generate XSD for complex type
+     * Generate XSD content for complex type (properties/elements)
+     * This is used both for regular complex types and for expanding $ref schemas
      */
-    private void generateXSDComplexType(StringBuilder xsd, String schemaName, Map<String, Object> schema, 
-                                       Map<String, Object> spec, Map<String, Object> allSchemas) {
-        xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
-        xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
-        xsd.append("        <xs:sequence>\n");
-
+    private void generateXSDComplexTypeContent(StringBuilder xsd, Map<String, Object> schema, 
+                                              Map<String, Object> spec, Map<String, Object> allSchemas) {
         Map<String, Object> allProperties = new LinkedHashMap<>();
         List<String> allRequired = new ArrayList<>();
 
@@ -2285,6 +2406,37 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             }
         } else {
             mergeSchemaProperties(schema, allProperties, allRequired, spec);
+        }
+        
+        // If no properties were found and schema has $ref to external file, try to resolve it manually
+        if (allProperties.isEmpty() && schema.containsKey("$ref")) {
+            String ref = (String) schema.get("$ref");
+            if (ref != null && !ref.startsWith("#") && (ref.endsWith(".yaml") || ref.endsWith(".yml") || ref.endsWith(".json"))) {
+                // External file reference - the parser should have resolved this, but if properties are empty,
+                // the resolution might have failed. Try to find the resolved schema in allSchemas.
+                // The mergeExternalSchemasIntoMainSpec should have merged schemas from external files.
+                // But if User.yaml is a schema definition file (not a full OpenAPI spec), it might not be merged.
+                // In this case, the resolved schema should have properties directly.
+                // If it doesn't, we need to handle it differently.
+                
+                // Check if the schema itself has properties (after resolution)
+                if (schema.containsKey("properties")) {
+                    Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+                    if (properties != null && !properties.isEmpty()) {
+                        allProperties.putAll(properties);
+                        if (schema.containsKey("required")) {
+                            List<String> required = Util.asStringList(schema.get("required"));
+                            if (required != null) {
+                                for (String field : required) {
+                                    if (!allRequired.contains(field)) {
+                                        allRequired.add(field);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Generate elements for each property
@@ -2349,6 +2501,20 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 xsd.append("            </xs:element>\n");
             }
         }
+
+        // Note: sequence closing tag is handled by caller
+    }
+
+    /**
+     * Generate XSD for complex type
+     */
+    private void generateXSDComplexType(StringBuilder xsd, String schemaName, Map<String, Object> schema, 
+                                       Map<String, Object> spec, Map<String, Object> allSchemas) {
+        xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
+        xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
+        xsd.append("        <xs:sequence>\n");
+
+        generateXSDComplexTypeContent(xsd, schema, spec, allSchemas);
 
         xsd.append("        </xs:sequence>\n");
         xsd.append("    </xs:complexType>\n");
@@ -2697,22 +2863,98 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         visited.put(schema, Boolean.TRUE);
 
         // Handle $ref
-        if (schema.containsKey("$ref")) {
-            String ref = (String) schema.get("$ref");
-            if (ref.startsWith("#/components/schemas/")) {
-                String schemaName = ref.substring(ref.lastIndexOf("/") + 1);
-                Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
-                if (components != null) {
-                    Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
-                    if (schemas != null && schemas.containsKey(schemaName)) {
-                        Map<String, Object> referencedSchema = Util.asStringObjectMap(schemas.get(schemaName));
-                        if (referencedSchema != null) {
-                            mergeSchemaProperties(referencedSchema, allProperties, allRequired, spec, visited);
+        // IMPORTANT: Check for properties FIRST, even if $ref exists.
+        // When the parser resolves external file $refs, it replaces the map content,
+        // so the schema should have properties directly. However, the $ref key might
+        // still be present. If properties exist, use them and ignore $ref.
+        if (schema.containsKey("properties")) {
+            // Schema has properties - use them directly (even if $ref also exists)
+            Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+            if (properties != null) {
+                allProperties.putAll(properties);
+            }
+            // Merge required fields
+            if (schema.containsKey("required")) {
+                List<String> required = Util.asStringList(schema.get("required"));
+                if (required != null) {
+                    for (String field : required) {
+                        if (!allRequired.contains(field)) {
+                            allRequired.add(field);
                         }
                     }
                 }
             }
-            return;
+            // Properties found - return (unless there's allOf/oneOf/anyOf to handle)
+            if (!schema.containsKey("allOf") && !schema.containsKey("oneOf") && !schema.containsKey("anyOf")) {
+                return;
+            }
+        }
+        
+        // Only handle $ref if no properties were found
+        if (schema.containsKey("$ref") && !schema.containsKey("properties")) {
+            String ref = (String) schema.get("$ref");
+            if (ref != null) {
+                if (ref.startsWith("#/components/schemas/")) {
+                    // Internal schema reference
+                    String schemaName = ref.substring(ref.lastIndexOf("/") + 1);
+                    Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+                    if (components != null) {
+                        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+                        if (schemas != null && schemas.containsKey(schemaName)) {
+                            Map<String, Object> referencedSchema = Util.asStringObjectMap(schemas.get(schemaName));
+                            if (referencedSchema != null) {
+                                mergeSchemaProperties(referencedSchema, allProperties, allRequired, spec, visited);
+                            }
+                        }
+                    }
+                } else if (ref.contains("#/components/schemas/")) {
+                    // External file with schema path
+                    String schemaPath = ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length());
+                    String schemaName = schemaPath.contains("/") ? schemaPath.substring(schemaPath.lastIndexOf("/") + 1) : schemaPath;
+                    Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+                    if (components != null) {
+                        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+                        if (schemas != null && schemas.containsKey(schemaName)) {
+                            Map<String, Object> referencedSchema = Util.asStringObjectMap(schemas.get(schemaName));
+                            if (referencedSchema != null) {
+                                mergeSchemaProperties(referencedSchema, allProperties, allRequired, spec, visited);
+                            }
+                        }
+                    }
+                } else {
+                    // External file reference without schema path (e.g., ../../../models/v4/User.yaml)
+                    // The parser should have resolved this by replacing $ref with the file content.
+                    // After resolution, the schema should have properties directly.
+                    // However, if properties are still empty, the resolution might have failed.
+                    // In this case, we can't resolve external files here, so we'll return.
+                    // The properties should have been merged above if they exist.
+                }
+                return;
+            }
+        }
+
+        // Merge direct properties (this handles schemas that were resolved and have properties)
+        if (schema.containsKey("properties")) {
+            Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+            if (properties != null) {
+                allProperties.putAll(properties);
+            }
+            // Merge required fields
+            if (schema.containsKey("required")) {
+                List<String> required = Util.asStringList(schema.get("required"));
+                if (required != null) {
+                    for (String field : required) {
+                        if (!allRequired.contains(field)) {
+                            allRequired.add(field);
+                        }
+                    }
+                }
+            }
+            // If schema has properties, we've merged them, so we can return
+            // (unless it also has allOf/oneOf/anyOf which should be handled)
+            if (!schema.containsKey("allOf") && !schema.containsKey("oneOf") && !schema.containsKey("anyOf")) {
+                return;
+            }
         }
 
         // Handle allOf

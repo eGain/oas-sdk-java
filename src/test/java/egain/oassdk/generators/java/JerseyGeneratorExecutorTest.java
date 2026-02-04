@@ -288,6 +288,13 @@ public class JerseyGeneratorExecutorTest {
                         "Should import Authorizer");
                     assertTrue(content.contains("import egain.ws.util.WsUtil"), 
                         "Should import WsUtil");
+                    
+                    // Check for framework executor base class imports
+                    boolean hasFrameworkImport = content.contains("import egain.ws.framework.GetBOExecutor_2") ||
+                                               content.contains("import egain.ws.framework.PostPutBOExecutor_2") ||
+                                               content.contains("import egain.ws.framework.PostPutBOExecutorNoResponseBody_2");
+                    assertTrue(hasFrameworkImport, 
+                        "Should import framework executor base class (GetBOExecutor_2 or PostPutBOExecutor_2)");
                 }
             }
         }

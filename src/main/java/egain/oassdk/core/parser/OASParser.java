@@ -214,7 +214,10 @@ public class OASParser {
             return spec;
         }
 
-        Map<String, Object> resolvedSpec = new HashMap<>(spec);
+        // IMPORTANT: Use the original spec directly, not a copy
+        // This ensures that when we modify maps during resolution, we're modifying the actual spec
+        // If we use a copy, the modifications won't be reflected in the original
+        Map<String, Object> resolvedSpec = spec;
         Map<String, Map<String, Object>> loadedFiles = new HashMap<>();
 
         // Load the base file into the cache
@@ -258,17 +261,29 @@ public class OASParser {
         }
 
         if (obj instanceof Map) {
-            Map<String, Object> map = Util.asStringObjectMap(obj);
+            // IMPORTANT: Cast directly to avoid creating a new map instance
+            // Util.asStringObjectMap might create a new LinkedHashMap, which would break our reference
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) obj;
             if (map == null) {
                 return;
             }
 
             // Check if this is a $ref
-            if (map.containsKey("$ref") && map.size() == 1) {
+            // IMPORTANT: Only resolve if map has ONLY $ref (size == 1)
+            // This ensures we don't try to resolve $refs that are part of a larger schema object
+            // However, for external file references that should be fully replaced, we need to handle them
+            if (map.containsKey("$ref")) {
+                // Check if this is an external file reference that should be fully replaced
                 String ref = (String) map.get("$ref");
-
-                // Create a unique key for this reference (file + path)
-                String refKey = createRefKey(ref, baseDir, currentFileKey);
+                boolean isExternalFileRef = ref != null && !ref.startsWith("#") && 
+                                           (ref.endsWith(".yaml") || ref.endsWith(".yml") || ref.endsWith(".json"));
+                
+                // If it's an external file reference, always resolve it (even if map.size() > 1)
+                // because external file refs should replace the entire schema
+                if (isExternalFileRef || map.size() == 1) {
+                    // Create a unique key for this reference (file + path)
+                    String refKey = createRefKey(ref, baseDir, currentFileKey);
 
                 // Check for circular reference
                 if (resolvingRefs.contains(refKey)) {
@@ -290,11 +305,22 @@ public class OASParser {
                         }
                         // Create a copy to avoid modifying the original
                         Map<String, Object> resolvedCopy = new HashMap<>(resolvedMap);
+                        
+                        // IMPORTANT: For external file references, the resolved content is the schema definition itself
+                        // (e.g., User.yaml contains type: object, properties: {...} directly)
+                        // We need to replace the entire map content with this schema definition
+                        
                         // Mark the original map as visited before replacing content
                         visitedObjects.add(map);
-                        // Replace the map content
+                        // Replace the map content completely - this ensures $ref is removed
                         map.clear();
                         map.putAll(resolvedCopy);
+                        // IMPORTANT: Remove $ref key if it still exists after resolution
+                        // This can happen if the resolved content itself contains a $ref
+                        // but for external file references, the resolved content should be the schema itself
+                        map.remove("$ref");
+                        
+                        
                         // Recursively resolve any references in the resolved content
                         // Note: We keep refKey in resolvingRefs to detect circular references in nested content
                         resolveReferencesRecursive(map, baseDir, currentFileKey, loadedFiles, resolvingRefs, visitedObjects);
@@ -302,11 +328,12 @@ public class OASParser {
                         // If resolved is not a map, this shouldn't happen for parameters
                         throw new OASSDKException("Resolved reference is not a Map: " + ref);
                     }
-                } finally {
-                    // Remove from resolving set after processing
-                    resolvingRefs.remove(refKey);
+                    } finally {
+                        // Remove from resolving set after processing
+                        resolvingRefs.remove(refKey);
+                    }
+                    return;
                 }
-                return;
             }
 
             // Mark this map as visited before processing its entries
@@ -436,6 +463,11 @@ public class OASParser {
                     loadedFiles.put(fileKey, externalSpec);
                     resolveReferencesRecursive(externalSpec, refPath.getParent(), fileKey, loadedFiles, resolvingRefs, visitedObjects);
                 }
+                
+                // IMPORTANT: If the external file is a schema definition (not a full OpenAPI spec),
+                // it will have type/properties directly. Return it as-is.
+                // If it's a full OpenAPI spec, we'd need to extract components/schemas, but
+                // for schema definition files, the content is the schema itself.
                 return externalSpec;
             } else {
                 // Internal reference without file part - use currentFileKey
@@ -455,6 +487,41 @@ public class OASParser {
      */
     private void mergeExternalSchemasIntoMainSpec(Map<String, Object> externalSpec, Map<String, Object> mainSpec) {
         if (externalSpec == null || mainSpec == null) {
+            return;
+        }
+
+        // Check if externalSpec is a schema definition file (not a full OpenAPI spec)
+        // Schema definition files have type/properties directly, not wrapped in components/schemas
+        if (externalSpec.containsKey("type") || externalSpec.containsKey("properties")) {
+            // This is a schema definition file - merge it as a schema
+            // Use the file name as the schema name, or try to find a title/name
+            String schemaName = null;
+            if (externalSpec.containsKey("title")) {
+                schemaName = (String) externalSpec.get("title");
+            } else {
+                // Try to extract from file path if available
+                // For now, we'll skip this as we don't have the file path here
+                // The resolved $ref should already have the schema content
+                return;
+            }
+            
+            // Ensure main spec has components/schemas
+            Map<String, Object> mainComponents = Util.asStringObjectMap(mainSpec.get("components"));
+            if (mainComponents == null) {
+                mainComponents = new HashMap<>();
+                mainSpec.put("components", mainComponents);
+            }
+            
+            Map<String, Object> mainSchemas = Util.asStringObjectMap(mainComponents.get("schemas"));
+            if (mainSchemas == null) {
+                mainSchemas = new HashMap<>();
+                mainComponents.put("schemas", mainSchemas);
+            }
+            
+            // Merge the schema definition if not already present
+            if (schemaName != null && !mainSchemas.containsKey(schemaName)) {
+                mainSchemas.put(schemaName, new HashMap<>(externalSpec));
+            }
             return;
         }
 

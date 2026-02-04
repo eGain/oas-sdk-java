@@ -136,10 +136,36 @@ public class PathResolver {
             Path candidatePath = searchPath.resolve(sanitizedPath).normalize();
             if (Files.exists(candidatePath) && Files.isRegularFile(candidatePath)) {
                 // Validate path traversal protection
-                validatePathTraversal(searchPath, candidatePath);
-                // Validate file size
-                validateFileSize(candidatePath);
-                return candidatePath;
+                try {
+                    validatePathTraversal(searchPath, candidatePath);
+                    // Validate file size
+                    validateFileSize(candidatePath);
+                    return candidatePath;
+                } catch (OASSDKException e) {
+                    // Path traversal detected for this search path, try next
+                    continue;
+                }
+            }
+        }
+
+        // If path contains ../ and wasn't found, try extracting just the filename
+        // This handles cases like ../../../models/v4/User.yaml where we want to find User.yaml in search paths
+        if (sanitizedPath.contains("../") || sanitizedPath.contains("..\\")) {
+            String fileName = Paths.get(sanitizedPath).getFileName().toString();
+            if (fileName != null && !fileName.isEmpty()) {
+                for (Path searchPath : searchPaths) {
+                    Path candidatePath = searchPath.resolve(fileName).normalize();
+                    if (Files.exists(candidatePath) && Files.isRegularFile(candidatePath)) {
+                        try {
+                            validatePathTraversal(searchPath, candidatePath);
+                            validateFileSize(candidatePath);
+                            return candidatePath;
+                        } catch (OASSDKException e) {
+                            // Path traversal detected, try next
+                            continue;
+                        }
+                    }
+                }
             }
         }
 
@@ -148,11 +174,24 @@ public class PathResolver {
         if (currentRecursionDepth.get() < MAX_RECURSION_DEPTH) {
             for (Path searchPath : searchPaths) {
                 try {
+                    // First try with full path
                     Path foundPath = findFileRecursively(sanitizedPath, searchPath);
+                    if (foundPath == null && (sanitizedPath.contains("../") || sanitizedPath.contains("..\\"))) {
+                        // If path has ../, try searching for just the filename
+                        String fileName = Paths.get(sanitizedPath).getFileName().toString();
+                        if (fileName != null && !fileName.isEmpty()) {
+                            foundPath = findFileRecursively(fileName, searchPath);
+                        }
+                    }
                     if (foundPath != null) {
-                        validatePathTraversal(searchPath, foundPath);
-                        validateFileSize(foundPath);
-                        return foundPath;
+                        try {
+                            validatePathTraversal(searchPath, foundPath);
+                            validateFileSize(foundPath);
+                            return foundPath;
+                        } catch (OASSDKException e) {
+                            // Path traversal detected, try next search path
+                            continue;
+                        }
                     }
                 } catch (IOException e) {
                     // Continue to next search path
