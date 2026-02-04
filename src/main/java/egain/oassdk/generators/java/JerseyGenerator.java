@@ -1758,7 +1758,72 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             
             // If this is an array type schema and the field is "items", wrap in List
             if (isArrayType && "items".equals(fieldName)) {
-                String itemType = getJavaType(fieldSchema);
+                // For array items, resolve $ref if present - this is critical for proper type resolution
+                String itemType = null;
+                if (fieldSchema != null) {
+                    // First, try to resolve $ref manually (if parser didn't resolve it)
+                    if (fieldSchema.containsKey("$ref")) {
+                        String ref = (String) fieldSchema.get("$ref");
+                        if (ref != null && ref.startsWith("#/components/schemas/")) {
+                            String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
+                            itemType = toJavaClassName(schemaRef);
+                        }
+                    }
+                    // If $ref was resolved by parser, match the resolved schema to its name
+                    if (itemType == null || itemType.isEmpty()) {
+                        // Check if fieldSchema matches any schema in components/schemas
+                        // Parser replaces $ref content in place, but creates a copy of the resolved content
+                        // So we need to match by structure (comparing key properties)
+                        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+                        if (components != null) {
+                            Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+                            if (schemas != null && fieldSchema != null) {
+                                // Check by identity first (parser might replace in place in some cases)
+                                for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
+                                    Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                    if (candidateSchema == fieldSchema) {
+                                        itemType = toJavaClassName(schemaEntry.getKey());
+                                        break;
+                                    }
+                                }
+                                // If identity didn't match, try structure matching
+                                // Compare key properties to find matching schema
+                                if (itemType == null || itemType.isEmpty()) {
+                                    Object fieldTypeObj = fieldSchema.get("type");
+                                    Object fieldProperties = fieldSchema.get("properties");
+                                    for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
+                                        Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                        if (candidateSchema != null) {
+                                            Object candidateType = candidateSchema.get("type");
+                                            Object candidateProperties = candidateSchema.get("properties");
+                                            // Match by type and properties structure
+                                            if (fieldTypeObj != null && fieldTypeObj.equals(candidateType) &&
+                                                fieldProperties != null && fieldProperties.equals(candidateProperties)) {
+                                                itemType = toJavaClassName(schemaEntry.getKey());
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // If still not found, use getJavaType (handles other cases)
+                    if (itemType == null || itemType.isEmpty()) {
+                        itemType = getJavaType(fieldSchema);
+                        // If getJavaType returns "Object" but we have a $ref, try manual resolution again
+                        if ("Object".equals(itemType) && fieldSchema.containsKey("$ref")) {
+                            String ref = (String) fieldSchema.get("$ref");
+                            if (ref != null && ref.startsWith("#/components/schemas/")) {
+                                String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
+                                itemType = toJavaClassName(schemaRef);
+                            }
+                        }
+                    }
+                }
+                if (itemType == null || itemType.isEmpty()) {
+                    itemType = "Object";
+                }
                 fieldType = "List<" + itemType + ">";
             } else {
                 fieldType = getJavaType(fieldSchema);
@@ -1803,17 +1868,71 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             
             // If this is an array type schema and the field is "items", wrap in List
             if (isArrayType && "items".equals(fieldName)) {
-                // For array items, resolve $ref if present
+                // For array items, resolve $ref if present - this is critical for proper type resolution
                 String itemType = null;
-                if (fieldSchema != null && fieldSchema.containsKey("$ref")) {
-                    String ref = (String) fieldSchema.get("$ref");
-                    if (ref != null && ref.startsWith("#/components/schemas/")) {
-                        String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
-                        itemType = toJavaClassName(schemaRef);
+                if (fieldSchema != null) {
+                    // First, try to resolve $ref manually (if parser didn't resolve it)
+                    if (fieldSchema.containsKey("$ref")) {
+                        String ref = (String) fieldSchema.get("$ref");
+                        if (ref != null && ref.startsWith("#/components/schemas/")) {
+                            String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
+                            itemType = toJavaClassName(schemaRef);
+                        }
+                    }
+                    // If $ref was resolved by parser, match the resolved schema to its name
+                    if (itemType == null || itemType.isEmpty()) {
+                        // Check if fieldSchema matches any schema in components/schemas
+                        // Parser replaces $ref content in place, but creates a copy of the resolved content
+                        // So we need to match by structure (comparing key properties)
+                        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+                        if (components != null) {
+                            Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+                            if (schemas != null && fieldSchema != null) {
+                                // Check by identity first (parser might replace in place in some cases)
+                                for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
+                                    Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                    if (candidateSchema == fieldSchema) {
+                                        itemType = toJavaClassName(schemaEntry.getKey());
+                                        break;
+                                    }
+                                }
+                                // If identity didn't match, try structure matching
+                                // Compare key properties to find matching schema
+                                if (itemType == null || itemType.isEmpty()) {
+                                    Object fieldTypeObj = fieldSchema.get("type");
+                                    Object fieldProperties = fieldSchema.get("properties");
+                                    for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
+                                        Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                        if (candidateSchema != null) {
+                                            Object candidateType = candidateSchema.get("type");
+                                            Object candidateProperties = candidateSchema.get("properties");
+                                            // Match by type and properties structure
+                                            if (fieldTypeObj != null && fieldTypeObj.equals(candidateType) &&
+                                                fieldProperties != null && fieldProperties.equals(candidateProperties)) {
+                                                itemType = toJavaClassName(schemaEntry.getKey());
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // If still not found, use getJavaType (handles other cases)
+                    if (itemType == null || itemType.isEmpty()) {
+                        itemType = getJavaType(fieldSchema);
+                        // If getJavaType returns "Object" but we have a $ref, try manual resolution again
+                        if ("Object".equals(itemType) && fieldSchema.containsKey("$ref")) {
+                            String ref = (String) fieldSchema.get("$ref");
+                            if (ref != null && ref.startsWith("#/components/schemas/")) {
+                                String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
+                                itemType = toJavaClassName(schemaRef);
+                            }
+                        }
                     }
                 }
-                if (itemType == null) {
-                    itemType = getJavaType(fieldSchema);
+                if (itemType == null || itemType.isEmpty()) {
+                    itemType = "Object";
                 }
                 fieldType = "List<" + itemType + ">";
             } else {
@@ -1960,17 +2079,51 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 
                 // If this is an array type schema and the field is "items", wrap in List
                 if (isArrayType && "items".equals(fieldName)) {
-                    // For array items, resolve $ref if present
+                    // For array items, resolve $ref if present - this is critical for proper type resolution
                     String itemType = null;
-                    if (fieldSchema != null && fieldSchema.containsKey("$ref")) {
-                        String ref = (String) fieldSchema.get("$ref");
-                        if (ref != null && ref.startsWith("#/components/schemas/")) {
-                            String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
-                            itemType = toJavaClassName(schemaRef);
+                    if (fieldSchema != null) {
+                        // First, try to resolve $ref manually (if parser didn't resolve it)
+                        if (fieldSchema.containsKey("$ref")) {
+                            String ref = (String) fieldSchema.get("$ref");
+                            if (ref != null && ref.startsWith("#/components/schemas/")) {
+                                String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
+                                itemType = toJavaClassName(schemaRef);
+                            }
+                        }
+                        // If $ref was resolved by parser, match the resolved schema to its name
+                        if (itemType == null || itemType.isEmpty()) {
+                            // Check if fieldSchema matches any schema in components/schemas by identity
+                            // (parser might replace $ref in place, so object identity matches)
+                            Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+                            if (components != null) {
+                                Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+                                if (schemas != null) {
+                                    for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
+                                        Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                        // Check by identity first (parser might replace in place)
+                                        if (candidateSchema == fieldSchema) {
+                                            itemType = toJavaClassName(schemaEntry.getKey());
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // If still not found, use getJavaType (handles other cases)
+                        if (itemType == null || itemType.isEmpty()) {
+                            itemType = getJavaType(fieldSchema);
+                            // If getJavaType returns "Object" but we have a $ref, try manual resolution again
+                            if ("Object".equals(itemType) && fieldSchema.containsKey("$ref")) {
+                                String ref = (String) fieldSchema.get("$ref");
+                                if (ref != null && ref.startsWith("#/components/schemas/")) {
+                                    String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
+                                    itemType = toJavaClassName(schemaRef);
+                                }
+                            }
                         }
                     }
-                    if (itemType == null) {
-                        itemType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
+                    if (itemType == null || itemType.isEmpty()) {
+                        itemType = "Object";
                     }
                     fieldType = "List<" + itemType + ">";
                 } else {
@@ -2410,6 +2563,62 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 collectReferencedSchemasForXSD(schema, allSchemas, referencedNamespaces, new HashSet<>());
             }
         } else {
+            // If $ref was resolved by parser, check if schema content matches a known schema
+            // This handles cases where EditNonIntegratedUser $ref User was resolved
+            // and now schema contains User's content
+            // The parser replaces $ref content in place, so the map object is the same
+            // but the content is from the resolved schema
+            boolean isResolvedRef = false;
+            // Check by identity first (parser might replace in place in some cases)
+            for (Map.Entry<String, Object> schemaEntry : allSchemas.entrySet()) {
+                if (schemaEntry.getKey().equals(schemaName)) {
+                    continue; // Skip self
+                }
+                Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                if (candidateSchema == schema) {
+                    // This schema is actually the resolved content of another schema
+                    // Add it to referenced namespaces
+                    referencedNamespaces.add(schemaEntry.getKey());
+                    isResolvedRef = true;
+                    break;
+                }
+            }
+            // If identity didn't match, try structure matching for resolved $refs
+            // This is needed because parser creates a copy of resolved content
+            if (!isResolvedRef && !schema.containsKey("$ref")) {
+                // Only do structure matching if schema doesn't have $ref (meaning it was resolved)
+                // and has meaningful content
+                boolean hasContent = (schema.containsKey("type") && schema.get("type") != null) ||
+                                    (schema.containsKey("properties") && schema.get("properties") != null);
+                if (hasContent) {
+                    // Try to match by comparing the entire schema structure
+                    // Create a copy without $ref for comparison
+                    Map<String, Object> schemaForComparison = new HashMap<>(schema);
+                    schemaForComparison.remove("$ref");
+                    
+                    for (Map.Entry<String, Object> schemaEntry : allSchemas.entrySet()) {
+                        if (schemaEntry.getKey().equals(schemaName)) {
+                            continue; // Skip self
+                        }
+                        Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                        if (candidateSchema != null && candidateSchema != schema) {
+                            // Create candidate copy without $ref for comparison
+                            Map<String, Object> candidateForComparison = new HashMap<>(candidateSchema);
+                            candidateForComparison.remove("$ref");
+                            
+                            // Compare entire schema structure using equals()
+                            // This works because Map.equals() compares entries recursively
+                            if (schemaForComparison.equals(candidateForComparison) && 
+                                !schemaForComparison.isEmpty()) {
+                                referencedNamespaces.add(schemaEntry.getKey());
+                                isResolvedRef = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
             // Collect referenced schemas for imports
             collectReferencedSchemasForXSD(schema, allSchemas, referencedNamespaces, new HashSet<>());
             
@@ -2484,28 +2693,17 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             } else if (ref.startsWith("#/components/schemas/")) {
                 // Internal schema reference
                 String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
-                Map<String, Object> refSchema = Util.asStringObjectMap(allSchemas.get(refSchemaName));
                 
-                if (refSchema != null && !refSchema.isEmpty()) {
-                    // Generate element and complexType, expanding the referenced schema's properties
-                    xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
-                    xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
-                    xsd.append("        <xs:sequence>\n");
-                    
-                    // Expand the referenced schema's properties by generating its content
-                    generateXSDComplexTypeContent(xsd, refSchema, spec, allSchemas);
-                    
-                    xsd.append("        </xs:sequence>\n");
-                    xsd.append("    </xs:complexType>\n");
-                } else {
-                    // Referenced schema not found - use type reference
-                    xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
-                    xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
-                    xsd.append("        <xs:sequence>\n");
-                    xsd.append("            <xs:element name=\"").append(schemaName).append("\" type=\"").append(refSchemaName).append(":").append(refSchemaName).append("\"/>\n");
-                    xsd.append("        </xs:sequence>\n");
-                    xsd.append("    </xs:complexType>\n");
-                }
+                // Generate element and complexType that references the referenced schema's type
+                xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
+                xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
+                xsd.append("        <xs:sequence>\n");
+                
+                // Use type reference to the referenced schema - element name matches the referenced schema name
+                xsd.append("            <xs:element name=\"").append(refSchemaName).append("\" type=\"").append(refSchemaName).append(":").append(refSchemaName).append("\"/>\n");
+                
+                xsd.append("        </xs:sequence>\n");
+                xsd.append("    </xs:complexType>\n");
             } else if (ref.contains("#/components/schemas/")) {
                 // External file with schema path
                 String schemaPath = ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length());
@@ -2527,13 +2725,47 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
             }
         } else {
-            // Generate complex type or element
-            if (schema.containsKey("type") && "array".equals(schema.get("type"))) {
-                // Handle array types
-                generateXSDArrayType(xsd, schemaName, schema, spec, allSchemas);
+            // Check if this is a resolved $ref (schema content matches another schema)
+            // We already detected this above and added to referencedNamespaces
+            String resolvedRefSchemaName = null;
+            if (!referencedNamespaces.isEmpty() && !schema.containsKey("$ref")) {
+                // Check if this schema content matches a referenced schema
+                Map<String, Object> schemaForComparison = new HashMap<>(schema);
+                schemaForComparison.remove("$ref");
+                for (String refSchema : referencedNamespaces) {
+                    Map<String, Object> candidateSchema = Util.asStringObjectMap(allSchemas.get(refSchema));
+                    if (candidateSchema != null) {
+                        Map<String, Object> candidateForComparison = new HashMap<>(candidateSchema);
+                        candidateForComparison.remove("$ref");
+                        if (schemaForComparison.equals(candidateForComparison) && !schemaForComparison.isEmpty()) {
+                            resolvedRefSchemaName = refSchema;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (resolvedRefSchemaName != null) {
+                // This is a resolved $ref - generate type reference instead of expanding properties
+                // Generate element and complexType that references the referenced schema's type
+                xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
+                xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
+                xsd.append("        <xs:sequence>\n");
+                
+                // Use type reference to the referenced schema - element name matches the referenced schema name
+                xsd.append("            <xs:element name=\"").append(resolvedRefSchemaName).append("\" type=\"").append(resolvedRefSchemaName).append(":").append(resolvedRefSchemaName).append("\"/>\n");
+                
+                xsd.append("        </xs:sequence>\n");
+                xsd.append("    </xs:complexType>\n");
             } else {
-                // Handle complex types
-                generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+                // Generate complex type or element
+                if (schema.containsKey("type") && "array".equals(schema.get("type"))) {
+                    // Handle array types
+                    generateXSDArrayType(xsd, schemaName, schema, spec, allSchemas);
+                } else {
+                    // Handle complex types
+                    generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+                }
             }
         }
 
@@ -2598,6 +2830,45 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     for (Map.Entry<String, Object> property : properties.entrySet()) {
                         Map<String, Object> propertySchema = Util.asStringObjectMap(property.getValue());
                         if (propertySchema != null && !visited.contains(propertySchema)) {
+                            // Check if propertySchema has a $ref (not resolved yet)
+                            String propRef = (String) propertySchema.get("$ref");
+                            if (propRef != null && propRef.startsWith("#/components/schemas/")) {
+                                String refSchemaName = propRef.substring(propRef.lastIndexOf("/") + 1);
+                                if (allSchemas.containsKey(refSchemaName) && !referencedSchemas.contains(refSchemaName)) {
+                                    referencedSchemas.add(refSchemaName);
+                                }
+                            } else {
+                                // If $ref was resolved, try to match the resolved schema to its name
+                                // Check by identity first
+                                boolean found = false;
+                                for (Map.Entry<String, Object> schemaEntry : allSchemas.entrySet()) {
+                                    Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                    if (candidateSchema == propertySchema) {
+                                        if (!referencedSchemas.contains(schemaEntry.getKey())) {
+                                            referencedSchemas.add(schemaEntry.getKey());
+                                        }
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                                // If identity didn't match, try structure matching using equals()
+                                if (!found && !propertySchema.containsKey("$ref")) {
+                                    // Only match if propertySchema doesn't have $ref (was resolved)
+                                    for (Map.Entry<String, Object> schemaEntry : allSchemas.entrySet()) {
+                                        Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                        if (candidateSchema != null && candidateSchema != propertySchema) {
+                                            // Compare entire schema structure using equals()
+                                            if (propertySchema.equals(candidateSchema)) {
+                                                if (!referencedSchemas.contains(schemaEntry.getKey())) {
+                                                    referencedSchemas.add(schemaEntry.getKey());
+                                                }
+                                                found = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                             collectReferencedSchemasForXSD(propertySchema, allSchemas, referencedSchemas, visited);
                         }
                     }
@@ -2614,6 +2885,37 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                         String refSchemaName = itemsRef.substring(itemsRef.lastIndexOf("/") + 1);
                         if (allSchemas.containsKey(refSchemaName) && !referencedSchemas.contains(refSchemaName)) {
                             referencedSchemas.add(refSchemaName);
+                        }
+                    } else {
+                        // If $ref was resolved, try to match the resolved schema to its name
+                        // Check by identity first
+                        boolean found = false;
+                        for (Map.Entry<String, Object> schemaEntry : allSchemas.entrySet()) {
+                            Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                            if (candidateSchema == itemsSchema) {
+                                if (!referencedSchemas.contains(schemaEntry.getKey())) {
+                                    referencedSchemas.add(schemaEntry.getKey());
+                                }
+                                found = true;
+                                break;
+                            }
+                        }
+                        // If identity didn't match, try structure matching using equals()
+                        if (!found && !itemsSchema.containsKey("$ref")) {
+                            // Only match if itemsSchema doesn't have $ref (was resolved)
+                            for (Map.Entry<String, Object> schemaEntry : allSchemas.entrySet()) {
+                                Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                if (candidateSchema != null && candidateSchema != itemsSchema) {
+                                    // Compare entire schema structure using equals()
+                                    if (itemsSchema.equals(candidateSchema)) {
+                                        if (!referencedSchemas.contains(schemaEntry.getKey())) {
+                                            referencedSchemas.add(schemaEntry.getKey());
+                                        }
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
                     collectReferencedSchemasForXSD(itemsSchema, allSchemas, referencedSchemas, visited);
@@ -2773,8 +3075,40 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     if (itemsSchema != null) {
                         // Check if items schema has a $ref - if so, reference it directly
                         String itemsRef = (String) itemsSchema.get("$ref");
+                        String refSchemaName = null;
                         if (itemsRef != null && itemsRef.startsWith("#/components/schemas/")) {
-                            String refSchemaName = itemsRef.substring(itemsRef.lastIndexOf("/") + 1);
+                            refSchemaName = itemsRef.substring(itemsRef.lastIndexOf("/") + 1);
+                        } else {
+                            // If $ref was resolved by parser, match the resolved schema to its name
+                            // Check if itemsSchema matches any schema in allSchemas by identity or structure
+                            for (Map.Entry<String, Object> schemaEntry : allSchemas.entrySet()) {
+                                Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                // Check by identity first (parser might replace in place)
+                                if (candidateSchema == itemsSchema) {
+                                    refSchemaName = schemaEntry.getKey();
+                                    break;
+                                }
+                            }
+                            // If identity didn't match, try structure matching
+                            if (refSchemaName == null) {
+                                Object itemsType = itemsSchema.get("type");
+                                Object itemsProperties = itemsSchema.get("properties");
+                                for (Map.Entry<String, Object> schemaEntry : allSchemas.entrySet()) {
+                                    Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                                    if (candidateSchema != null) {
+                                        Object candidateType = candidateSchema.get("type");
+                                        Object candidateProperties = candidateSchema.get("properties");
+                                        // Match by type and properties structure
+                                        if (itemsType != null && itemsType.equals(candidateType) &&
+                                            itemsProperties != null && itemsProperties.equals(candidateProperties)) {
+                                            refSchemaName = schemaEntry.getKey();
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (refSchemaName != null) {
                             xsd.append(" type=\"").append(refSchemaName).append(":").append(refSchemaName).append("\"");
                         } else {
                             generateXSDPropertyType(xsd, itemsSchema, allSchemas, propertyName);
@@ -2866,8 +3200,40 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         
         // Check for $ref
         String ref = (String) propertySchema.get("$ref");
+        String refSchemaName = null;
         if (ref != null && ref.startsWith("#/components/schemas/")) {
-            String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+            refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+        } else {
+            // If $ref was resolved by parser, match the resolved schema to its name
+            // Check if propertySchema matches any schema in allSchemas by identity or structure
+            for (Map.Entry<String, Object> schemaEntry : allSchemas.entrySet()) {
+                Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                // Check by identity first (parser might replace in place)
+                if (candidateSchema == propertySchema) {
+                    refSchemaName = schemaEntry.getKey();
+                    break;
+                }
+            }
+            // If identity didn't match, try structure matching
+            if (refSchemaName == null) {
+                Object propType = propertySchema.get("type");
+                Object propProperties = propertySchema.get("properties");
+                for (Map.Entry<String, Object> schemaEntry : allSchemas.entrySet()) {
+                    Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                    if (candidateSchema != null) {
+                        Object candidateType = candidateSchema.get("type");
+                        Object candidateProperties = candidateSchema.get("properties");
+                        // Match by type and properties structure
+                        if (propType != null && propType.equals(candidateType) &&
+                            propProperties != null && propProperties.equals(candidateProperties)) {
+                            refSchemaName = schemaEntry.getKey();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (refSchemaName != null) {
             xsd.append(" type=\"").append(refSchemaName).append(":").append(refSchemaName).append("\"");
             return;
         }
