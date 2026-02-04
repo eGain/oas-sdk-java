@@ -1307,8 +1307,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      */
     private void collectSchemasFromSchemaObject(Object schemaObj, Set<String> referencedSchemas, Map<String, Object> spec, java.util.Map<Object, Boolean> visited, int depth) {
         // Prevent StackOverflow by limiting recursion depth
-        // Increased limit for large bundle specs, but still need cycle detection
-        if (depth > 5000) {
+        // Reduced limit to prevent StackOverflow in very large specs with deep nesting
+        if (depth > 200) {
             logger.warning("Recursion depth limit reached in collectSchemasFromSchemaObject: " + depth);
             return;
         }
@@ -1354,7 +1354,18 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                 }
                                 // Mark this schema object as visited BEFORE recursing to prevent cycles
                                 visited.put(referencedSchema, Boolean.TRUE);
-                                collectSchemasFromSchemaObject(referencedSchema, referencedSchemas, spec, visited, depth + 1);
+                                
+                                // For array types, only collect the items schema, not all nested properties
+                                // This prevents StackOverflow in large specs with deeply nested structures
+                                if (referencedSchema.containsKey("type") && "array".equals(referencedSchema.get("type"))) {
+                                    Object items = referencedSchema.get("items");
+                                    if (items != null && depth < 50) {
+                                        collectSchemasFromSchemaObject(items, referencedSchemas, spec, visited, depth + 1);
+                                    }
+                                } else if (depth < 50) {
+                                    // For non-array types, do full recursive collection but with depth limit
+                                    collectSchemasFromSchemaObject(referencedSchema, referencedSchemas, spec, visited, depth + 1);
+                                }
                             }
                         }
                     }
@@ -1449,28 +1460,46 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         }
 
         // Check allOf, oneOf, anyOf
-        for (String compositionType : new String[]{"allOf", "oneOf", "anyOf"}) {
-            if (schema.containsKey(compositionType)) {
-                Object compObj = schema.get(compositionType);
-                if (compObj instanceof List<?> compositions) {
-                    for (Object compItem : compositions) {
-                        collectSchemasFromSchemaObject(compItem, referencedSchemas, spec, visited, depth + 1);
+        // Limit composition processing depth to prevent StackOverflow
+        if (depth < 100) {
+            for (String compositionType : new String[]{"allOf", "oneOf", "anyOf"}) {
+                if (schema.containsKey(compositionType)) {
+                    Object compObj = schema.get(compositionType);
+                    if (compObj instanceof List<?> compositions) {
+                        // Limit number of composition items to prevent StackOverflow
+                        int compCount = 0;
+                        int maxCompositions = 100;
+                        for (Object compItem : compositions) {
+                            if (compCount++ >= maxCompositions) {
+                                logger.warning("Composition limit reached in collectSchemasFromSchemaObject at depth " + depth);
+                                break;
+                            }
+                            collectSchemasFromSchemaObject(compItem, referencedSchemas, spec, visited, depth + 1);
+                        }
                     }
                 }
             }
-        }
 
-        // Check items (for arrays)
-        if (schema.containsKey("items")) {
-            collectSchemasFromSchemaObject(schema.get("items"), referencedSchemas, spec, visited, depth + 1);
+            // Check items (for arrays)
+            if (schema.containsKey("items")) {
+                collectSchemasFromSchemaObject(schema.get("items"), referencedSchemas, spec, visited, depth + 1);
+            }
         }
 
         // Check properties (for objects)
-        if (schema.containsKey("properties")) {
+        // Limit property processing depth to prevent StackOverflow in large specs with many nested properties
+        if (schema.containsKey("properties") && depth < 100) {
             Object propsObj = schema.get("properties");
             if (propsObj instanceof Map<?, ?>) {
                 Map<String, Object> properties = Util.asStringObjectMap(propsObj);
+                // Limit number of properties processed to prevent StackOverflow
+                int propertyCount = 0;
+                int maxProperties = 1000; // Reasonable limit for large specs
                 for (Object propSchema : properties.values()) {
+                    if (propertyCount++ >= maxProperties) {
+                        logger.warning("Property limit reached in collectSchemasFromSchemaObject at depth " + depth);
+                        break;
+                    }
                     collectSchemasFromSchemaObject(propSchema, referencedSchemas, spec, visited, depth + 1);
                 }
             }
@@ -1558,6 +1587,49 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         // Get components once for use throughout the method
         Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
         
+        // Build a cache/index of array schemas by their items $ref for efficient lookup
+        // This avoids iterating through all schemas for each response (critical for large specs)
+        Map<String, String> arraySchemaByItemsRef = new java.util.HashMap<>();
+        Map<String, String> arraySchemaByItemsType = new java.util.HashMap<>();
+        Map<String, Integer> arraySchemaCountByItemsType = new java.util.HashMap<>();
+        
+        if (components != null) {
+            Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+            if (schemas != null) {
+                for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
+                    Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+                    if (candidateSchema != null && 
+                        candidateSchema.containsKey("type") && 
+                        "array".equals(candidateSchema.get("type"))) {
+                        Object items = candidateSchema.get("items");
+                        if (items != null) {
+                            Map<String, Object> itemsMap = Util.asStringObjectMap(items);
+                            if (itemsMap != null) {
+                                String itemsRef = (String) itemsMap.get("$ref");
+                                String itemsType = (String) itemsMap.get("type");
+                                if (itemsRef != null) {
+                                    // Index by items $ref for fast lookup
+                                    arraySchemaByItemsRef.put(itemsRef, schemaEntry.getKey());
+                                }
+                                if (itemsType != null) {
+                                    // Track count of array schemas with same items type
+                                    arraySchemaCountByItemsType.put(itemsType, 
+                                        arraySchemaCountByItemsType.getOrDefault(itemsType, 0) + 1);
+                                    // Only store if count is 1 (unique match)
+                                    if (arraySchemaCountByItemsType.get(itemsType) == 1) {
+                                        arraySchemaByItemsType.put(itemsType, schemaEntry.getKey());
+                                    } else {
+                                        // More than one schema with this items type - remove from cache
+                                        arraySchemaByItemsType.remove(itemsType);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         // Use a shared visited set across all schema object processing to prevent processing the same schema multiple times
         // This prevents StackOverflow when processing large specs with many shared schemas
         java.util.Map<Object, Boolean> globalVisitedSchemas = new java.util.IdentityHashMap<>();
@@ -1586,7 +1658,29 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                     Object schemaObj = mediaType.get("schema");
                                     // Collect schemas from this schema object with cycle detection
                                     // Use shared visited set to prevent processing same schema multiple times
-                                    collectSchemasFromSchemaObject(schemaObj, referencedSchemas, spec, globalVisitedSchemas, 0);
+                                    // Wrap in try-catch to handle StackOverflow gracefully for very large specs
+                                    try {
+                                        collectSchemasFromSchemaObject(schemaObj, referencedSchemas, spec, globalVisitedSchemas, 0);
+                                    } catch (StackOverflowError e) {
+                                        logger.warning("StackOverflow in collectSchemasFromSchemaObject, skipping deep recursion for: " + responseEntry.getKey());
+                                        // Still try to extract schema name directly if it's a $ref
+                                        if (schemaObj instanceof Map) {
+                                            Map<String, Object> schemaMap = Util.asStringObjectMap(schemaObj);
+                                            if (schemaMap != null && schemaMap.containsKey("$ref")) {
+                                                String ref = (String) schemaMap.get("$ref");
+                                                if (ref != null && ref.startsWith("#/components/schemas/")) {
+                                                    String schemaName = ref.substring(ref.lastIndexOf("/") + 1);
+                                                    referencedSchemas.add(schemaName);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Early exit if we've collected too many schemas (safety check)
+                                    if (referencedSchemas.size() > 10000) {
+                                        logger.warning("Schema collection limit reached, stopping to prevent StackOverflow");
+                                        break;
+                                    }
                                     
                                     // Also check if this schema object itself is an array type that needs to be added
                                     // This handles cases where the parser has already resolved the $ref
@@ -1632,7 +1726,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                                     }
                                                 }
                                                 
-                                                // If identity match failed, try items $ref match (only if not found)
+                                                // If identity match failed, use cache for fast lookup (only if not found)
                                                 if (!found) {
                                                     Object responseItems = schemaMap.get("items");
                                                     String responseItemsRef = null;
@@ -1645,71 +1739,24 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                                         }
                                                     }
                                                     
-                                                    // Try $ref match first if we have a $ref to match
-                                                    if (responseItemsRef != null) {
-                                                        for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
-                                                            Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
-                                                            if (candidateSchema != null && 
-                                                                candidateSchema.containsKey("type") && 
-                                                                "array".equals(candidateSchema.get("type"))) {
-                                                                Object candidateItems = candidateSchema.get("items");
-                                                                if (candidateItems != null) {
-                                                                    Map<String, Object> candidateItemsMap = Util.asStringObjectMap(candidateItems);
-                                                                    if (candidateItemsMap != null) {
-                                                                        String candidateItemsRef = (String) candidateItemsMap.get("$ref");
-                                                                        if (responseItemsRef.equals(candidateItemsRef)) {
-                                                                            // Items $ref matches - this is the schema
-                                                                            String schemaName = schemaEntry.getKey();
-                                                                            if (!referencedSchemas.contains(schemaName)) {
-                                                                                referencedSchemas.add(schemaName);
-                                                                            }
-                                                                            found = true;
-                                                                            break;
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                            if (found) break;
+                                                    // Try $ref match first using cache (O(1) lookup instead of O(n) iteration)
+                                                    if (responseItemsRef != null && arraySchemaByItemsRef.containsKey(responseItemsRef)) {
+                                                        String schemaName = arraySchemaByItemsRef.get(responseItemsRef);
+                                                        if (!referencedSchemas.contains(schemaName)) {
+                                                            referencedSchemas.add(schemaName);
                                                         }
+                                                        found = true;
                                                     }
                                                     
-                                                    // If $ref match failed, try matching by resolved items structure
+                                                    // If $ref match failed, try matching by resolved items type using cache
                                                     // This handles cases where the parser has resolved the items $ref as well
-                                                    if (!found && responseItems != null) {
-                                                        // Try to match by comparing the resolved items structure
-                                                        // We'll match if the items type matches and there's only one array schema with that items type
-                                                        if (responseItemsType != null) {
-                                                            int matchingCount = 0;
-                                                            String matchingSchemaName = null;
-                                                            for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
-                                                                Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
-                                                                if (candidateSchema != null && 
-                                                                    candidateSchema.containsKey("type") && 
-                                                                    "array".equals(candidateSchema.get("type"))) {
-                                                                    Object candidateItems = candidateSchema.get("items");
-                                                                    if (candidateItems != null) {
-                                                                        Map<String, Object> candidateItemsMap = Util.asStringObjectMap(candidateItems);
-                                                                        if (candidateItemsMap != null) {
-                                                                            String candidateItemsType = (String) candidateItemsMap.get("type");
-                                                                            String candidateItemsRef = (String) candidateItemsMap.get("$ref");
-                                                                            // Match if type matches and no $ref (resolved) or if both have same $ref
-                                                                            if (responseItemsType.equals(candidateItemsType) && 
-                                                                                (responseItemsRef == null || responseItemsRef.equals(candidateItemsRef))) {
-                                                                                matchingCount++;
-                                                                                matchingSchemaName = schemaEntry.getKey();
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                            // Only add if there's exactly one match (to avoid false positives)
-                                                            if (matchingCount == 1 && matchingSchemaName != null) {
-                                                                if (!referencedSchemas.contains(matchingSchemaName)) {
-                                                                    referencedSchemas.add(matchingSchemaName);
-                                                                }
-                                                                found = true;
-                                                            }
+                                                    if (!found && responseItemsType != null && arraySchemaByItemsType.containsKey(responseItemsType)) {
+                                                        // Only use type match if there's exactly one array schema with this items type
+                                                        String schemaName = arraySchemaByItemsType.get(responseItemsType);
+                                                        if (schemaName != null && !referencedSchemas.contains(schemaName)) {
+                                                            referencedSchemas.add(schemaName);
                                                         }
+                                                        found = true;
                                                     }
                                                 }
                                                 // If no match found, don't add all array schemas as fallback
@@ -1759,7 +1806,29 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                                     Object schemaObj = mediaType.get("schema");
                                                     // Collect schemas from this schema object with cycle detection
                                                     // Use shared visited set to prevent processing same schema multiple times
-                                                    collectSchemasFromSchemaObject(schemaObj, referencedSchemas, spec, globalVisitedSchemas, 0);
+                                                    // Wrap in try-catch to handle StackOverflow gracefully for very large specs
+                                                    try {
+                                                        collectSchemasFromSchemaObject(schemaObj, referencedSchemas, spec, globalVisitedSchemas, 0);
+                                                    } catch (StackOverflowError e) {
+                                                        logger.warning("StackOverflow in collectSchemasFromSchemaObject, skipping deep recursion");
+                                                        // Still try to extract schema name directly if it's a $ref
+                                                        if (schemaObj instanceof Map) {
+                                                            Map<String, Object> schemaMap = Util.asStringObjectMap(schemaObj);
+                                                            if (schemaMap != null && schemaMap.containsKey("$ref")) {
+                                                                String ref = (String) schemaMap.get("$ref");
+                                                                if (ref != null && ref.startsWith("#/components/schemas/")) {
+                                                                    String schemaName = ref.substring(ref.lastIndexOf("/") + 1);
+                                                                    referencedSchemas.add(schemaName);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    // Early exit if we've collected too many schemas (safety check)
+                                                    if (referencedSchemas.size() > 10000) {
+                                                        logger.warning("Schema collection limit reached, stopping to prevent StackOverflow");
+                                                        break;
+                                                    }
                                                     
                                                     // Also check if this schema object itself is an array type that needs to be added
                                                     // This handles cases where the parser has already resolved the $ref
@@ -1805,7 +1874,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                                                     }
                                                                 }
                                                                 
-                                                                // If identity match failed, try items $ref match (only if not found)
+                                                                // If identity match failed, use cache for fast lookup (only if not found)
                                                                 if (!found) {
                                                                     Object responseItems = schemaMap.get("items");
                                                                     String responseItemsRef = null;
@@ -1818,71 +1887,24 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                                                         }
                                                                     }
                                                                     
-                                                                    // Try $ref match first if we have a $ref to match
-                                                                    if (responseItemsRef != null) {
-                                                                        for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
-                                                                            Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
-                                                                            if (candidateSchema != null && 
-                                                                                candidateSchema.containsKey("type") && 
-                                                                                "array".equals(candidateSchema.get("type"))) {
-                                                                                Object candidateItems = candidateSchema.get("items");
-                                                                                if (candidateItems != null) {
-                                                                                    Map<String, Object> candidateItemsMap = Util.asStringObjectMap(candidateItems);
-                                                                                    if (candidateItemsMap != null) {
-                                                                                        String candidateItemsRef = (String) candidateItemsMap.get("$ref");
-                                                                                        if (responseItemsRef.equals(candidateItemsRef)) {
-                                                                                            // Items $ref matches - this is the schema
-                                                                                            String schemaName = schemaEntry.getKey();
-                                                                                            if (!referencedSchemas.contains(schemaName)) {
-                                                                                                referencedSchemas.add(schemaName);
-                                                                                            }
-                                                                                            found = true;
-                                                                                            break;
-                                                                                        }
-                                                                                    }
-                                                                                }
-                                                                            }
-                                                                            if (found) break;
+                                                                    // Try $ref match first using cache (O(1) lookup instead of O(n) iteration)
+                                                                    if (responseItemsRef != null && arraySchemaByItemsRef.containsKey(responseItemsRef)) {
+                                                                        String schemaName = arraySchemaByItemsRef.get(responseItemsRef);
+                                                                        if (!referencedSchemas.contains(schemaName)) {
+                                                                            referencedSchemas.add(schemaName);
                                                                         }
+                                                                        found = true;
                                                                     }
                                                                     
-                                                                    // If $ref match failed, try matching by resolved items structure
+                                                                    // If $ref match failed, try matching by resolved items type using cache
                                                                     // This handles cases where the parser has resolved the items $ref as well
-                                                                    if (!found && responseItems != null) {
-                                                                        // Try to match by comparing the resolved items structure
-                                                                        // We'll match if the items type matches and there's only one array schema with that items type
-                                                                        if (responseItemsType != null) {
-                                                                            int matchingCount = 0;
-                                                                            String matchingSchemaName = null;
-                                                                            for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
-                                                                                Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
-                                                                                if (candidateSchema != null && 
-                                                                                    candidateSchema.containsKey("type") && 
-                                                                                    "array".equals(candidateSchema.get("type"))) {
-                                                                                    Object candidateItems = candidateSchema.get("items");
-                                                                                    if (candidateItems != null) {
-                                                                                        Map<String, Object> candidateItemsMap = Util.asStringObjectMap(candidateItems);
-                                                                                        if (candidateItemsMap != null) {
-                                                                                            String candidateItemsType = (String) candidateItemsMap.get("type");
-                                                                                            String candidateItemsRef = (String) candidateItemsMap.get("$ref");
-                                                                                            // Match if type matches and no $ref (resolved) or if both have same $ref
-                                                                                            if (responseItemsType.equals(candidateItemsType) && 
-                                                                                                (responseItemsRef == null || responseItemsRef.equals(candidateItemsRef))) {
-                                                                                                matchingCount++;
-                                                                                                matchingSchemaName = schemaEntry.getKey();
-                                                                                            }
-                                                                                        }
-                                                                                    }
-                                                                                }
-                                                                            }
-                                                                            // Only add if there's exactly one match (to avoid false positives)
-                                                                            if (matchingCount == 1 && matchingSchemaName != null) {
-                                                                                if (!referencedSchemas.contains(matchingSchemaName)) {
-                                                                                    referencedSchemas.add(matchingSchemaName);
-                                                                                }
-                                                                                found = true;
-                                                                            }
+                                                                    if (!found && responseItemsType != null && arraySchemaByItemsType.containsKey(responseItemsType)) {
+                                                                        // Only use type match if there's exactly one array schema with this items type
+                                                                        String schemaName = arraySchemaByItemsType.get(responseItemsType);
+                                                                        if (schemaName != null && !referencedSchemas.contains(schemaName)) {
+                                                                            referencedSchemas.add(schemaName);
                                                                         }
+                                                                        found = true;
                                                                     }
                                                                 }
                                                                 // If no match found, don't add all array schemas as fallback
