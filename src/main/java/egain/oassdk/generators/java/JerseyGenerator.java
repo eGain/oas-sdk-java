@@ -2747,7 +2747,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             boolean hasRef = schema.containsKey("$ref");
 
             if (hasStructure || hasRef || (schema.containsKey("type") && "array".equals(schema.get("type")))) {
-                String xsdContent = generateXSD(schemaName, schema, spec, schemas);
+                String xsdContent = null;
+                try {
+                    xsdContent = generateXSD(schemaName, schema, spec, schemas);
+                } catch (StackOverflowError e) {
+                    // Catch StackOverflow and generate minimal XSD as fallback
+                    logger.warning("StackOverflow error generating XSD for " + schemaName + ", generating minimal XSD instead");
+                    xsdContent = generateMinimalXSD(schemaName);
+                }
                 // Validate XSD content is not empty and has minimum required structure
                 if (xsdContent != null && !xsdContent.trim().isEmpty() && 
                     xsdContent.contains("<?xml") && xsdContent.contains("<xs:schema") && 
@@ -2772,7 +2779,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
             Map<String, Object> schema = Util.asStringObjectMap(schemaObj);
             if (schema != null) {
-                String xsdContent = generateXSD(modelName, schema, spec, schemas);
+                String xsdContent = null;
+                try {
+                    xsdContent = generateXSD(modelName, schema, spec, schemas);
+                } catch (StackOverflowError e) {
+                    // Catch StackOverflow and generate minimal XSD as fallback
+                    logger.warning("StackOverflow error generating XSD for inlined schema " + modelName + ", generating minimal XSD instead");
+                    xsdContent = generateMinimalXSD(modelName);
+                }
                 // Validate XSD content is not empty and has minimum required structure
                 if (xsdContent != null && !xsdContent.trim().isEmpty() && 
                     xsdContent.contains("<?xml") && xsdContent.contains("<xs:schema") && 
@@ -2795,12 +2809,19 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      * Generate XSD for a single schema
      */
     private String generateXSD(String schemaName, Map<String, Object> schema, Map<String, Object> spec, Map<String, Object> allSchemas) {
+        // Create shared visited set for ALL nested property type generation within this schema
+        // This prevents cycles across all recursive calls in generateXSDPropertyType
+        Set<Object> propertyTypeVisited = Collections.newSetFromMap(new IdentityHashMap<>());
+        
         StringBuilder xsd = new StringBuilder();
         xsd.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n");
         
         // Build namespace declarations
         String targetNamespace = "http://bindings.egain.com/ws/model/xsds/common/v4/" + schemaName;
         Set<String> referencedNamespaces = new LinkedHashSet<>();
+        // Shared visited set to prevent cycles across all recursive calls
+        // Use IdentityHashMap-based set for identity-based comparison (not content-based)
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         
         // Check for top-level $ref first
         String ref = (String) schema.get("$ref");
@@ -2813,7 +2834,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 // (e.g., EditNonIntegratedUser $ref User, and User might reference other schemas)
                 Map<String, Object> refSchema = Util.asStringObjectMap(allSchemas.get(refSchemaName));
                 if (refSchema != null) {
-                    collectReferencedSchemasForXSD(refSchema, allSchemas, referencedNamespaces, new HashSet<>());
+                    collectReferencedSchemasForXSD(refSchema, allSchemas, referencedNamespaces, visited);
                 }
             } else if (ref.contains("#/components/schemas/")) {
                 // External file with schema path - extract schema name
@@ -2822,12 +2843,12 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 referencedNamespaces.add(refSchemaName);
                 Map<String, Object> refSchema = Util.asStringObjectMap(allSchemas.get(refSchemaName));
                 if (refSchema != null) {
-                    collectReferencedSchemasForXSD(refSchema, allSchemas, referencedNamespaces, new HashSet<>());
+                    collectReferencedSchemasForXSD(refSchema, allSchemas, referencedNamespaces, visited);
                 }
             } else {
                 // External file reference without schema path - try to find the schema
                 // The parser should have resolved this, but if not, collect references normally
-                collectReferencedSchemasForXSD(schema, allSchemas, referencedNamespaces, new HashSet<>());
+                collectReferencedSchemasForXSD(schema, allSchemas, referencedNamespaces, visited);
             }
         } else {
             // If $ref was resolved by parser, check if schema content matches a known schema
@@ -2887,7 +2908,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             }
             
             // Collect referenced schemas for imports
-            collectReferencedSchemasForXSD(schema, allSchemas, referencedNamespaces, new HashSet<>());
+            collectReferencedSchemasForXSD(schema, allSchemas, referencedNamespaces, visited);
             
             // For array type schemas, also collect referenced schemas from items
             if (schema.containsKey("type") && "array".equals(schema.get("type"))) {
@@ -2896,7 +2917,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     Map<String, Object> itemsSchema = Util.asStringObjectMap(itemsObj);
                     if (itemsSchema != null) {
                         // Collect referenced schemas from items for imports
-                        collectReferencedSchemasForXSD(itemsSchema, allSchemas, referencedNamespaces, new HashSet<>());
+                        collectReferencedSchemasForXSD(itemsSchema, allSchemas, referencedNamespaces, visited);
                     }
                 }
             }
@@ -2942,7 +2963,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 // Check if the schema has properties (indicating it was resolved)
                 if (schema.containsKey("properties") || (schema.containsKey("type") && !schema.containsKey("$ref"))) {
                     // Schema was resolved - use it directly
-                    generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+                    generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas, propertyTypeVisited);
                 } else {
                     // Schema still has $ref - the resolution might have failed
                     // Try to generate anyway - mergeSchemaProperties should handle it
@@ -2951,10 +2972,10 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     schemaWithoutRef.remove("$ref");
                     if (schemaWithoutRef.containsKey("properties") || schemaWithoutRef.containsKey("type")) {
                         // Schema has content after removing $ref - use it
-                        generateXSDComplexType(xsd, schemaName, schemaWithoutRef, spec, allSchemas);
+                        generateXSDComplexType(xsd, schemaName, schemaWithoutRef, spec, allSchemas, propertyTypeVisited);
                     } else {
                         // No properties found - generate as regular complex type anyway
-                        generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+                        generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas, propertyTypeVisited);
                     }
                 }
             } else if (ref.startsWith("#/components/schemas/")) {
@@ -2981,15 +3002,15 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
                     xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
                     xsd.append("        <xs:sequence>\n");
-                    generateXSDComplexTypeContent(xsd, refSchema, spec, allSchemas);
+                    generateXSDComplexTypeContent(xsd, refSchema, spec, allSchemas, propertyTypeVisited);
                     xsd.append("        </xs:sequence>\n");
                     xsd.append("    </xs:complexType>\n");
                 } else {
-                    generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+                    generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas, propertyTypeVisited);
                 }
             } else {
                 // Other $ref format - generate as regular complex type
-                generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+                generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas, propertyTypeVisited);
             }
         } else {
             // Check if this is a resolved $ref (schema content matches another schema)
@@ -3028,10 +3049,10 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 // Generate complex type or element
                 if (schema.containsKey("type") && "array".equals(schema.get("type"))) {
                     // Handle array types
-                    generateXSDArrayType(xsd, schemaName, schema, spec, allSchemas);
+                    generateXSDArrayType(xsd, schemaName, schema, spec, allSchemas, propertyTypeVisited);
                 } else {
                     // Handle complex types
-                    generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas);
+                    generateXSDComplexType(xsd, schemaName, schema, spec, allSchemas, propertyTypeVisited);
                 }
             }
         }
@@ -3065,11 +3086,27 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      */
     private void collectReferencedSchemasForXSD(Map<String, Object> schema, Map<String, Object> allSchemas, 
                                                  Set<String> referencedSchemas, Set<Object> visited) {
+        collectReferencedSchemasForXSD(schema, allSchemas, referencedSchemas, visited, 0);
+    }
+    
+    /**
+     * Collect referenced schemas for XSD imports with depth limit to prevent StackOverflow
+     */
+    private void collectReferencedSchemasForXSD(Map<String, Object> schema, Map<String, Object> allSchemas, 
+                                                 Set<String> referencedSchemas, Set<Object> visited, int depth) {
+        // Prevent StackOverflow by limiting recursion depth
+        // Aggressively reduced limit to prevent StackOverflow in very large specs with deep nesting
+        if (depth > 20) {
+            logger.warning("Recursion depth limit reached in collectReferencedSchemasForXSD: " + depth);
+            return;
+        }
+        
         if (schema == null) {
             return;
         }
         
         // Use IdentityHashMap-based visited set to prevent cycles
+        // Check and add to visited BEFORE processing to prevent infinite recursion
         if (visited.contains(schema)) {
             return;
         }
@@ -3083,15 +3120,21 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 if (allSchemas.containsKey(refSchemaName) && !referencedSchemas.contains(refSchemaName)) {
                     referencedSchemas.add(refSchemaName);
                     Map<String, Object> refSchema = Util.asStringObjectMap(allSchemas.get(refSchemaName));
-                    if (refSchema != null && !visited.contains(refSchema)) {
-                        collectReferencedSchemasForXSD(refSchema, allSchemas, referencedSchemas, visited);
+                    if (refSchema != null) {
+                        // Check visited BEFORE recursing to prevent cycles
+                        if (!visited.contains(refSchema)) {
+                            // Add to visited before recursing to prevent infinite loops
+                            visited.add(refSchema);
+                            collectReferencedSchemasForXSD(refSchema, allSchemas, referencedSchemas, visited, depth + 1);
+                        }
                     }
                 }
                 return; // Don't process further if this is just a $ref
             }
             
             // Check properties
-            if (schema.containsKey("properties")) {
+            // Limit property processing at deeper levels to prevent StackOverflow
+            if (schema.containsKey("properties") && depth < 15) {
                 Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
                 if (properties != null) {
                     for (Map.Entry<String, Object> property : properties.entrySet()) {
@@ -3136,14 +3179,15 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                     }
                                 }
                             }
-                            collectReferencedSchemasForXSD(propertySchema, allSchemas, referencedSchemas, visited);
+                            collectReferencedSchemasForXSD(propertySchema, allSchemas, referencedSchemas, visited, depth + 1);
                         }
                     }
                 }
             }
             
             // Check items for arrays - this is important for collecting array item references
-            if (schema.containsKey("items")) {
+            // Limit items processing at deeper levels to prevent StackOverflow
+            if (schema.containsKey("items") && depth < 15) {
                 Map<String, Object> itemsSchema = Util.asStringObjectMap(schema.get("items"));
                 if (itemsSchema != null && !visited.contains(itemsSchema)) {
                     // First, check if items has a $ref and add it to referencedSchemas
@@ -3185,7 +3229,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                             }
                         }
                     }
-                    collectReferencedSchemasForXSD(itemsSchema, allSchemas, referencedSchemas, visited);
+                    collectReferencedSchemasForXSD(itemsSchema, allSchemas, referencedSchemas, visited, depth + 1);
                 }
             }
             
@@ -3195,7 +3239,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 if (allOfSchemas != null) {
                     for (Map<String, Object> subSchema : allOfSchemas) {
                         if (subSchema != null && !visited.contains(subSchema)) {
-                            collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+                            collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited, depth + 1);
                         }
                     }
                 }
@@ -3205,7 +3249,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 if (oneOfSchemas != null) {
                     for (Map<String, Object> subSchema : oneOfSchemas) {
                         if (subSchema != null && !visited.contains(subSchema)) {
-                            collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+                            collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited, depth + 1);
                         }
                     }
                 }
@@ -3215,7 +3259,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 if (anyOfSchemas != null) {
                     for (Map<String, Object> subSchema : anyOfSchemas) {
                         if (subSchema != null && !visited.contains(subSchema)) {
-                            collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited);
+                            collectReferencedSchemasForXSD(subSchema, allSchemas, referencedSchemas, visited, depth + 1);
                         }
                     }
                 }
@@ -3230,7 +3274,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      * Generate XSD for array type
      */
     private void generateXSDArrayType(StringBuilder xsd, String schemaName, Map<String, Object> schema, 
-                                      Map<String, Object> spec, Map<String, Object> allSchemas) {
+                                      Map<String, Object> spec, Map<String, Object> allSchemas,
+                                      Set<Object> propertyTypeVisited) {
         xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
         xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
         xsd.append("        <xs:sequence>\n");
@@ -3246,7 +3291,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
                     xsd.append(" type=\"").append(refSchemaName).append(":").append(refSchemaName).append("\"");
                 } else {
-                    generateXSDPropertyType(xsd, itemsSchema, allSchemas, "item");
+                    generateXSDPropertyType(xsd, itemsSchema, allSchemas, "item", propertyTypeVisited, 0);
                 }
                 
                 // Handle minOccurs and maxOccurs (from array schema, not items schema)
@@ -3275,7 +3320,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      * This is used both for regular complex types and for expanding $ref schemas
      */
     private void generateXSDComplexTypeContent(StringBuilder xsd, Map<String, Object> schema, 
-                                              Map<String, Object> spec, Map<String, Object> allSchemas) {
+                                              Map<String, Object> spec, Map<String, Object> allSchemas,
+                                              Set<Object> propertyTypeVisited) {
+        
         Map<String, Object> allProperties = new LinkedHashMap<>();
         List<String> allRequired = new ArrayList<>();
 
@@ -3378,7 +3425,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                         if (refSchemaName != null) {
                             xsd.append(" type=\"").append(refSchemaName).append(":").append(refSchemaName).append("\"");
                         } else {
-                            generateXSDPropertyType(xsd, itemsSchema, allSchemas, propertyName);
+                            generateXSDPropertyType(xsd, itemsSchema, allSchemas, propertyName, propertyTypeVisited, 0);
                         }
                     } else {
                         xsd.append(" type=\"xs:anyType\"");
@@ -3421,7 +3468,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     hasProperties = properties != null && !properties.isEmpty();
                 }
                 
-                generateXSDPropertyType(xsd, propertySchema, allSchemas, propertyName);
+                generateXSDPropertyType(xsd, propertySchema, allSchemas, propertyName, propertyTypeVisited, 0);
                 
                 if (!isObjectType || !hasProperties) {
                     // Not an object type, or object with no properties - need to close
@@ -3444,12 +3491,13 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      * Generate XSD for complex type
      */
     private void generateXSDComplexType(StringBuilder xsd, String schemaName, Map<String, Object> schema, 
-                                       Map<String, Object> spec, Map<String, Object> allSchemas) {
+                                       Map<String, Object> spec, Map<String, Object> allSchemas,
+                                       Set<Object> propertyTypeVisited) {
         xsd.append("    <xs:element name=\"").append(schemaName).append("\" type=\"").append(schemaName).append(":").append(schemaName).append("\"/>\n");
         xsd.append("    <xs:complexType name=\"").append(schemaName).append("\">\n");
         xsd.append("        <xs:sequence>\n");
 
-        generateXSDComplexTypeContent(xsd, schema, spec, allSchemas);
+        generateXSDComplexTypeContent(xsd, schema, spec, allSchemas, propertyTypeVisited);
 
         xsd.append("        </xs:sequence>\n");
         xsd.append("    </xs:complexType>\n");
@@ -3460,10 +3508,36 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      */
     private void generateXSDPropertyType(StringBuilder xsd, Map<String, Object> propertySchema, 
                                          Map<String, Object> allSchemas, String propertyName) {
+        // Use IdentityHashMap-based set for identity-based comparison (not content-based)
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        generateXSDPropertyType(xsd, propertySchema, allSchemas, propertyName, visited, 0);
+    }
+    
+    /**
+     * Generate XSD property type (inline or reference) with cycle detection and depth limit
+     */
+    private void generateXSDPropertyType(StringBuilder xsd, Map<String, Object> propertySchema, 
+                                         Map<String, Object> allSchemas, String propertyName,
+                                         Set<Object> visited, int depth) {
+        // Prevent StackOverflow by limiting recursion depth
+        // Aggressively reduced limit to prevent StackOverflow in very large specs with deep nesting
+        if (depth > 10) {
+            logger.warning("Recursion depth limit reached in generateXSDPropertyType: " + depth);
+            xsd.append(" type=\"xs:anyType\"");
+            return;
+        }
+        
         if (propertySchema == null) {
             xsd.append(" type=\"xs:anyType\"");
             return;
         }
+        
+        // Cycle detection - prevent infinite recursion
+        if (visited.contains(propertySchema)) {
+            xsd.append(" type=\"xs:anyType\"");
+            return;
+        }
+        visited.add(propertySchema);
         
         // Check for $ref
         String ref = (String) propertySchema.get("$ref");
@@ -3508,11 +3582,18 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         String type = (String) propertySchema.get("type");
         
         // Handle object types - create nested complex type
+        // Limit nested object processing at deeper levels to prevent StackOverflow
         if ("object".equals(type)) {
             Map<String, Object> properties = Util.asStringObjectMap(propertySchema.get("properties"));
             
             // If object has no properties, use anyType
             if (properties == null || properties.isEmpty()) {
+                xsd.append(" type=\"xs:anyType\"");
+                return;
+            }
+            
+            // Skip processing nested object properties at very deep levels
+            if (depth >= 8) {
                 xsd.append(" type=\"xs:anyType\"");
                 return;
             }
@@ -3546,7 +3627,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                 Map<String, Object> itemsProps = isItemsObjectType ? Util.asStringObjectMap(itemsSchema.get("properties")) : null;
                                 boolean itemsHasProperties = itemsProps != null && !itemsProps.isEmpty();
                                 
-                                generateXSDPropertyType(xsd, itemsSchema, allSchemas, propName);
+                                generateXSDPropertyType(xsd, itemsSchema, allSchemas, propName, visited, depth + 1);
                                 
                                 // Handle minOccurs and maxOccurs for arrays
                                 Object minItems = propSchema.get("minItems");
@@ -3598,7 +3679,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                             hasProperties = propProps != null && !propProps.isEmpty();
                         }
                         
-                        generateXSDPropertyType(xsd, propSchema, allSchemas, propName);
+                        generateXSDPropertyType(xsd, propSchema, allSchemas, propName, visited, depth + 1);
                         
                         if (!isObjectType || !hasProperties) {
                             // Not an object type, or object with no properties - need to close
