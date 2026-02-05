@@ -819,8 +819,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         }
     }
 
-    /** Max recursion depth for collectInlineSchemasFromSchemaProperties to prevent StackOverflow on large specs. */
-    private static final int MAX_INLINE_SCHEMA_COLLECTION_DEPTH = 25;
+    /** Max recursion depth for collectInlineSchemasFromSchemaProperties to prevent StackOverflow on very deep specs. */
+    private static final int MAX_INLINE_SCHEMA_COLLECTION_DEPTH = 100;
 
     /**
      * Recursively collect inline object schemas from a schema's properties
@@ -838,7 +838,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     private void collectInlineSchemasFromSchemaProperties(Map<String, Object> schema, String parentPropertyName, Map<String, Object> spec, Set<Object> visited, Set<Object> topLevelSchemaObjects, boolean isInCompositionContext, int depth) {
         if (schema == null) return;
         if (depth > MAX_INLINE_SCHEMA_COLLECTION_DEPTH) {
-            logger.warning("Recursion depth limit reached in collectInlineSchemasFromSchemaProperties: " + depth);
+            logger.fine("Recursion depth limit reached in collectInlineSchemasFromSchemaProperties: " + depth + " (no impact on SDK generation for already-visited schemas)");
             return;
         }
 
