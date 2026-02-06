@@ -148,6 +148,28 @@ public class PathResolver {
             }
         }
 
+        // When path escapes base dir (e.g. ../../../models/v4/Link.yaml), try path under search root with leading ../ stripped
+        if (sanitizedPath.contains("../") || sanitizedPath.contains("..\\")) {
+            String stripped = sanitizedPath.replace('\\', '/');
+            while (stripped.startsWith("../")) {
+                stripped = stripped.substring(3);
+            }
+            if (!stripped.isEmpty()) {
+                for (Path searchPath : searchPaths) {
+                    Path candidatePath = searchPath.resolve(stripped).normalize();
+                    if (Files.exists(candidatePath) && Files.isRegularFile(candidatePath)) {
+                        try {
+                            validatePathTraversal(searchPath, candidatePath);
+                            validateFileSize(candidatePath);
+                            return candidatePath;
+                        } catch (OASSDKException e) {
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
         // If path contains ../ and wasn't found, try extracting just the filename
         // This handles cases like ../../../models/v4/User.yaml where we want to find User.yaml in search paths
         if (sanitizedPath.contains("../") || sanitizedPath.contains("..\\")) {

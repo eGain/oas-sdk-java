@@ -239,7 +239,7 @@ public class OASParser {
         Map<String, Object> mainSpec = loadedFiles.get(baseFileKey);
         for (Map.Entry<String, Map<String, Object>> entry : loadedFiles.entrySet()) {
             if (!entry.getKey().equals(baseFileKey) && entry.getValue() != mainSpec) {
-                mergeExternalSchemasIntoMainSpec(entry.getValue(), mainSpec);
+                mergeExternalSchemasIntoMainSpec(entry.getKey(), entry.getValue(), mainSpec);
             }
         }
 
@@ -265,9 +265,6 @@ public class OASParser {
             // Util.asStringObjectMap might create a new LinkedHashMap, which would break our reference
             @SuppressWarnings("unchecked")
             Map<String, Object> map = (Map<String, Object>) obj;
-            if (map == null) {
-                return;
-            }
 
             // Check if this is a $ref
             // IMPORTANT: Only resolve if map has ONLY $ref (size == 1)
@@ -322,6 +319,12 @@ public class OASParser {
                         // Preserve original ref path for internal refs so generators (e.g. XSD) can emit imports/type refs
                         if (ref != null && ref.startsWith("#/components/schemas/")) {
                             map.put("x-resolved-ref", ref);
+                        } else if (isExternalFileRef && ref != null) {
+                            // For external file refs, set x-resolved-ref so generators emit type refs and imports
+                            String schemaName = deriveSchemaNameFromRef(ref);
+                            if (schemaName != null && !schemaName.isEmpty()) {
+                                map.put("x-resolved-ref", "#/components/schemas/" + schemaName);
+                            }
                         }
                         
                         // Recursively resolve any references in the resolved content
@@ -400,6 +403,33 @@ public class OASParser {
             // Internal reference without file part
             return currentFileKey + "#" + ref;
         }
+    }
+
+    /**
+     * Derive schema name from a $ref or file path (e.g. "models/v4/Link.yaml" -> "Link", "DepartmentView.yaml" -> "DepartmentView").
+     * Used so that x-resolved-ref and merged schema names match for external file refs.
+     */
+    private String deriveSchemaNameFromRef(String ref) {
+        if (ref == null || ref.isEmpty()) {
+            return null;
+        }
+        String path = ref.contains("#") ? ref.split("#", 2)[0] : ref;
+        path = path.replace('\\', '/');
+        int lastSlash = path.lastIndexOf('/');
+        String segment = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+        if (segment.isEmpty()) {
+            return null;
+        }
+        if (segment.endsWith(".yaml")) {
+            return segment.substring(0, segment.length() - 5);
+        }
+        if (segment.endsWith(".yml")) {
+            return segment.substring(0, segment.length() - 4);
+        }
+        if (segment.endsWith(".json")) {
+            return segment.substring(0, segment.length() - 5);
+        }
+        return segment;
     }
 
     /**
@@ -487,8 +517,10 @@ public class OASParser {
     /**
      * Merge external schemas into the main spec's components/schemas section
      * This allows generators to find and generate models from external files
+     *
+     * @param fileKey the file path key (e.g. from loadedFiles) used to derive schema name when title is absent
      */
-    private void mergeExternalSchemasIntoMainSpec(Map<String, Object> externalSpec, Map<String, Object> mainSpec) {
+    private void mergeExternalSchemasIntoMainSpec(String fileKey, Map<String, Object> externalSpec, Map<String, Object> mainSpec) {
         if (externalSpec == null || mainSpec == null) {
             return;
         }
@@ -497,14 +529,14 @@ public class OASParser {
         // Schema definition files have type/properties directly, not wrapped in components/schemas
         if (externalSpec.containsKey("type") || externalSpec.containsKey("properties")) {
             // This is a schema definition file - merge it as a schema
-            // Use the file name as the schema name, or try to find a title/name
+            // Use title if present, otherwise derive schema name from file path (must match x-resolved-ref)
             String schemaName = null;
             if (externalSpec.containsKey("title")) {
                 schemaName = (String) externalSpec.get("title");
-            } else {
-                // Try to extract from file path if available
-                // For now, we'll skip this as we don't have the file path here
-                // The resolved $ref should already have the schema content
+            } else if (fileKey != null && !fileKey.isEmpty()) {
+                schemaName = deriveSchemaNameFromRef(fileKey);
+            }
+            if (schemaName == null || schemaName.isEmpty()) {
                 return;
             }
             
