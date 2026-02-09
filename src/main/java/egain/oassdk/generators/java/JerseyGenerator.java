@@ -2929,7 +2929,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                 }
                                 String propName = property.getKey();
                                 String inferred = resolveRefSchemaNameFromPropertyName(propName, allSchemas);
-                                if (inferred != null && allSchemas.containsKey(inferred) && !referencedNamespaces.contains(inferred)) {
+                                if (inferred != null && !referencedNamespaces.contains(inferred)) {
                                     referencedNamespaces.add(inferred);
                                 }
                             }
@@ -2959,7 +2959,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                                 }
                                             }
                                             String inferredItems = resolveRefSchemaNameFromPropertyName(property.getKey(), allSchemas);
-                                            if (inferredItems != null && allSchemas.containsKey(inferredItems) && !referencedNamespaces.contains(inferredItems)) {
+                                            if (inferredItems != null && !referencedNamespaces.contains(inferredItems)) {
                                                 referencedNamespaces.add(inferredItems);
                                             }
                                         }
@@ -4005,17 +4005,23 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      * Get XSD type from OpenAPI schema
      */
     /**
-     * Return the XSD namespace prefix for a schema name (schema name as-is for all types).
+     * Return the XSD namespace prefix for a schema name.
+     * Link uses lowercase "link" to match reference XSD (xmlns:link); others use schema name as-is.
      */
     private String getXSDNamespacePrefix(String schemaName) {
+        if ("Link".equals(schemaName)) return "link";
         return schemaName;
     }
 
     /**
      * Infer referenced schema name from property name when ref is not set (capitalize and match exact or endsWith in allSchemas).
+     * Also supports well-known binding types: link -> Link, department -> DepartmentView (even when not in components).
      */
     private String resolveRefSchemaNameFromPropertyName(String propertyName, Map<String, Object> allSchemas) {
         if (propertyName == null || propertyName.isEmpty()) return null;
+        // Well-known eGain binding types (used in XSD type refs even when not in components)
+        if ("link".equals(propertyName)) return "Link";
+        if ("department".equals(propertyName)) return "DepartmentView";
         if (allSchemas == null || allSchemas.isEmpty()) return null;
         String capitalized = propertyName.substring(0, 1).toUpperCase(Locale.ROOT) + propertyName.substring(1);
         if (allSchemas.containsKey(capitalized)) return capitalized;
