@@ -1099,6 +1099,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         // Generate ObjectFactory for JAXB support
         generateObjectFactory(schemas, outputDir, packagePath);
 
+        // Generate jaxb.index for JAXB package discovery
+        generateJaxbIndex(schemas, outputDir, packagePath);
+
         // Generate XSD files
         generateXSDs(spec, outputDir, packagePath);
     }
@@ -1146,6 +1149,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      * Generate ObjectFactory class for JAXB support
      */
     private void generateObjectFactory(Map<String, Object> schemas, String outputDir, String packagePath) throws IOException {
+        Set<String> generatedClasses = collectJaxbModelClassNames(schemas);
+
         StringBuilder content = new StringBuilder();
         content.append("package ").append(packagePath).append(".model;\n\n");
         content.append("import jakarta.xml.bind.JAXBElement;\n");
@@ -1160,7 +1165,30 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("    public ObjectFactory() {\n");
         content.append("    }\n\n");
 
-        // Generate factory methods for each model class
+        for (String javaClassName : generatedClasses) {
+            generateObjectFactoryMethod(content, javaClassName);
+        }
+
+        content.append("}\n");
+
+        writeFile(outputDir + "/src/main/java/" + packagePath.replace(".", "/") + "/model/ObjectFactory.java", content.toString());
+    }
+
+    /**
+     * Generate jaxb.index file for JAXB package-based context discovery.
+     * Lists all generated model class names (one per line) so JAXB can discover them.
+     */
+    private void generateJaxbIndex(Map<String, Object> schemas, String outputDir, String packagePath) throws IOException {
+        Set<String> classNames = collectJaxbModelClassNames(schemas);
+        String indexContent = String.join("\n", classNames);
+        String modelDir = outputDir + "/src/main/java/" + packagePath.replace(".", "/") + "/model";
+        writeFile(modelDir + "/jaxb.index", indexContent);
+    }
+
+    /**
+     * Collect the set of JAXB model class names (same set used for ObjectFactory and jaxb.index).
+     */
+    private Set<String> collectJaxbModelClassNames(Map<String, Object> schemas) {
         Set<String> generatedClasses = new HashSet<>();
 
         // Add all top-level schemas
@@ -1169,7 +1197,6 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             Map<String, Object> schema = Util.asStringObjectMap(schemaEntry.getValue());
             if (schema == null) continue;
 
-            // Skip error schemas and simple types
             if (isErrorSchema(schemaName)) {
                 continue;
             }
@@ -1188,23 +1215,13 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             }
 
             String javaClassName = toJavaClassName(schemaName);
-            if (!generatedClasses.contains(javaClassName)) {
-                generateObjectFactoryMethod(content, javaClassName);
-                generatedClasses.add(javaClassName);
-            }
+            generatedClasses.add(javaClassName);
         }
 
         // Add inlined schemas
-        for (String modelName : inlinedSchemas.values()) {
-            if (!generatedClasses.contains(modelName)) {
-                generateObjectFactoryMethod(content, modelName);
-                generatedClasses.add(modelName);
-            }
-        }
+        generatedClasses.addAll(inlinedSchemas.values());
 
-        content.append("}\n");
-
-        writeFile(outputDir + "/src/main/java/" + packagePath.replace(".", "/") + "/model/ObjectFactory.java", content.toString());
+        return generatedClasses;
     }
 
     /**
@@ -2073,7 +2090,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         // Add serialVersionUID for Serializable
         content.append("    private static final long serialVersionUID = 1L;\n\n");
 
-        // Add field for dynamic attributes
+        // Add field for dynamic attributes (excluded from JAXB binding)
+        content.append("    @XmlTransient\n");
         content.append("    private Map<String, Object> attributes = new HashMap<>();\n\n");
 
         // Generate fields
