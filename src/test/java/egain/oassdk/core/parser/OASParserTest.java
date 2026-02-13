@@ -1,8 +1,10 @@
 package egain.oassdk.core.parser;
 
+import egain.oassdk.Util;
 import egain.oassdk.core.exceptions.OASSDKException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
@@ -263,6 +265,67 @@ public class OASParserTest {
         Map<String, Object> result = parser.resolveReferences(spec, "test.yaml");
         assertNotNull(result);
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void testResolveReferencesRegistersNestedExternalSchemaInMainSpec(@TempDir Path tempDir) throws IOException, OASSDKException {
+        // Main spec references models/Users.yaml; Users.yaml has user.items $ref: './User.yaml'.
+        // Parser must register User in main spec when inlining so generators see the full User schema.
+        Path modelsDir = tempDir.resolve("models");
+        Files.createDirectories(modelsDir);
+
+        String userYaml = """
+            type: object
+            title: User
+            properties:
+              firstName:
+                allOf:
+                  - type: string
+              name:
+                allOf:
+                  - type: string
+            """;
+        Files.writeString(modelsDir.resolve("User.yaml"), userYaml);
+
+        String usersYaml = """
+            type: object
+            title: Users
+            properties:
+              user:
+                allOf:
+                  - type: array
+                    items:
+                      $ref: "./User.yaml"
+            """;
+        Files.writeString(modelsDir.resolve("Users.yaml"), usersYaml);
+
+        String apiYaml = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            paths: {}
+            components:
+              schemas:
+                Users:
+                  $ref: models/Users.yaml
+            """;
+        Path apiPath = tempDir.resolve("api.yaml");
+        Files.writeString(apiPath, apiYaml);
+
+        Map<String, Object> spec = parser.parse(apiPath.toString());
+        Map<String, Object> resolved = parser.resolveReferences(spec, apiPath.toString());
+
+        assertNotNull(resolved);
+        Map<String, Object> components = Util.asStringObjectMap(resolved.get("components"));
+        assertNotNull(components, "components should exist");
+        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+        assertNotNull(schemas, "schemas should exist");
+        assertTrue(schemas.containsKey("User"), "User schema must be registered when User.yaml is inlined from Users.yaml");
+        assertTrue(schemas.containsKey("Users"), "Users schema should exist");
+        Map<String, Object> userSchema = Util.asStringObjectMap(schemas.get("User"));
+        assertNotNull(userSchema);
+        assertTrue(userSchema.containsKey("properties"));
     }
 }
 

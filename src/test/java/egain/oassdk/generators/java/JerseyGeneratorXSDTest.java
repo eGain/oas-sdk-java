@@ -878,7 +878,216 @@ public class JerseyGeneratorXSDTest {
         assertTrue(content.contains("name=\"name\""), 
             "Should include name from Base2 schema");
     }
-    
+
+    @Test
+    @DisplayName("Test Java model with property-level allOf resolves to correct type and validation")
+    public void testPropertyLevelAllOfResolvesToTypeAndValidation() throws OASSDKException, IOException {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            paths: {}
+            components:
+              schemas:
+                PropertyLevelAllOf:
+                  type: object
+                  properties:
+                    foo:
+                      allOf:
+                        - type: string
+                          pattern: "^x$"
+                          maxLength: 10
+            """;
+
+        Path testSpecFile = tempOutputDir.resolve("property-allof-spec.yaml");
+        Files.writeString(testSpecFile, yamlContent);
+
+        Path outputDir = tempOutputDir.resolve("property-allof-sdk");
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(testSpecFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path modelPath = outputDir.resolve("src/main/java/com/test/api/model/PropertyLevelAllOf.java");
+        assertTrue(Files.exists(modelPath), "PropertyLevelAllOf.java should exist");
+
+        String javaContent = Files.readString(modelPath);
+
+        // Property-level allOf should resolve to String, not Object
+        assertTrue(javaContent.contains("private String foo") || javaContent.contains("String foo"),
+            "Property foo with allOf [ type: string ] should generate String foo, not Object foo");
+
+        // Validation from allOf branch should be applied
+        assertTrue(javaContent.contains("@Pattern") && javaContent.contains("x"),
+            "Validation @Pattern from allOf branch should be present");
+        assertTrue(javaContent.contains("@Size") && javaContent.contains("max"),
+            "Validation @Size(maxLength) from allOf branch should be present");
+    }
+
+    @Test
+    @DisplayName("Test User model has many typed fields and Users has List<User> user")
+    public void testUserAndUsersModelsGeneratedCorrectly() throws OASSDKException, IOException {
+        // User with many properties (property-level allOf) and Users with one property (array of User).
+        // No paths so resolution does not affect components/schemas. Link is inline to avoid extra refs.
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            paths: {}
+            components:
+              schemas:
+                User:
+                  type: object
+                  properties:
+                    firstName:
+                      allOf:
+                        - type: string
+                          maxLength: 124
+                    lastName:
+                      allOf:
+                        - type: string
+                    link:
+                      allOf:
+                        - type: array
+                          items:
+                            type: string
+                Users:
+                  type: object
+                  properties:
+                    user:
+                      allOf:
+                        - type: array
+                          items:
+                            $ref: '#/components/schemas/User'
+                          maxItems: 75
+            """;
+
+        Path testSpecFile = tempOutputDir.resolve("user-users-spec.yaml");
+        Files.writeString(testSpecFile, yamlContent);
+
+        Path outputDir = tempOutputDir.resolve("user-users-sdk");
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(testSpecFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        String modelPackagePath = "src/main/java/com/test/api/model";
+
+        // User.java: must have many typed fields (firstName, lastName, link), not just List<Object> user
+        Path userModelPath = outputDir.resolve(modelPackagePath + "/User.java");
+        assertTrue(Files.exists(userModelPath), "User.java should exist");
+        String userJava = Files.readString(userModelPath);
+
+        assertTrue(userJava.contains("firstName"),
+            "User model should have firstName (many properties from User schema)");
+        assertTrue(userJava.contains("lastName"),
+            "User model should have lastName");
+        assertTrue(userJava.contains("link"),
+            "User model should have link");
+        assertTrue(userJava.contains("String") || userJava.contains("List<"),
+            "User model should have typed fields (String or List<...>), not only Object");
+
+        // Users.java: must have List<User> user, not List<Object>
+        Path usersModelPath = outputDir.resolve(modelPackagePath + "/Users.java");
+        assertTrue(Files.exists(usersModelPath), "Users.java should exist");
+        String usersJava = Files.readString(usersModelPath);
+
+        assertTrue(usersJava.contains("user") && usersJava.contains("List<User>"),
+            "Users model should have List<User> user, not List<Object>");
+    }
+
+    @Test
+    @DisplayName("Test external User.yaml and Users.yaml: full User model and List<User> user")
+    public void testExternalUserAndUsersModelsGeneratedCorrectly() throws OASSDKException, IOException {
+        // Main spec references models/Users.yaml. Refs inside Users.yaml are resolved with that file's
+        // directory (models/), so User.yaml is in models/ with $ref: "./User.yaml".
+        // Parser must register User in main spec when inlining so User.java has many fields.
+        Path modelsDir = tempOutputDir.resolve("models");
+        Files.createDirectories(modelsDir);
+
+        String userYaml = """
+            type: object
+            title: User
+            properties:
+              firstName:
+                allOf:
+                  - type: string
+                    maxLength: 124
+              lastName:
+                allOf:
+                  - type: string
+              name:
+                allOf:
+                  - type: string
+              link:
+                allOf:
+                  - type: array
+                    items:
+                      type: string
+            """;
+        Files.writeString(modelsDir.resolve("User.yaml"), userYaml);
+
+        String usersYaml = """
+            type: object
+            title: Users
+            properties:
+              user:
+                title: user
+                allOf:
+                  - type: array
+                    items:
+                      $ref: "./User.yaml"
+                    minItems: 0
+                    maxItems: 75
+            """;
+        Files.writeString(modelsDir.resolve("Users.yaml"), usersYaml);
+
+        String apiYaml = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            paths: {}
+            components:
+              schemas:
+                Users:
+                  $ref: models/Users.yaml
+            """;
+        Path apiSpecPath = tempOutputDir.resolve("api.yaml");
+        Files.writeString(apiSpecPath, apiYaml);
+
+        Path outputDir = tempOutputDir.resolve("external-user-users-sdk");
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(apiSpecPath.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        String modelPackagePath = "src/main/java/com/test/api/model";
+
+        // User.java must have many fields (from User.yaml), not just List<User> user
+        Path userModelPath = outputDir.resolve(modelPackagePath + "/User.java");
+        assertTrue(Files.exists(userModelPath), "User.java should exist (registered when User.yaml was inlined)");
+        String userJava = Files.readString(userModelPath);
+
+        assertTrue(userJava.contains("firstName"), "User model from User.yaml should have firstName");
+        assertTrue(userJava.contains("lastName"), "User model should have lastName");
+        assertTrue(userJava.contains("name"), "User model should have name");
+        assertTrue(userJava.contains("link"), "User model should have link");
+
+        // Users.java must have List<User> user
+        Path usersModelPath = outputDir.resolve(modelPackagePath + "/Users.java");
+        assertTrue(Files.exists(usersModelPath), "Users.java should exist");
+        String usersJava = Files.readString(usersModelPath);
+
+        assertTrue(usersJava.contains("user") && usersJava.contains("List<User>"),
+            "Users model should have List<User> user");
+    }
+
     @Test
     @DisplayName("Test XSD with nested array of objects")
     public void testXSDNestedArrayOfObjects() throws OASSDKException, IOException {

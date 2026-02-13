@@ -232,7 +232,7 @@ public class OASParser {
         Set<Object> visitedObjects = Collections.newSetFromMap(new IdentityHashMap<>());
 
         // Resolve all references recursively
-        resolveReferencesRecursive(resolvedSpec, basePath.getParent(), baseFileKey, loadedFiles, resolvingRefs, visitedObjects);
+        resolveReferencesRecursive(resolvedSpec, basePath.getParent(), baseFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects);
 
         // After all references are resolved, merge external schemas into the main spec
         // This allows generators to find and generate models from external files
@@ -248,8 +248,9 @@ public class OASParser {
 
     /**
      * Recursively resolve $ref references in the specification
+     * @param baseFileKey key of the main spec in loadedFiles (for registering resolved external schemas)
      */
-    private void resolveReferencesRecursive(Object obj, Path baseDir, String currentFileKey,
+    private void resolveReferencesRecursive(Object obj, Path baseDir, String currentFileKey, String baseFileKey,
                                             Map<String, Map<String, Object>> loadedFiles, Set<String> resolvingRefs, Set<Object> visitedObjects) throws OASSDKException {
         if (obj == null) {
             return;
@@ -292,7 +293,7 @@ public class OASParser {
                 resolvingRefs.add(refKey);
 
                 try {
-                    Object resolved = resolveReference(ref, baseDir, currentFileKey, loadedFiles, resolvingRefs, visitedObjects);
+                    Object resolved = resolveReference(ref, baseDir, currentFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects);
 
                     // Replace the map with resolved content
                     if (resolved instanceof Map) {
@@ -327,9 +328,16 @@ public class OASParser {
                             }
                         }
                         
+                        // When we inline an external schema file, register it in the main spec's components/schemas
+                        // so that the full schema (e.g. User from User.yaml) is available even if the main spec
+                        // had a wrong or missing entry for that name (e.g. User pointing at Users.yaml).
+                        if (isExternalFileRef && ref != null) {
+                            addResolvedExternalSchemaToMainSpec(ref, resolvedCopy, loadedFiles, baseFileKey);
+                        }
+
                         // Recursively resolve any references in the resolved content
                         // Note: We keep refKey in resolvingRefs to detect circular references in nested content
-                        resolveReferencesRecursive(map, baseDir, currentFileKey, loadedFiles, resolvingRefs, visitedObjects);
+                        resolveReferencesRecursive(map, baseDir, currentFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects);
                     } else {
                         // If resolved is not a map, this shouldn't happen for parameters
                         throw new OASSDKException("Resolved reference is not a Map: " + ref);
@@ -361,16 +369,54 @@ public class OASParser {
                         }
                     }
                 }
-                resolveReferencesRecursive(value, baseDir, currentFileKey, loadedFiles, resolvingRefs, visitedObjects);
+                resolveReferencesRecursive(value, baseDir, currentFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects);
             }
         } else if (obj instanceof List) {
             List<Object> list = Util.asObjectList(obj);
             // Mark list as visited
             visitedObjects.add(list);
             for (Object o : list) {
-                resolveReferencesRecursive(o, baseDir, currentFileKey, loadedFiles, resolvingRefs, visitedObjects);
+                resolveReferencesRecursive(o, baseDir, currentFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects);
             }
         }
+    }
+
+    /**
+     * When an external file ref (e.g. User.yaml) is resolved and inlined, register that schema
+     * in the main spec's components/schemas under the derived name. This ensures the full schema
+     * is available to generators even when the only reference was nested (e.g. Users.user.items).
+     */
+    private void addResolvedExternalSchemaToMainSpec(String ref, Map<String, Object> resolvedCopy,
+                                                     Map<String, Map<String, Object>> loadedFiles, String baseFileKey) {
+        if (ref == null || resolvedCopy == null || loadedFiles == null || baseFileKey == null) {
+            return;
+        }
+        // Only register if the resolved content looks like a schema definition (type or properties at top level)
+        if (!resolvedCopy.containsKey("type") && !resolvedCopy.containsKey("properties")) {
+            return;
+        }
+        String schemaName = deriveSchemaNameFromRef(ref);
+        if (schemaName == null || schemaName.isEmpty()) {
+            return;
+        }
+        Map<String, Object> mainSpec = loadedFiles.get(baseFileKey);
+        if (mainSpec == null) {
+            return;
+        }
+        // Use the actual map from the spec so we modify in place (Util.asStringObjectMap would copy)
+        @SuppressWarnings("unchecked")
+        Map<String, Object> mainComponents = (Map<String, Object>) mainSpec.get("components");
+        if (mainComponents == null) {
+            mainComponents = new HashMap<>();
+            mainSpec.put("components", mainComponents);
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> mainSchemas = (Map<String, Object>) mainComponents.get("schemas");
+        if (mainSchemas == null) {
+            mainSchemas = new HashMap<>();
+            mainComponents.put("schemas", mainSchemas);
+        }
+        mainSchemas.put(schemaName, new HashMap<>(resolvedCopy));
     }
 
     /**
@@ -434,8 +480,9 @@ public class OASParser {
 
     /**
      * Resolve a single $ref reference
+     * @param baseFileKey key of the main spec in loadedFiles (for recursive resolution)
      */
-    private Object resolveReference(String ref, Path baseDir, String currentFileKey, Map<String, Map<String, Object>> loadedFiles, Set<String> resolvingRefs, Set<Object> visitedObjects) throws OASSDKException {
+    private Object resolveReference(String ref, Path baseDir, String currentFileKey, String baseFileKey, Map<String, Map<String, Object>> loadedFiles, Set<String> resolvingRefs, Set<Object> visitedObjects) throws OASSDKException {
         if (ref == null || ref.isEmpty()) {
             throw new OASSDKException("Empty $ref reference");
         }
@@ -461,7 +508,7 @@ public class OASParser {
                     loadedFiles.put(fileKey, externalSpec);
                     // Resolve references in the external file recursively
                     // Share the same resolving set to detect cross-file circular references
-                    resolveReferencesRecursive(externalSpec, refPath.getParent(), fileKey, loadedFiles, resolvingRefs, visitedObjects);
+                    resolveReferencesRecursive(externalSpec, refPath.getParent(), fileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects);
                 }
 
                 // Resolve the JSON path in the external file
@@ -494,7 +541,7 @@ public class OASParser {
                     externalSpec = parse(refPath.toString());
                     externalSpec = new HashMap<>(externalSpec);
                     loadedFiles.put(fileKey, externalSpec);
-                    resolveReferencesRecursive(externalSpec, refPath.getParent(), fileKey, loadedFiles, resolvingRefs, visitedObjects);
+                    resolveReferencesRecursive(externalSpec, refPath.getParent(), fileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects);
                 }
                 
                 // IMPORTANT: If the external file is a schema definition (not a full OpenAPI spec),
@@ -528,35 +575,39 @@ public class OASParser {
         // Check if externalSpec is a schema definition file (not a full OpenAPI spec)
         // Schema definition files have type/properties directly, not wrapped in components/schemas
         if (externalSpec.containsKey("type") || externalSpec.containsKey("properties")) {
-            // This is a schema definition file - merge it as a schema
-            // Use title if present, otherwise derive schema name from file path (must match x-resolved-ref)
+            // This is a schema definition file - merge it as a schema.
+            // Use stable name from file path (e.g. User.yaml -> "User", Users.yaml -> "Users")
+            // so that the correct schema always wins (full User from User.yaml, not inlined placeholder).
             String schemaName = null;
-            if (externalSpec.containsKey("title")) {
-                schemaName = (String) externalSpec.get("title");
-            } else if (fileKey != null && !fileKey.isEmpty()) {
+            if (fileKey != null && !fileKey.isEmpty()) {
                 schemaName = deriveSchemaNameFromRef(fileKey);
+            }
+            if (schemaName == null || schemaName.isEmpty()) {
+                if (externalSpec.containsKey("title")) {
+                    schemaName = (String) externalSpec.get("title");
+                }
             }
             if (schemaName == null || schemaName.isEmpty()) {
                 return;
             }
             
-            // Ensure main spec has components/schemas
-            Map<String, Object> mainComponents = Util.asStringObjectMap(mainSpec.get("components"));
+            // Use the actual map from the spec so we modify in place (Util.asStringObjectMap would copy)
+            @SuppressWarnings("unchecked")
+            Map<String, Object> mainComponents = (Map<String, Object>) mainSpec.get("components");
             if (mainComponents == null) {
                 mainComponents = new HashMap<>();
                 mainSpec.put("components", mainComponents);
             }
-            
-            Map<String, Object> mainSchemas = Util.asStringObjectMap(mainComponents.get("schemas"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> mainSchemas = (Map<String, Object>) mainComponents.get("schemas");
             if (mainSchemas == null) {
                 mainSchemas = new HashMap<>();
                 mainComponents.put("schemas", mainSchemas);
             }
             
-            // Merge the schema definition if not already present
-            if (schemaName != null && !mainSchemas.containsKey(schemaName)) {
-                mainSchemas.put(schemaName, new HashMap<>(externalSpec));
-            }
+            // Overwrite with external schema definition so full schema from file wins
+            // (e.g. User.yaml provides full User with many properties, not an inlined placeholder)
+            mainSchemas.put(schemaName, new HashMap<>(externalSpec));
             return;
         }
 
@@ -571,23 +622,30 @@ public class OASParser {
             return;
         }
 
-        // Ensure main spec has components/schemas
-        Map<String, Object> mainComponents = Util.asStringObjectMap(mainSpec.get("components"));
+        // Use the actual map from the spec so we modify in place
+        @SuppressWarnings("unchecked")
+        Map<String, Object> mainComponents = (Map<String, Object>) mainSpec.get("components");
         if (mainComponents == null) {
             mainComponents = new HashMap<>();
             mainSpec.put("components", mainComponents);
         }
-
-        Map<String, Object> mainSchemas = Util.asStringObjectMap(mainComponents.get("schemas"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> mainSchemas = (Map<String, Object>) mainComponents.get("schemas");
         if (mainSchemas == null) {
             mainSchemas = new HashMap<>();
             mainComponents.put("schemas", mainSchemas);
         }
 
-        // Merge external schemas into main schemas (only if not already present)
+        // Derive schema name from this file (e.g. User.yaml -> "User") so we overwrite that name when
+        // the external file is the canonical source (e.g. full User from User.yaml wins over a wrong main entry).
+        String fileDerivedSchemaName = (fileKey != null && !fileKey.isEmpty()) ? deriveSchemaNameFromRef(fileKey) : null;
+
+        // Merge external schemas into main schemas. Add if not present; overwrite when schema name
+        // matches the current file's derived name so that the definition from this file wins.
         for (Map.Entry<String, Object> schemaEntry : externalSchemas.entrySet()) {
             String schemaName = schemaEntry.getKey();
-            if (!mainSchemas.containsKey(schemaName)) {
+            boolean overwrite = fileDerivedSchemaName != null && fileDerivedSchemaName.equals(schemaName);
+            if (overwrite || !mainSchemas.containsKey(schemaName)) {
                 // Create a copy to avoid modifying the original
                 Object schemaValue = schemaEntry.getValue();
                 if (schemaValue instanceof Map) {

@@ -22,9 +22,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
     private static final Logger logger = LoggerConfig.getLogger(JerseyGenerator.class);
 
+    /** Max depth when resolving allOf/oneOf/anyOf to prevent infinite recursion */
+    private static final int MAX_COMPOSITION_RESOLVE_DEPTH = 10;
+
     private GeneratorConfig config;
     // Map to store in-lined schemas: schema object -> generated model name
     private final Map<Object, String> inlinedSchemas = new java.util.IdentityHashMap<>();
+    /** Current spec for resolving $ref inside composition (set during generate). */
+    private final ThreadLocal<Map<String, Object>> currentSpecForResolution = new ThreadLocal<>();
 
     @Override
     public void generate(Map<String, Object> spec, String outputDir, GeneratorConfig config, String packageName) throws GenerationException {
@@ -34,6 +39,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         this.config = config;
 
         try {
+            currentSpecForResolution.set(spec);
             // Create directory structure
             createDirectoryStructure(outputDir, packageName);
 
@@ -73,6 +79,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         } catch (Exception e) {
             logger.log(java.util.logging.Level.SEVERE, "Failed to generate Jersey application: " + e.getMessage(), e);
             throw new GenerationException("Failed to generate Jersey application: " + e.getMessage(), e);
+        } finally {
+            currentSpecForResolution.remove();
         }
     }
 
@@ -3776,7 +3784,15 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             return true;
         }
         visited.add(propertySchema);
-        
+
+        // Resolve property-level allOf/oneOf/anyOf to effective schema for XSD type
+        if (propertySchema.containsKey("allOf") || propertySchema.containsKey("oneOf") || propertySchema.containsKey("anyOf")) {
+            Map<String, Object> effective = resolveCompositionToEffectiveSchema(propertySchema, currentSpecForResolution.get());
+            if (effective != null && effective != propertySchema) {
+                propertySchema = effective;
+            }
+        }
+
         // Check for x-resolved-ref (parser preserves this) or $ref
         String refSchemaName = getSchemaNameFromRef(propertySchema);
         if (refSchemaName == null) {
@@ -4058,6 +4074,23 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         if (ref == null) ref = (String) schema.get("$ref");
         if (ref == null || !ref.contains("#/components/schemas/")) return null;
         return ref.substring(ref.lastIndexOf("/") + 1);
+    }
+
+    /**
+     * Derive schema name from external file $ref (e.g. "./User.yaml" or "models/v3/User.yaml" -> "User").
+     * Used when array items have unresolved external $ref so we can resolve to List&lt;User&gt; if that schema exists.
+     */
+    private String deriveSchemaNameFromExternalRef(String ref) {
+        if (ref == null || ref.isEmpty()) return null;
+        String path = ref.contains("#") ? ref.split("#", 2)[0] : ref;
+        path = path.replace('\\', '/');
+        int lastSlash = path.lastIndexOf('/');
+        String segment = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+        if (segment.isEmpty()) return null;
+        if (segment.endsWith(".yaml")) return segment.substring(0, segment.length() - 5);
+        if (segment.endsWith(".yml")) return segment.substring(0, segment.length() - 4);
+        if (segment.endsWith(".json")) return segment.substring(0, segment.length() - 5);
+        return segment;
     }
 
     private String getXSDType(Map<String, Object> schema, Map<String, Object> allSchemas) {
@@ -4347,6 +4380,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             return isRequired ? "@NotNull\n    " : "";
         }
 
+        // Resolve property-level allOf/oneOf/anyOf to effective schema for validation constraints
+        if (schema.containsKey("allOf") || schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+            Map<String, Object> effective = resolveCompositionToEffectiveSchema(schema, currentSpecForResolution.get());
+            if (effective != null && effective != schema) {
+                schema = effective;
+            }
+        }
+
         // Handle $ref - resolve the reference to get actual schema
         if (schema.containsKey("$ref")) {
             // Note: We can't resolve $ref here as we don't have access to the full spec
@@ -4604,6 +4645,114 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     }
 
     /**
+     * Resolve allOf/oneOf/anyOf to a single effective schema for type/validation/XSD.
+     * allOf: merged schema from all branches; oneOf/anyOf: first branch (Java has no union type).
+     * Resolves $ref in sub-schemas when spec is non-null.
+     *
+     * @param schema the schema that may contain allOf, oneOf, or anyOf
+     * @param spec   the full OpenAPI spec (nullable); when non-null, $ref in composition are resolved
+     * @return effective schema map, or the original schema if no composition or depth exceeded
+     */
+    private Map<String, Object> resolveCompositionToEffectiveSchema(Map<String, Object> schema, Map<String, Object> spec) {
+        return resolveCompositionToEffectiveSchema(schema, spec, 0);
+    }
+
+    private Map<String, Object> resolveCompositionToEffectiveSchema(Map<String, Object> schema, Map<String, Object> spec, int depth) {
+        if (schema == null || depth > MAX_COMPOSITION_RESOLVE_DEPTH) {
+            return schema;
+        }
+        if (schema.containsKey("allOf")) {
+            List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
+            if (allOfSchemas == null || allOfSchemas.isEmpty()) {
+                return schema;
+            }
+            Map<String, Object> merged = new LinkedHashMap<>();
+            for (Map<String, Object> sub : allOfSchemas) {
+                if (sub == null) continue;
+                Map<String, Object> resolved = resolveRefInSchema(sub, spec);
+                resolved = resolveCompositionToEffectiveSchema(resolved, spec, depth + 1);
+                if (resolved != null) {
+                    mergeIntoEffectiveSchema(merged, resolved);
+                }
+            }
+            return merged.isEmpty() ? schema : merged;
+        }
+        if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+            List<Map<String, Object>> schemas = Util.asStringObjectMapList(
+                    schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
+            if (schemas != null && !schemas.isEmpty()) {
+                Map<String, Object> first = schemas.get(0);
+                if (first != null) {
+                    first = resolveRefInSchema(first, spec);
+                    return resolveCompositionToEffectiveSchema(first, spec, depth + 1);
+                }
+            }
+            return schema;
+        }
+        return schema;
+    }
+
+    /** Resolve $ref in a schema using spec (components/schemas). Returns resolved map or original if no ref/spec. */
+    private Map<String, Object> resolveRefInSchema(Map<String, Object> schema, Map<String, Object> spec) {
+        if (schema == null || spec == null || !schema.containsKey("$ref")) {
+            return schema;
+        }
+        String ref = (String) schema.get("$ref");
+        if (ref == null || !ref.contains("components/schemas/")) {
+            return schema;
+        }
+        String schemaName = ref.contains("#/components/schemas/")
+                ? ref.substring(ref.lastIndexOf("/") + 1)
+                : (ref.contains("#") ? ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length()) : ref);
+        if (schemaName.contains("/")) {
+            schemaName = schemaName.substring(schemaName.lastIndexOf("/") + 1);
+        }
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        if (components == null) return schema;
+        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+        if (schemas == null || !schemas.containsKey(schemaName)) return schema;
+        Map<String, Object> resolved = Util.asStringObjectMap(schemas.get(schemaName));
+        return resolved != null ? resolved : schema;
+    }
+
+    /** Merge one schema into the effective merged map (type, format, pattern, constraints, properties, required). */
+    private void mergeIntoEffectiveSchema(Map<String, Object> merged, Map<String, Object> from) {
+        if (from == null) return;
+        for (String key : new String[]{"type", "format", "pattern", "minLength", "maxLength", "minItems", "maxItems", "enum", "writeOnly", "readOnly"}) {
+            if (from.containsKey(key) && !merged.containsKey(key)) {
+                merged.put(key, from.get(key));
+            }
+        }
+        if (from.containsKey("properties")) {
+            Map<String, Object> fromProps = Util.asStringObjectMap(from.get("properties"));
+            if (fromProps != null && !fromProps.isEmpty()) {
+                Map<String, Object> mergedProps = Util.asStringObjectMap(merged.get("properties"));
+                if (mergedProps == null) {
+                    mergedProps = new LinkedHashMap<>();
+                    merged.put("properties", mergedProps);
+                }
+                mergedProps.putAll(fromProps);
+            }
+        }
+        if (from.containsKey("required")) {
+            List<String> fromReq = Util.asStringList(from.get("required"));
+            if (fromReq != null && !fromReq.isEmpty()) {
+                List<String> mergedReq = Util.asStringList(merged.get("required"));
+                if (mergedReq == null) {
+                    mergedReq = new ArrayList<>();
+                    merged.put("required", mergedReq);
+                }
+                for (String r : fromReq) {
+                    if (!mergedReq.contains(r)) mergedReq.add(r);
+                }
+            }
+        }
+        if (from.containsKey("items") && !merged.containsKey("items")) {
+            merged.put("items", from.get("items"));
+        }
+    }
+
+    /**
      * Convert OpenAPI type to Java type
      */
     // Thread-local visited set for getJavaType to prevent infinite recursion
@@ -4631,6 +4780,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     private String getJavaTypeInternal(Map<String, Object> schema) {
         if (schema == null) {
             return "Object";
+        }
+
+        // Resolve property-level allOf/oneOf/anyOf to effective schema for type resolution
+        if (schema.containsKey("allOf") || schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+            Map<String, Object> effective = resolveCompositionToEffectiveSchema(schema, currentSpecForResolution.get());
+            if (effective != null && effective != schema) {
+                schema = effective;
+            }
         }
 
         // Check for $ref first (before type check, as $ref schemas may not have explicit type)
@@ -4679,8 +4836,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     if (itemsObj instanceof Map) {
                         Map<String, Object> items = Util.asStringObjectMap(itemsObj);
 
-                        // First priority: Check for $ref in items
-                        if (items.containsKey("$ref")) {
+                        // First priority: x-resolved-ref (parser sets this when external $ref was resolved, e.g. items from User.yaml)
+                        String resolvedSchemaName = getSchemaNameFromRef(items);
+                        if (resolvedSchemaName != null) {
+                            itemType = toJavaClassName(resolvedSchemaName);
+                        }
+
+                        // Second priority: Check for $ref in items
+                        if (itemType == null && items.containsKey("$ref")) {
                             String itemsRef = (String) items.get("$ref");
                             if (itemsRef != null && itemsRef.startsWith("#/components/schemas/")) {
                                 String schemaRef = itemsRef.substring(itemsRef.lastIndexOf("/") + 1);
@@ -4688,17 +4851,35 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                             }
                         }
 
-                        // Second priority: Use getJavaTypeInternal to resolve (it also checks for $ref)
+                        // Third priority: Use getJavaTypeInternal to resolve (it also checks for $ref)
                         if (itemType == null) {
                             itemType = getJavaTypeInternal(items);
                         }
 
-                        // Fallback: If still Object but items has $ref, resolve it manually
-                        if ("Object".equals(itemType) && items.containsKey("$ref")) {
-                            String itemsRef = (String) items.get("$ref");
-                            if (itemsRef != null && itemsRef.startsWith("#/components/schemas/")) {
-                                String schemaRef = itemsRef.substring(itemsRef.lastIndexOf("/") + 1);
-                                itemType = toJavaClassName(schemaRef);
+                        // Fallback: If still Object but items has $ref or x-resolved-ref, resolve it manually
+                        if ("Object".equals(itemType)) {
+                            String fallbackName = getSchemaNameFromRef(items);
+                            if (fallbackName == null && items.containsKey("$ref")) {
+                                String itemsRef = (String) items.get("$ref");
+                                if (itemsRef != null && itemsRef.startsWith("#/components/schemas/")) {
+                                    fallbackName = itemsRef.substring(itemsRef.lastIndexOf("/") + 1);
+                                } else if (itemsRef != null && (itemsRef.endsWith(".yaml") || itemsRef.endsWith(".yml") || itemsRef.endsWith(".json"))) {
+                                    // External file $ref (e.g. ./User.yaml) - derive name and use if schema exists in spec
+                                    String externalSchemaName = deriveSchemaNameFromExternalRef(itemsRef);
+                                    if (externalSchemaName != null) {
+                                        Map<String, Object> spec = currentSpecForResolution.get();
+                                        if (spec != null) {
+                                            Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+                                            Map<String, Object> schemas = components != null ? Util.asStringObjectMap(components.get("schemas")) : null;
+                                            if (schemas != null && schemas.containsKey(externalSchemaName)) {
+                                                fallbackName = externalSchemaName;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (fallbackName != null) {
+                                itemType = toJavaClassName(fallbackName);
                             }
                         }
                     } else {
