@@ -2100,7 +2100,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
         // Add field for dynamic attributes (excluded from JAXB binding)
         content.append("    @XmlTransient\n");
-        content.append("    private Map<String, Object> attributes = new HashMap<>();\n\n");
+        content.append("    private Map<String, Object> attributes;\n\n");
 
         // Generate fields
         for (Map.Entry<String, Object> property : allProperties.entrySet()) {
@@ -2382,7 +2382,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("    public Object getAttribute(String name) {\n");
         // First check attributes map, then check fields
         if (!fieldNames.isEmpty()) {
-            content.append("        if (attributes.containsKey(name)) {\n");
+            content.append("        if (attributes != null && attributes.containsKey(name)) {\n");
             content.append("            return attributes.get(name);\n");
             content.append("        }\n");
             content.append("        switch (name) {\n");
@@ -2395,6 +2395,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             content.append("                return null;\n");
             content.append("        }\n");
         } else {
+            content.append("        if (attributes == null) return null;\n");
             content.append("        return attributes.get(name);\n");
         }
         content.append("    }\n\n");
@@ -2402,7 +2403,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("    @Override\n");
         content.append("    public boolean isSetAttribute(String name) {\n");
         // Check attributes map first
-        content.append("        if (attributes.containsKey(name)) {\n");
+        content.append("        if (attributes != null && attributes.containsKey(name)) {\n");
         content.append("            return true;\n");
         content.append("        }\n");
         // Then check if it's a field and if it's set (not null)
@@ -2423,7 +2424,10 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
         content.append("    @Override\n");
         content.append("    public Set<String> getAttributeNames() {\n");
-        content.append("        Set<String> allNames = new LinkedHashSet<>(attributes.keySet());\n");
+        content.append("        Set<String> allNames = new LinkedHashSet<>();\n");
+        content.append("        if (attributes != null) {\n");
+        content.append("            allNames.addAll(attributes.keySet());\n");
+        content.append("        }\n");
         // Add field names to the set
         if (!fieldNames.isEmpty()) {
             for (String fieldName : fieldNames) {
@@ -2502,10 +2506,16 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 content.append("                return;\n");
             }
             content.append("            default:\n");
+            content.append("                if (attributes == null) {\n");
+            content.append("                    attributes = new HashMap<>();\n");
+            content.append("                }\n");
             content.append("                attributes.put(name, value);\n");
             content.append("                break;\n");
             content.append("        }\n");
         } else {
+            content.append("        if (attributes == null) {\n");
+            content.append("            attributes = new HashMap<>();\n");
+            content.append("        }\n");
             content.append("        attributes.put(name, value);\n");
         }
         content.append("    }\n");
