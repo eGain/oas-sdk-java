@@ -25,12 +25,11 @@ This directory contains examples demonstrating how to use the eGain OAS SDK Java
   - Security configuration
   - Performance configuration
 
-### **Generate SDK and XSD for published**
+### **Generate SDK for published**
 - **File**: `egain/oassdk/examples/GeneratePublishedSDK.java`
-- **Description**: Generates Java Jersey SDK and XSD for the published folder (core API in `core/`, referenced schemas in `models/`). Output is written under the published folder (e.g. `C:\eGain\published\sdk`).
+- **Description**: Generates Java Jersey SDK for the published folder (core API in `core/`, referenced schemas in `models/`). Output is written under the published folder (e.g. `C:\eGain\published\sdk`).
 - **Features**:
   - Uses `GeneratorConfig.searchPaths` so the spec and model refs resolve from any working directory
-  - Single run produces both SDK and XSD (XSD under `sdk/src/main/resources/xsd/`)
   - Configurable via system property `oas.published.root` or env `OAS_PUBLISHED_ROOT` (default: `C:\eGain\published`)
 - **How to run**:
   1. Build the SDK: from repo root run `mvn clean package -DskipTests`.
@@ -40,7 +39,7 @@ This directory contains examples demonstrating how to use the eGain OAS SDK Java
      cd C:\eGain\published
      java -jar path\to\oas-sdk-java\target\oas-sdk-java-1.11-SNAPSHOT.jar generate core/usermgr/v4/api.yaml -l java -f jersey -p egain.ws.usermgr.v4 -o ./sdk
      ```
-     When it works, SDK and XSD are under `C:\eGain\published\sdk\` (XSD in `sdk/src/main/resources/xsd/`).
+     When it works, SDK is under `C:\eGain\published\sdk\`.
 
 ## 🚀 Quick Start
 
