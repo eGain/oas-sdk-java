@@ -2131,9 +2131,20 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 content.append(")\n    ");
             }
 
-            // Add @JsonProperty annotation if field name differs from Java naming
-            if (!fieldName.equals(javaFieldName)) {
-                content.append("@JsonProperty(\"").append(fieldName).append("\")\n    ");
+            // Add @JsonProperty for name mapping and/or readOnly/writeOnly access
+            boolean readOnly = isSchemaFlagTrue(fieldSchema, "readOnly");
+            boolean writeOnly = isSchemaFlagTrue(fieldSchema, "writeOnly");
+            if (readOnly && writeOnly) writeOnly = false; // invalid spec: prefer READ_ONLY
+            String accessStr = null;
+            if (readOnly) accessStr = "READ_ONLY";
+            else if (writeOnly) accessStr = "WRITE_ONLY";
+            boolean needName = !fieldName.equals(javaFieldName);
+            if (needName || accessStr != null) {
+                content.append("@JsonProperty(");
+                if (needName) content.append("value = \"").append(fieldName).append("\"");
+                if (needName && accessStr != null) content.append(", ");
+                if (accessStr != null) content.append("access = JsonProperty.Access.").append(accessStr);
+                content.append(")\n    ");
             }
 
             // Add validation annotations based on schema constraints
@@ -2150,7 +2161,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("    public ").append(schemaName).append("() {\n");
         content.append("    }\n\n");
 
-        // Generate getters and setters
+        // Generate getters and setters (readOnly: getter only; writeOnly: setter only; else both)
         for (Map.Entry<String, Object> property : allProperties.entrySet()) {
             String fieldName = property.getKey();
             Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
@@ -2159,15 +2170,23 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             String javaFieldName = toCamelCase(fieldName);
             String capitalizedFieldName = capitalize(javaFieldName);
 
-            // Getter
-            content.append("    public ").append(fieldType).append(" get").append(capitalizedFieldName).append("() {\n");
-            content.append("        return ").append(javaFieldName).append(";\n");
-            content.append("    }\n\n");
+            boolean readOnly = isSchemaFlagTrue(fieldSchema, "readOnly");
+            boolean writeOnly = isSchemaFlagTrue(fieldSchema, "writeOnly");
+            if (readOnly && writeOnly) writeOnly = false; // invalid spec: prefer readOnly
 
-            // Setter
-            content.append("    public void set").append(capitalizedFieldName).append("(").append(fieldType).append(" ").append(javaFieldName).append(") {\n");
-            content.append("        this.").append(javaFieldName).append(" = ").append(javaFieldName).append(";\n");
-            content.append("    }\n\n");
+            // Getter: generate when not writeOnly (readOnly and normal properties get getter)
+            if (!writeOnly) {
+                content.append("    public ").append(fieldType).append(" get").append(capitalizedFieldName).append("() {\n");
+                content.append("        return ").append(javaFieldName).append(";\n");
+                content.append("    }\n\n");
+            }
+
+            // Setter: generate when not readOnly (writeOnly and normal properties get setter)
+            if (!readOnly) {
+                content.append("    public void set").append(capitalizedFieldName).append("(").append(fieldType).append(" ").append(javaFieldName).append(") {\n");
+                content.append("        this.").append(javaFieldName).append(" = ").append(javaFieldName).append(";\n");
+                content.append("    }\n\n");
+            }
         }
 
         // Generate equals method
@@ -2237,6 +2256,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             content.append("        }\n");
             content.append("        switch (name) {\n");
             for (String fieldName : fieldNames) {
+                Map<String, Object> fieldSchema = Util.asStringObjectMap(allProperties.get(fieldName));
+                if (isSchemaFlagTrue(fieldSchema, "writeOnly")) continue;
                 String javaFieldName = toCamelCase(fieldName);
                 content.append("            case \"").append(fieldName).append("\":\n");
                 content.append("                return ").append(javaFieldName).append(";\n");
@@ -2260,6 +2281,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         if (!fieldNames.isEmpty()) {
             content.append("        switch (name) {\n");
             for (String fieldName : fieldNames) {
+                Map<String, Object> fieldSchema = Util.asStringObjectMap(allProperties.get(fieldName));
+                if (isSchemaFlagTrue(fieldSchema, "readOnly")) continue;
                 String javaFieldName = toCamelCase(fieldName);
                 content.append("            case \"").append(fieldName).append("\":\n");
                 content.append("                return ").append(javaFieldName).append(" != null;\n");
@@ -2278,9 +2301,11 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("        if (attributes != null) {\n");
         content.append("            allNames.addAll(attributes.keySet());\n");
         content.append("        }\n");
-        // Add field names to the set
+        // Add field names to the set (exclude writeOnly - not exposed as readable attributes)
         if (!fieldNames.isEmpty()) {
             for (String fieldName : fieldNames) {
+                Map<String, Object> fieldSchema = Util.asStringObjectMap(allProperties.get(fieldName));
+                if (isSchemaFlagTrue(fieldSchema, "writeOnly")) continue;
                 content.append("        allNames.add(\"").append(fieldName).append("\");\n");
             }
         }
@@ -2350,10 +2375,15 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 } else {
                     fieldType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
                 }
-                
+                // readOnly properties have no setter; setAttribute must not call setXxx for them
+                boolean readOnly = isSchemaFlagTrue(fieldSchema, "readOnly");
                 content.append("            case \"").append(fieldName).append("\":\n");
-                content.append("                set").append(capitalizedFieldName).append("((").append(fieldType).append(") value);\n");
-                content.append("                return;\n");
+                if (readOnly) {
+                    content.append("                return; // readOnly, no setter\n");
+                } else {
+                    content.append("                set").append(capitalizedFieldName).append("((").append(fieldType).append(") value);\n");
+                    content.append("                return;\n");
+                }
             }
             content.append("            default:\n");
             content.append("                if (attributes == null) {\n");
@@ -3351,6 +3381,15 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         if (from.containsKey("items") && !merged.containsKey("items")) {
             merged.put("items", from.get("items"));
         }
+    }
+
+    /** Return true if the schema has the given key set to a truthy value (e.g. readOnly, writeOnly). */
+    private static boolean isSchemaFlagTrue(Map<String, Object> schema, String key) {
+        if (schema == null || !schema.containsKey(key)) return false;
+        Object v = schema.get(key);
+        if (v instanceof Boolean) return Boolean.TRUE.equals(v);
+        if (v instanceof String) return "true".equalsIgnoreCase((String) v);
+        return false;
     }
 
     /**

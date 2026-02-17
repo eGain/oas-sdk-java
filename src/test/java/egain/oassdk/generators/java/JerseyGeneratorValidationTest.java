@@ -496,5 +496,67 @@ public class JerseyGeneratorValidationTest {
                 className + " should have substantial content");
         }
     }
+
+    @Test
+    @DisplayName("Test readOnly and writeOnly generate correct JsonProperty access annotations")
+    public void testReadOnlyWriteOnlyJsonPropertyAccess() throws OASSDKException, IOException {
+        Path outputDir = tempOutputDir.resolve("readonly-writeonly-test");
+        String yamlFile = "src/test/resources/openapi-readonly-writeonly.yaml";
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(yamlFile);
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path modelDir = outputDir.resolve("src/main/java/com/test/api/model");
+        Path userModel = modelDir.resolve("User.java");
+        assertTrue(Files.exists(userModel), "User model should be generated");
+
+        String content = Files.readString(userModel);
+
+        assertTrue(content.contains("JsonProperty.Access.READ_ONLY"),
+            "Generated model should contain @JsonProperty(access = JsonProperty.Access.READ_ONLY) for readOnly property");
+        assertTrue(content.contains("JsonProperty.Access.WRITE_ONLY"),
+            "Generated model should contain @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) for writeOnly property");
+
+        // readOnly (id): getter only, no setter
+        assertTrue(content.contains("public String getId()"),
+            "readOnly property should have getter");
+        assertFalse(content.contains("public void setId("),
+            "readOnly property should not have setter");
+
+        // writeOnly (password): setter only, no getter
+        assertTrue(content.contains("public void setPassword("),
+            "writeOnly property should have setter");
+        assertFalse(content.contains("public String getPassword()"),
+            "writeOnly property should not have getter");
+
+        // setAttribute must not call setId for readOnly property (setId does not exist)
+        assertTrue(content.contains("return; // readOnly, no setter"),
+            "setAttribute should no-op for readOnly properties instead of calling missing setter");
+        assertFalse(content.contains("setId(("),
+            "setAttribute must not call setId for readOnly property id");
+
+        // isSetAttribute must not include readOnly property (id) in its switch
+        String isSetAttributeSection = content.substring(
+            content.indexOf("public boolean isSetAttribute"),
+            content.indexOf("public Set<String> getAttributeNames()"));
+        assertFalse(isSetAttributeSection.contains("case \"id\":"),
+            "isSetAttribute should not have a case for readOnly property id");
+
+        // getAttribute must not include writeOnly property (password) in its switch
+        String getAttributeSection = content.substring(
+            content.indexOf("public Object getAttribute"),
+            content.indexOf("public boolean isSetAttribute"));
+        assertFalse(getAttributeSection.contains("case \"password\":"),
+            "getAttribute should not have a case for writeOnly property password");
+
+        // getAttributeNames must not add writeOnly property (password)
+        String getAttributeNamesSection = content.substring(
+            content.indexOf("public Set<String> getAttributeNames()"),
+            content.indexOf("public void setAttribute"));
+        assertFalse(getAttributeNamesSection.contains("allNames.add(\"password\")"),
+            "getAttributeNames should not include writeOnly property password");
+    }
 }
 
