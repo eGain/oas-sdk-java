@@ -55,29 +55,38 @@ public class PathResolver {
         if (searchPaths != null) {
             for (String searchPath : searchPaths) {
                 if (searchPath != null && !searchPath.trim().isEmpty()) {
-                    Path path = Paths.get(searchPath).normalize();
-                    if (Files.exists(path) && Files.isDirectory(path)) {
-                        this.searchPaths.add(path);
+                    String unixPath = PathUtils.toUnixPath(searchPath);
+                    if (unixPath != null && !unixPath.isEmpty()) {
+                        Path path = Paths.get(unixPath).normalize();
+                        if (Files.exists(path) && Files.isDirectory(path)) {
+                            this.searchPaths.add(path);
+                        }
                     }
                 }
             }
         }
 
-        // Add environment variable search path if set
+        // Add environment variable search path if set (Unix style)
         String envPath = System.getenv("OAS_SEARCH_PATH");
         if (envPath != null && !envPath.trim().isEmpty()) {
-            Path envPathObj = Paths.get(envPath).normalize();
-            if (Files.exists(envPathObj) && Files.isDirectory(envPathObj)) {
-                this.searchPaths.add(envPathObj);
+            String unixEnv = PathUtils.toUnixPath(envPath);
+            if (unixEnv != null && !unixEnv.isEmpty()) {
+                Path envPathObj = Paths.get(unixEnv).normalize();
+                if (Files.exists(envPathObj) && Files.isDirectory(envPathObj)) {
+                    this.searchPaths.add(envPathObj);
+                }
             }
         }
 
-        // Add system property search path if set
+        // Add system property search path if set (Unix style)
         String sysPropPath = System.getProperty("oas.search.path");
         if (sysPropPath != null && !sysPropPath.trim().isEmpty()) {
-            Path sysPropPathObj = Paths.get(sysPropPath).normalize();
-            if (Files.exists(sysPropPathObj) && Files.isDirectory(sysPropPathObj)) {
-                this.searchPaths.add(sysPropPathObj);
+            String unixSys = PathUtils.toUnixPath(sysPropPath);
+            if (unixSys != null && !unixSys.isEmpty()) {
+                Path sysPropPathObj = Paths.get(unixSys).normalize();
+                if (Files.exists(sysPropPathObj) && Files.isDirectory(sysPropPathObj)) {
+                    this.searchPaths.add(sysPropPathObj);
+                }
             }
         }
     }
@@ -108,7 +117,7 @@ public class PathResolver {
         // Validate file extension after sanitization
         validateFileExtension(sanitizedPath);
 
-        // Resolve path relative to base directory
+        // Resolve path relative to base directory (sanitizedPath is already Unix style)
         Path resolvedPath;
         if (baseDir != null) {
             resolvedPath = baseDir.resolve(sanitizedPath).normalize();
@@ -260,22 +269,10 @@ public class PathResolver {
     }
 
     /**
-     * Normalize path to a canonical string (forward slashes) for cross-platform comparison.
-     * On Windows, Path.startsWith() can be inconsistent when paths use different separators;
-     * comparing canonical strings ensures validation works the same on all platforms.
-     */
-    private static String toCanonicalPathString(Path path) {
-        if (path == null) {
-            return "";
-        }
-        return path.toAbsolutePath().normalize().toString().replace('\\', '/');
-    }
-
-    /**
      * Validate that resolved path doesn't escape base directory (path traversal protection)
      *
      * <p>Logs path traversal attempts at FINE (debug) level when resolution continues via search paths.</p>
-     * <p>Uses canonical path strings (forward slashes) so validation behaves consistently on Windows and Unix.</p>
+     * <p>Uses Unix-style path strings so validation behaves consistently on Windows and Unix.</p>
      */
     private void validatePathTraversal(Path baseDir, Path resolvedPath) throws OASSDKException {
         if (baseDir == null) {
@@ -288,8 +285,14 @@ public class PathResolver {
         }
 
         try {
-            String canonicalBase = toCanonicalPathString(baseDir);
-            String canonicalResolved = toCanonicalPathString(resolvedPath);
+            String canonicalBase = PathUtils.toUnixPath(baseDir);
+            String canonicalResolved = PathUtils.toUnixPath(resolvedPath);
+            if (canonicalBase == null) {
+                canonicalBase = "";
+            }
+            if (canonicalResolved == null) {
+                canonicalResolved = "";
+            }
 
             // Ensure resolved path is within base directory (string comparison for cross-platform consistency)
             if (!canonicalResolved.startsWith(canonicalBase)) {

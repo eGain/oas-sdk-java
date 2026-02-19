@@ -235,12 +235,13 @@ public class OASSDK {
      */
     public OASSDK loadSpec(String specPath) throws OASSDKException {
         Objects.requireNonNull(specPath, "Specification path cannot be null");
+        String unixSpecPath = egain.oassdk.core.parser.PathUtils.toUnixPath(specPath);
         try {
-            // Parse the specification
-            this.spec = parser.parse(specPath);
+            // Parse the specification (all paths processed in Unix style)
+            this.spec = parser.parse(unixSpecPath);
 
             // Resolve all $ref references (internal and external)
-            this.spec = parser.resolveReferences(this.spec, specPath);
+            this.spec = parser.resolveReferences(this.spec, unixSpecPath);
 
             // Validate specification
             validator.validate(this.spec);
@@ -272,8 +273,9 @@ public class OASSDK {
      */
     public OASSDK loadSLA(String slaPath) throws OASSDKException {
         Objects.requireNonNull(slaPath, "SLA path cannot be null");
+        String unixSlaPath = egain.oassdk.core.parser.PathUtils.toUnixPath(slaPath);
         try {
-            this.slaSpec = parser.parse(slaPath);
+            this.slaSpec = parser.parse(unixSlaPath);
             return this;
         } catch (RuntimeException e) {
             logger.log(java.util.logging.Level.SEVERE, "Failed to load SLA specification: " + e.getMessage(), e);

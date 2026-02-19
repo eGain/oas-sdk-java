@@ -84,19 +84,11 @@ public class OASParser {
     }
 
     /**
-     * Sanitize file path to prevent path traversal attacks
+     * Sanitize file path and normalize to Unix style (forward slashes only).
+     * All path processing in the parser uses Unix style for cross-platform consistency.
      */
     private String sanitizeFilePath(String filePath) {
-        // Remove any null bytes
-        String sanitized = filePath.replace("\0", "");
-
-        // Remove leading/trailing whitespace
-        sanitized = sanitized.trim();
-
-        // Replace backslashes with forward slashes for cross-platform compatibility
-        sanitized = sanitized.replace('\\', '/');
-
-        return sanitized;
+        return PathUtils.toUnixPath(filePath != null ? filePath : "");
     }
 
     /**
@@ -201,15 +193,12 @@ public class OASParser {
     }
 
     /**
-     * Normalize a path to a canonical string key (forward slashes, absolute).
+     * Normalize a path to a canonical string key (Unix style: forward slashes, absolute).
      * Ensures the same file gets the same key on all platforms (e.g. Windows vs Mac),
      * so loadedFiles lookups and merge logic work correctly.
      */
     private static String normalizePathKey(Path path) {
-        if (path == null) {
-            return null;
-        }
-        return path.normalize().toAbsolutePath().toString().replace('\\', '/');
+        return PathUtils.toUnixPath(path);
     }
 
     /**
@@ -590,8 +579,8 @@ public class OASParser {
                 String fileKey = normalizePathKey(refPath);
                 Map<String, Object> externalSpec = loadedFiles.get(fileKey);
                 if (externalSpec == null) {
-                    // Parse the external file
-                    externalSpec = parse(refPath.toString());
+                    // Parse the external file (always use Unix-style path)
+                    externalSpec = parse(PathUtils.toUnixPath(refPath));
                     // Create a copy to avoid modifying the original
                     externalSpec = new HashMap<>(externalSpec);
                     loadedFiles.put(fileKey, externalSpec);
@@ -646,7 +635,7 @@ public class OASParser {
                 String fileKey = normalizePathKey(refPath);
                 Map<String, Object> externalSpec = loadedFiles.get(fileKey);
                 if (externalSpec == null) {
-                    externalSpec = parse(refPath.toString());
+                    externalSpec = parse(PathUtils.toUnixPath(refPath));
                     externalSpec = new HashMap<>(externalSpec);
                     loadedFiles.put(fileKey, externalSpec);
                     resolveReferencesRecursive(externalSpec, refPath.getParent(), fileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);

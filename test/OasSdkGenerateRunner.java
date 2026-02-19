@@ -1,6 +1,7 @@
 import egain.oassdk.OASSDK;
 import egain.oassdk.config.GeneratorConfig;
 import egain.oassdk.core.exceptions.OASSDKException;
+import egain.oassdk.core.parser.PathUtils;
 import java.util.Collections;
 
 import java.io.File;
@@ -45,13 +46,12 @@ public final class OasSdkGenerateRunner {
                 failed++;
                 continue;
             }
-            // Normalize path for consistent behavior on Windows and Unix (avoids mixed separators)
-            Path specPath = Paths.get(path).normalize().toAbsolutePath();
-            String pathStr = specPath.toString();
+            // Normalize to Unix-style path for consistent behavior on Windows and Unix
+            String pathStr = PathUtils.toUnixPath(Paths.get(path).normalize().toAbsolutePath());
             System.out.println("_______________ Generated: pathStr -> " + pathStr);
             String specName = deriveSpecName(pathStr);
             System.out.println("_______________ Generated: specName -> " + specName);
-            String outputSubdir = baseOutputDir + "/" + specName;
+            String outputSubdir = PathUtils.toUnixPath(baseOutputDir) + "/" + specName;
             System.out.println("_______________ Generated: outputSubdir -> " + outputSubdir);
             String packageName = PACKAGE_PREFIX + specName;
             String folderName = "platform-api-interfaces";
@@ -60,14 +60,14 @@ public final class OasSdkGenerateRunner {
                 if (index == -1)
                     continue;
                 Path repoRoot = Paths.get(pathStr.substring(0, index + folderName.length())).normalize().toAbsolutePath();
-                System.out.println("_______________ Generated: repoRoot -> " + repoRoot.toString());
-                // Use published/ as search path so refs like ../../../models/v4/common.yaml resolve to published/models/v4/common.yaml
+                System.out.println("_______________ Generated: repoRoot -> " + PathUtils.toUnixPath(repoRoot));
+                // Use published/ as search path so refs like ../../../models/v4/common.yaml resolve to published/models/v4/common.yaml (Unix style)
                 Path publishedPath = repoRoot.resolve("published").normalize();
-                System.out.println("_______________ Generated: publishedPath -> " + publishedPath.toString());
-                String publishedDir = publishedPath.toAbsolutePath().toString();
+                System.out.println("_______________ Generated: publishedPath -> " + PathUtils.toUnixPath(publishedPath));
+                String publishedDir = PathUtils.toUnixPath(publishedPath.toAbsolutePath());
                 System.out.println("_______________ Generated: publishedDir -> " + publishedDir);
                 if (!publishedPath.toFile().isDirectory()) {
-                    publishedDir = repoRoot.toAbsolutePath().toString();
+                    publishedDir = PathUtils.toUnixPath(repoRoot.toAbsolutePath());
                 }
                 //System.out.println("_______________ Generated: publishedDir -> " + publishedDir);
                 GeneratorConfig config = GeneratorConfig.builder()
