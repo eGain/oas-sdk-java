@@ -21,3 +21,4 @@ logs/
 # Log files
 *.log
 dependency-reduced-pom.xml
+/generated

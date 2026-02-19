@@ -201,6 +201,18 @@ public class OASParser {
     }
 
     /**
+     * Normalize a path to a canonical string key (forward slashes, absolute).
+     * Ensures the same file gets the same key on all platforms (e.g. Windows vs Mac),
+     * so loadedFiles lookups and merge logic work correctly.
+     */
+    private static String normalizePathKey(Path path) {
+        if (path == null) {
+            return null;
+        }
+        return path.normalize().toAbsolutePath().toString().replace('\\', '/');
+    }
+
+    /**
      * Resolve all $ref references in the specification
      * This includes both internal references (#/components/...) and external file references
      *
@@ -220,9 +232,9 @@ public class OASParser {
         Map<String, Object> resolvedSpec = spec;
         Map<String, Map<String, Object>> loadedFiles = new HashMap<>();
 
-        // Load the base file into the cache
-        Path basePath = Paths.get(baseFilePath);
-        String baseFileKey = basePath.normalize().toString();
+        // Load the base file into the cache (use normalized key for cross-platform consistency)
+        Path basePath = Paths.get(sanitizeFilePath(baseFilePath)).normalize().toAbsolutePath();
+        String baseFileKey = normalizePathKey(basePath);
         loadedFiles.put(baseFileKey, resolvedSpec);
 
         // Track references currently being resolved to detect circular references
@@ -462,14 +474,15 @@ public class OASParser {
             String jsonPath = parts.length > 1 ? parts[1] : "";
 
             if (!filePath.isEmpty()) {
-                // External file reference
+                // External file reference (use normalized key for cross-platform consistency)
                 Path refPath;
                 if (baseDir != null) {
                     refPath = baseDir.resolve(filePath).normalize();
                 } else {
                     refPath = Paths.get(filePath).normalize();
                 }
-                return refPath + "#" + jsonPath;
+                String pathKey = refPath.isAbsolute() ? normalizePathKey(refPath) : refPath.toString().replace('\\', '/');
+                return pathKey + "#" + jsonPath;
             } else {
                 // Internal reference
                 return currentFileKey + "#" + jsonPath;
@@ -573,8 +586,8 @@ public class OASParser {
                 // External file reference - use PathResolver for secure resolution
                 Path refPath = pathResolver.resolveReference(filePath, baseDir);
 
-                // Load the external file if not already loaded
-                String fileKey = refPath.toString();
+                // Load the external file if not already loaded (use normalized key for cross-platform consistency)
+                String fileKey = normalizePathKey(refPath);
                 Map<String, Object> externalSpec = loadedFiles.get(fileKey);
                 if (externalSpec == null) {
                     // Parse the external file
@@ -629,8 +642,8 @@ public class OASParser {
                 // Use PathResolver for secure resolution
                 Path refPath = pathResolver.resolveReference(ref, baseDir);
 
-                // Load the external file if not already loaded
-                String fileKey = refPath.toString();
+                // Load the external file if not already loaded (use normalized key for cross-platform consistency)
+                String fileKey = normalizePathKey(refPath);
                 Map<String, Object> externalSpec = loadedFiles.get(fileKey);
                 if (externalSpec == null) {
                     externalSpec = parse(refPath.toString());
