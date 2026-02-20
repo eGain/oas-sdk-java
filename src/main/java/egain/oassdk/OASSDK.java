@@ -18,6 +18,7 @@ import egain.oassdk.testgenerators.TestGeneratorFactory;
 import java.util.logging.Logger;
 
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -28,8 +29,10 @@ import java.util.*;
  * <p>
  * This class provides the primary interface for generating applications,
  * tests, mock data, SLA enforcement, and documentation from OpenAPI specifications.
+ * When constructed with {@link GeneratorConfig#getSpecZipPath() specZipPath}, specs are
+ * read from the ZIP and {@link #close()} should be called when done to release the ZIP filesystem.
  */
-public class OASSDK {
+public class OASSDK implements AutoCloseable {
 
     private static final Logger logger = LoggerConfig.getLogger(OASSDK.class);
 
@@ -40,6 +43,8 @@ public class OASSDK {
     // Core components
     private final OASParser parser;
     private final OASValidator validator;
+    /** When specZipPath is set, the ZIP is opened as a FileSystem and closed in close() */
+    private final java.nio.file.FileSystem zipFileSystem;
     private final OASMetadata metadata;
     private final GeneratorFactory generatorFactory;
     private final TestGeneratorFactory testGeneratorFactory;
@@ -78,19 +83,50 @@ public class OASSDK {
         this.testConfig = testConfig;
         this.slaConfig = slaConfig;
 
-        // Initialize components
-        // Get search paths from config if available
-        List<String> searchPaths = null;
-        if (generatorConfig != null && generatorConfig.getSearchPaths() != null) {
-            searchPaths = generatorConfig.getSearchPaths();
+        // Initialize components: ZIP-based or filesystem-based
+        java.nio.file.FileSystem zipFs = null;
+        if (generatorConfig != null && generatorConfig.getSpecZipPath() != null) {
+            try {
+                Path zipPath = Paths.get(generatorConfig.getSpecZipPath()).normalize();
+                if (!Files.isRegularFile(zipPath)) {
+                    throw new IllegalArgumentException("Spec ZIP path is not a file: " + generatorConfig.getSpecZipPath());
+                }
+                zipFs = FileSystems.newFileSystem(zipPath, (ClassLoader) null);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to open spec ZIP: " + generatorConfig.getSpecZipPath(), e);
+            }
         }
-        this.parser = new OASParser(searchPaths);
+        this.zipFileSystem = zipFs;
+        if (zipFs != null) {
+            this.parser = new OASParser(null, zipFs, "/");
+        } else {
+            List<String> searchPaths = null;
+            if (generatorConfig != null && generatorConfig.getSearchPaths() != null) {
+                searchPaths = generatorConfig.getSearchPaths();
+            }
+            this.parser = new OASParser(searchPaths);
+        }
         this.validator = new OASValidator();
         this.metadata = new OASMetadata();
         this.generatorFactory = new GeneratorFactory();
         this.testGeneratorFactory = new TestGeneratorFactory();
         this.slaProcessor = new SLAProcessor();
         this.docGenerator = new DocumentationGenerator();
+    }
+
+    /**
+     * Closes the ZIP filesystem if this SDK was created with {@link GeneratorConfig#getSpecZipPath() specZipPath}.
+     * Call this when done using the SDK to release resources when creating many SDK instances with different ZIPs.
+     */
+    @Override
+    public void close() {
+        if (zipFileSystem != null && zipFileSystem.isOpen()) {
+            try {
+                zipFileSystem.close();
+            } catch (IOException e) {
+                logger.log(java.util.logging.Level.WARNING, "Failed to close spec ZIP filesystem: " + e.getMessage(), e);
+            }
+        }
     }
 
     /**
@@ -227,9 +263,12 @@ public class OASSDK {
     }
 
     /**
-     * Load OpenAPI specification from file
+     * Load OpenAPI specification from file or from a ZIP entry.
+     * When this SDK was created with {@link GeneratorConfig#getSpecZipPath() specZipPath}, {@code specPath}
+     * is an entry path inside the ZIP (e.g. {@code published/core/infomgr/v4/api.yaml}); use forward slashes.
+     * Otherwise, {@code specPath} is a filesystem path to a YAML/JSON file.
      *
-     * @param specPath Path to OpenAPI specification file
+     * @param specPath Path to the spec file, or ZIP entry path when using specZipPath
      * @return This SDK instance for method chaining
      * @throws OASSDKException if specification cannot be loaded
      */

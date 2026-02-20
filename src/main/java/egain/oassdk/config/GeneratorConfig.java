@@ -26,6 +26,9 @@ public class GeneratorConfig {
     // External file reference search paths
     private List<String> searchPaths;  // Additional paths to search for external file references
 
+    // ZIP-based spec loading: when set, specs and $ref resolution are read from this ZIP (entry paths use forward slashes)
+    private String specZipPath;
+
     /**
      * Default constructor
      */
@@ -41,6 +44,7 @@ public class GeneratorConfig {
         this.includePaths = null;
         this.includeOperations = null;
         this.searchPaths = null;
+        this.specZipPath = null;
     }
 
     /**
@@ -60,6 +64,7 @@ public class GeneratorConfig {
         this.includePaths = null;
         this.includeOperations = null;
         this.searchPaths = null;
+        this.specZipPath = null;
     }
 
     // Getters and Setters
@@ -166,6 +171,19 @@ public class GeneratorConfig {
     }
 
     /**
+     * Path to a ZIP file containing OpenAPI YAML/JSON specs. When set, loadSpec() expects entry paths
+     * inside the ZIP (e.g. published/core/infomgr/v4/api.yaml); all $ref resolution stays inside the ZIP.
+     * Avoids path/separator differences between Windows and Mac.
+     */
+    public String getSpecZipPath() {
+        return specZipPath;
+    }
+
+    public void setSpecZipPath(String specZipPath) {
+        this.specZipPath = specZipPath;
+    }
+
+    /**
      * Builder class for GeneratorConfig
      */
     public static class Builder {
@@ -180,6 +198,7 @@ public class GeneratorConfig {
         private List<String> includePaths = null;
         private Map<String, List<String>> includeOperations = null;
         private List<String> searchPaths = null;
+        private String specZipPath = null;
 
         public Builder language(String language) {
             this.language = language;
@@ -243,12 +262,18 @@ public class GeneratorConfig {
             return this;
         }
 
+        public Builder specZipPath(String specZipPath) {
+            this.specZipPath = specZipPath;
+            return this;
+        }
+
         public GeneratorConfig build() {
             GeneratorConfig config = new GeneratorConfig(language, framework, packageName, version,
                     outputDir, templatesDir, customTemplates, additionalProperties);
             config.setIncludePaths(includePaths);
             config.setIncludeOperations(includeOperations);
             config.setSearchPaths(searchPaths);
+            config.setSpecZipPath(specZipPath);
             return config;
         }
     }
@@ -276,6 +301,7 @@ public class GeneratorConfig {
                 ", includePaths=" + includePaths +
                 ", includeOperations=" + includeOperations +
                 ", searchPaths=" + searchPaths +
+                ", specZipPath=" + specZipPath +
                 '}';
     }
 }

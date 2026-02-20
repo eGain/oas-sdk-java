@@ -1,5 +1,6 @@
 package egain.oassdk.core.parser;
 
+import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -34,14 +35,26 @@ public final class PathUtils {
 
     /**
      * Convert a Path to a Unix-style path string (absolute, normalized, forward slashes).
+     * For paths on the default filesystem, uses normalize() and toAbsolutePath().
+     * For paths on other filesystems (e.g. ZipFileSystem), avoids toAbsolutePath() and
+     * normalizes to forward slashes so keys stay consistent when resolving refs inside a ZIP.
      *
-     * @param path path (may have been created with Windows separators)
+     * @param path path (may have been created with Windows separators or from a ZIP)
      * @return Unix-style path string, or null if input is null
      */
     public static String toUnixPath(Path path) {
         if (path == null) {
             return null;
         }
-        return path.normalize().toAbsolutePath().toString().replace('\\', '/');
+        if (path.getFileSystem().equals(FileSystems.getDefault())) {
+            return path.normalize().toAbsolutePath().toString().replace('\\', '/');
+        }
+        // Zip or other non-default FS: normalize string only (toAbsolutePath may not apply)
+        String unix = path.normalize().toString().replace('\\', '/');
+        // Strip leading slash if present so entry keys match (e.g. "published/core/..." not "/published/...")
+        if (unix.startsWith("/") && unix.length() > 1) {
+            unix = unix.substring(1);
+        }
+        return unix;
     }
 }

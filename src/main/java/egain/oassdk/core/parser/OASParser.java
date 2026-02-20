@@ -7,6 +7,7 @@ import egain.oassdk.Util;
 import egain.oassdk.core.exceptions.OASSDKException;
 
 import java.io.IOException;
+import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -20,13 +21,10 @@ public class OASParser {
     private final ObjectMapper yamlMapper;
     private final ObjectMapper jsonMapper;
     private final PathResolver pathResolver;
+    private final FileSystem zipFs;
 
     public OASParser() {
-        this.yamlMapper = new ObjectMapper(new YAMLFactory());
-        this.yamlMapper.registerModule(new JavaTimeModule());
-        this.jsonMapper = new ObjectMapper();
-        this.jsonMapper.registerModule(new JavaTimeModule());
-        this.pathResolver = new PathResolver();
+        this(null, null, null);
     }
 
     /**
@@ -35,11 +33,34 @@ public class OASParser {
      * @param searchPaths List of paths to search for external references
      */
     public OASParser(List<String> searchPaths) {
+        this(searchPaths, null, null);
+    }
+
+    /**
+     * Constructor for ZIP-based spec loading. When zipFs is non-null, parse() and resolveReferences()
+     * treat paths as entry paths inside the ZIP; all $ref resolution stays inside the ZIP.
+     *
+     * @param searchPaths  ignored when zipFs is non-null (use null)
+     * @param zipFs        the ZIP file system, or null for filesystem-based loading
+     * @param zipSearchRoot in-ZIP search root (e.g. "" or "published"); use "/" for ZIP root
+     */
+    public OASParser(List<String> searchPaths, FileSystem zipFs, String zipSearchRoot) {
         this.yamlMapper = new ObjectMapper(new YAMLFactory());
         this.yamlMapper.registerModule(new JavaTimeModule());
         this.jsonMapper = new ObjectMapper();
         this.jsonMapper.registerModule(new JavaTimeModule());
-        this.pathResolver = new PathResolver(searchPaths);
+        this.zipFs = zipFs;
+        if (zipFs != null) {
+            String root = (zipSearchRoot != null && !zipSearchRoot.isEmpty()) ? zipSearchRoot : "/";
+            if (!root.startsWith("/")) {
+                root = "/" + root;
+            }
+            List<Path> zipSearchPaths = new ArrayList<>();
+            zipSearchPaths.add(zipFs.getPath(root));
+            this.pathResolver = PathResolver.fromPathList(zipSearchPaths);
+        } else {
+            this.pathResolver = new PathResolver(searchPaths);
+        }
     }
 
     /**
@@ -55,11 +76,20 @@ public class OASParser {
             throw new OASSDKException("File path cannot be null or empty");
         }
 
-        // Sanitize file path
+        // Sanitize file path (Unix style)
         String sanitizedPath = sanitizeFilePath(filePath);
+        // ZIP entry paths: ensure no leading slash for consistent getPath() (ZipFS may use "" or "/" as root)
+        if (zipFs != null && sanitizedPath.startsWith("/") && sanitizedPath.length() > 1) {
+            sanitizedPath = sanitizedPath.substring(1);
+        }
 
         try {
-            Path path = Paths.get(sanitizedPath);
+            Path path = (zipFs != null) ? zipFs.getPath(sanitizedPath) : Paths.get(sanitizedPath);
+            if (zipFs != null) {
+                path = path.normalize();
+            } else {
+                path = path.normalize().toAbsolutePath();
+            }
             if (!Files.exists(path)) {
                 throw new OASSDKException("File not found: " + filePath);
             }
@@ -201,6 +231,19 @@ public class OASParser {
         return PathUtils.toUnixPath(path);
     }
 
+    /** Derive parent directory path (Unix style) from a file key, e.g. "published/models/v4/common.yaml" -> "published/models/v4". */
+    private static String baseDirFromFileKey(String fileKey) {
+        if (fileKey == null || fileKey.isEmpty()) {
+            return null;
+        }
+        String unix = fileKey.replace('\\', '/');
+        int last = unix.lastIndexOf('/');
+        if (last < 0) {
+            return null;
+        }
+        return last == 0 ? "" : unix.substring(0, last);
+    }
+
     /**
      * Resolve all $ref references in the specification
      * This includes both internal references (#/components/...) and external file references
@@ -222,9 +265,20 @@ public class OASParser {
         Map<String, Map<String, Object>> loadedFiles = new HashMap<>();
 
         // Load the base file into the cache (use normalized key for cross-platform consistency)
-        Path basePath = Paths.get(sanitizeFilePath(baseFilePath)).normalize().toAbsolutePath();
+        String sanitizedBase = sanitizeFilePath(baseFilePath);
+        if (zipFs != null && sanitizedBase.startsWith("/") && sanitizedBase.length() > 1) {
+            sanitizedBase = sanitizedBase.substring(1);
+        }
+        Path basePath = (zipFs != null)
+                ? zipFs.getPath(sanitizedBase).normalize()
+                : Paths.get(sanitizedBase).normalize().toAbsolutePath();
         String baseFileKey = normalizePathKey(basePath);
         loadedFiles.put(baseFileKey, resolvedSpec);
+
+        Path baseDir = basePath.getParent();
+        if (baseDir == null && zipFs != null) {
+            baseDir = zipFs.getPath("/");
+        }
 
         // Track references currently being resolved to detect circular references
         Set<String> resolvingRefs = new HashSet<>();
@@ -236,7 +290,7 @@ public class OASParser {
         Map<String, Set<String>> referencedFragmentsByFile = new HashMap<>();
 
         // Resolve all references recursively
-        resolveReferencesRecursive(resolvedSpec, basePath.getParent(), baseFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);
+        resolveReferencesRecursive(resolvedSpec, baseDir, baseFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);
 
         // After all references are resolved, merge external schemas into the main spec
         // This allows generators to find and generate models from external files
@@ -253,6 +307,19 @@ public class OASParser {
 
     /** Sentinel in referencedFragmentsByFile meaning the entire file was referenced (e.g. ref without fragment). */
     private static final String REF_FRAGMENT_WHOLE_FILE = "/";
+
+    /** Result of resolving a $ref: the resolved value and, when from an external file, that file's context so nested refs are resolved relative to it. */
+    private static final class ResolveResult {
+        final Object resolved;
+        final Path sourceBaseDir;
+        final String sourceFileKey;
+
+        ResolveResult(Object resolved, Path sourceBaseDir, String sourceFileKey) {
+            this.resolved = resolved;
+            this.sourceBaseDir = sourceBaseDir;
+            this.sourceFileKey = sourceFileKey;
+        }
+    }
 
     /**
      * Recursively resolve $ref references in the specification
@@ -302,7 +369,8 @@ public class OASParser {
                 resolvingRefs.add(refKey);
 
                 try {
-                    Object resolved = resolveReference(ref, baseDir, currentFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);
+                    ResolveResult result = resolveReference(ref, baseDir, currentFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);
+                    Object resolved = result.resolved;
 
                     // Replace the map with resolved content
                     if (resolved instanceof Map) {
@@ -365,9 +433,12 @@ public class OASParser {
                             addResolvedExternalSchemaToMainSpec(ref, resolvedCopy, loadedFiles, baseFileKey);
                         }
 
-                        // Recursively resolve any references in the resolved content
-                        // Note: We keep refKey in resolvingRefs to detect circular references in nested content
-                        resolveReferencesRecursive(map, baseDir, currentFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);
+                        // Recursively resolve any references in the resolved content. Use the source file's
+                        // baseDir and fileKey when the content came from an external file, so refs inside
+                        // that content (e.g. ./DepartmentView.yaml) are resolved relative to that file.
+                        Path recurseBaseDir = result.sourceBaseDir != null ? result.sourceBaseDir : baseDir;
+                        String recurseFileKey = result.sourceFileKey != null ? result.sourceFileKey : currentFileKey;
+                        resolveReferencesRecursive(map, recurseBaseDir, recurseFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);
                     } else {
                         // If resolved is not a map, this shouldn't happen for parameters
                         throw new OASSDKException("Resolved reference is not a Map: " + ref);
@@ -558,10 +629,13 @@ public class OASParser {
     }
 
     /**
-     * Resolve a single $ref reference
+     * Resolve a single $ref reference.
+     * Returns a ResolveResult so callers can recurse into resolved content using the source file's directory
+     * (refs inside that content must be resolved relative to the file they came from, not the referencing file).
+     *
      * @param baseFileKey key of the main spec in loadedFiles (for recursive resolution)
      */
-    private Object resolveReference(String ref, Path baseDir, String currentFileKey, String baseFileKey, Map<String, Map<String, Object>> loadedFiles, Set<String> resolvingRefs, Set<Object> visitedObjects, Map<String, Set<String>> referencedFragmentsByFile) throws OASSDKException {
+    private ResolveResult resolveReference(String ref, Path baseDir, String currentFileKey, String baseFileKey, Map<String, Map<String, Object>> loadedFiles, Set<String> resolvingRefs, Set<Object> visitedObjects, Map<String, Set<String>> referencedFragmentsByFile) throws OASSDKException {
         if (ref == null || ref.isEmpty()) {
             throw new OASSDKException("Empty $ref reference");
         }
@@ -573,8 +647,42 @@ public class OASParser {
             String jsonPath = parts.length > 1 ? parts[1] : "";
 
             if (!filePath.isEmpty()) {
-                // External file reference - use PathResolver for secure resolution
-                Path refPath = pathResolver.resolveReference(filePath, baseDir);
+                // External file reference - resolve path (ZIP: resolve ".." and "./" relative to the file that contains the ref)
+                Path refPath = null;
+                boolean zipRelativeRef = (filePath.contains("../") || filePath.contains("..\\") || filePath.startsWith("./"));
+                if (zipFs != null && zipRelativeRef && loadedFiles != null) {
+                    // Try containing file's directory first, then baseDir, then every loaded file's directory
+                    List<String> basesToTry = new ArrayList<>();
+                    String fromKey = baseDirFromFileKey(currentFileKey);
+                    if (fromKey != null && !fromKey.isEmpty()) {
+                        basesToTry.add(fromKey);
+                    }
+                    if (baseDir != null) {
+                        String fromDir = PathUtils.toUnixPath(baseDir);
+                        if (fromDir != null && !fromDir.isEmpty() && !basesToTry.contains(fromDir)) {
+                            basesToTry.add(fromDir);
+                        }
+                    }
+                    for (String loadedKey : loadedFiles.keySet()) {
+                        String base = baseDirFromFileKey(loadedKey);
+                        if (base != null && !base.isEmpty() && !basesToTry.contains(base)) {
+                            basesToTry.add(base);
+                        }
+                    }
+                    for (String baseStr : basesToTry) {
+                        String resolvedStr = PathResolver.resolveRelativePathString(baseStr, filePath);
+                        if (resolvedStr != null) {
+                            Path candidate = zipFs.getPath(resolvedStr);
+                            if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
+                                refPath = candidate;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (refPath == null) {
+                    refPath = pathResolver.resolveReference(filePath, baseDir);
+                }
 
                 // Load the external file if not already loaded (use normalized key for cross-platform consistency)
                 String fileKey = normalizePathKey(refPath);
@@ -600,8 +708,9 @@ public class OASParser {
                 referencedFragmentsByFile.computeIfAbsent(fileKey, k -> new HashSet<>()).add(normalizedPath);
 
                 // Resolve the JSON path in the external file
+                Path sourceDir = refPath.getParent();
                 if (jsonPath == null || jsonPath.isEmpty() || "/".equals(jsonPath)) {
-                    return externalSpec;
+                    return new ResolveResult(externalSpec, sourceDir, fileKey);
                 } else {
                     String path = jsonPath.startsWith("/") ? jsonPath.substring(1) : jsonPath;
                     Object fragment;
@@ -611,7 +720,7 @@ public class OASParser {
                         if (e.getMessage() != null && e.getMessage().contains("Reference not found") && path.startsWith("components/")) {
                             Object resolved = resolveComponentFromLoadedFilesOrByConvention(path, baseDir, currentFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);
                             if (resolved != null) {
-                                return resolved;
+                                return new ResolveResult(resolved, null, null);
                             }
                         }
                         throw e;
@@ -625,7 +734,7 @@ public class OASParser {
                     if (mainSpec != null) {
                         mergeExternalSchemasIntoMainSpec(fileKey, externalSpec, mainSpec, referencedFragmentsByFile.get(fileKey));
                     }
-                    return fragment;
+                    return new ResolveResult(fragment, sourceDir, fileKey);
                 }
             } else {
                 // Internal reference (same file) - use currentFileKey to get the correct spec
@@ -635,13 +744,13 @@ public class OASParser {
                 }
                 String path = jsonPath.startsWith("/") ? jsonPath.substring(1) : jsonPath;
                 try {
-                    return resolveJsonPath(currentSpec, path);
+                    return new ResolveResult(resolveJsonPath(currentSpec, path), null, null);
                 } catch (OASSDKException e) {
                     if (e.getMessage() != null && e.getMessage().contains("Reference not found")) {
                         // Try to resolve from already-loaded specs or load by convention (e.g. KnowledgeCommonObjects.yaml)
                         Object resolved = resolveComponentFromLoadedFilesOrByConvention(path, baseDir, currentFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);
                         if (resolved != null) {
-                            return resolved;
+                            return new ResolveResult(resolved, null, null);
                         }
                     }
                     throw e;
@@ -652,8 +761,42 @@ public class OASParser {
             // Check if it looks like a file path (contains .yaml or .yml or .json)
             if (ref.endsWith(".yaml") || ref.endsWith(".yml") || ref.endsWith(".json")) {
                 // External file reference without JSON path - return the whole file
-                // Use PathResolver for secure resolution
-                Path refPath = pathResolver.resolveReference(ref, baseDir);
+                Path refPath = null;
+                boolean zipRelativeRef = (ref.contains("../") || ref.contains("..\\") || ref.startsWith("./"));
+                if (zipFs != null && zipRelativeRef && loadedFiles != null) {
+                    // Try containing file's directory first, then baseDir, then every loaded file's directory
+                    // (refs can appear in content merged from another file, so currentFileKey may be the main spec)
+                    List<String> basesToTry = new ArrayList<>();
+                    String fromKey = baseDirFromFileKey(currentFileKey);
+                    if (fromKey != null && !fromKey.isEmpty()) {
+                        basesToTry.add(fromKey);
+                    }
+                    if (baseDir != null) {
+                        String fromDir = PathUtils.toUnixPath(baseDir);
+                        if (fromDir != null && !fromDir.isEmpty() && !basesToTry.contains(fromDir)) {
+                            basesToTry.add(fromDir);
+                        }
+                    }
+                    for (String loadedKey : loadedFiles.keySet()) {
+                        String base = baseDirFromFileKey(loadedKey);
+                        if (base != null && !base.isEmpty() && !basesToTry.contains(base)) {
+                            basesToTry.add(base);
+                        }
+                    }
+                    for (String baseStr : basesToTry) {
+                        String resolvedStr = PathResolver.resolveRelativePathString(baseStr, ref);
+                        if (resolvedStr != null) {
+                            Path candidate = zipFs.getPath(resolvedStr);
+                            if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
+                                refPath = candidate;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (refPath == null) {
+                    refPath = pathResolver.resolveReference(ref, baseDir);
+                }
 
                 // Load the external file if not already loaded (use normalized key for cross-platform consistency)
                 String fileKey = normalizePathKey(refPath);
@@ -672,7 +815,7 @@ public class OASParser {
                 // it will have type/properties directly. Return it as-is.
                 // If it's a full OpenAPI spec, we'd need to extract components/schemas, but
                 // for schema definition files, the content is the schema itself.
-                return externalSpec;
+                return new ResolveResult(externalSpec, refPath.getParent(), fileKey);
             } else {
                 // Internal reference without file part - use currentFileKey
                 Map<String, Object> currentSpec = loadedFiles.get(currentFileKey);
@@ -681,12 +824,12 @@ public class OASParser {
                 }
                 String jsonPath = ref.startsWith("/") ? ref.substring(1) : ref;
                 try {
-                    return resolveJsonPath(currentSpec, jsonPath);
+                    return new ResolveResult(resolveJsonPath(currentSpec, jsonPath), null, null);
                 } catch (OASSDKException e) {
                     if (e.getMessage() != null && e.getMessage().contains("Reference not found")) {
                         Object resolved = resolveComponentFromLoadedFilesOrByConvention(jsonPath, baseDir, currentFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);
                         if (resolved != null) {
-                            return resolved;
+                            return new ResolveResult(resolved, null, null);
                         }
                     }
                     throw e;

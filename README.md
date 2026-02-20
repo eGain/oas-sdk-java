@@ -259,6 +259,31 @@ public class Example {
 }
 ```
 
+### 2a. Cross-platform: Loading specs from a ZIP
+
+To avoid file and path separator differences between Windows and Mac, you can load specs from a ZIP file. Set `specZipPath` in `GeneratorConfig` to the path of the ZIP file; then call `loadSpec()` with the **entry path inside the ZIP** (use forward slashes, e.g. `published/core/infomgr/v4/api.yaml`). All YAML and `$ref` resolution are read from the ZIP.
+
+```java
+import egain.oassdk.OASSDK;
+import egain.oassdk.config.GeneratorConfig;
+import egain.oassdk.core.exceptions.OASSDKException;
+
+try {
+    GeneratorConfig config = GeneratorConfig.builder()
+        .specZipPath("path/to/platform-api-interfaces.zip")
+        .build();
+    try (OASSDK sdk = new OASSDK(config, null, null)) {
+        // Entry path inside the ZIP (forward slashes)
+        sdk.loadSpec("published/core/infomgr/v4/api.yaml");
+        sdk.generateApplication("java", "jersey", "com.example.api", "./generated-app");
+    }
+} catch (OASSDKException e) {
+    e.printStackTrace();
+}
+```
+
+When using `specZipPath`, call `close()` when done (or use try-with-resources as above) to release the ZIP filesystem.
+
 ### 3. Security and @Actor Annotations
 
 The SDK automatically generates `@Actor` annotations for Jersey resources based on OpenAPI security specifications. The annotations include `ActorType` and `OAuthScope` enums extracted from security schemes.
@@ -394,7 +419,7 @@ sdk.generateMockData("./generated-mock-data");
 
 ### 5. External File References and Security
 
-The SDK supports external file references in OpenAPI specifications using `$ref`. You can configure search paths for external schemas and files.
+The SDK supports external file references in OpenAPI specifications using `$ref`. You can configure search paths for external schemas and files. When using **ZIP-based loading** (`GeneratorConfig.specZipPath`), all specs and `$ref` resolution are read from the ZIP; entry paths use forward slashes and work the same on Windows and Mac.
 
 #### Configuring Search Paths
 
@@ -473,6 +498,7 @@ public class ConfiguredExample {
                 .framework("jersey")
                 .packageName("com.example.api")
                 .searchPaths(List.of("/path/to/schemas")) // Optional: external file search paths
+                // .specZipPath("path/to/specs.zip")     // Optional: load specs from ZIP (then loadSpec(entryPathInZip))
                 .build();
             
             TestConfig testConfig = new TestConfig();

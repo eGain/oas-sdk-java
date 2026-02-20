@@ -92,10 +92,37 @@ public class PathResolver {
     }
 
     /**
+     * Constructor with search paths as Path objects (e.g. from a Zip FileSystem).
+     * Uses the paths as-is; environment and system property search paths are not added.
+     * Use {@link #fromPathList(List)} to create a resolver from a list of Paths.
+     */
+    private PathResolver(List<Path> searchPaths, boolean fromPathList) {
+        this.searchPaths = new ArrayList<>();
+        if (searchPaths != null) {
+            for (Path p : searchPaths) {
+                if (p != null) {
+                    this.searchPaths.add(p.normalize());
+                }
+            }
+        }
+    }
+
+    /**
+     * Creates a PathResolver that uses the given paths (e.g. from a Zip FileSystem).
+     * Environment and system property search paths are not added.
+     *
+     * @param searchPaths list of paths to search for external references (can be on any FileSystem)
+     * @return a new PathResolver
+     */
+    public static PathResolver fromPathList(List<Path> searchPaths) {
+        return new PathResolver(searchPaths, true);
+    }
+
+    /**
      * Default constructor - no search paths
      */
     public PathResolver() {
-        this(null);
+        this((List<String>) null);
     }
 
     /**
@@ -119,18 +146,38 @@ public class PathResolver {
 
         // Resolve path relative to base directory (sanitizedPath is already Unix style)
         Path resolvedPath;
+        String resolvedPathStr = null; // when path contains "..", resolved absolute path string for search path fallback
         if (baseDir != null) {
-            resolvedPath = baseDir.resolve(sanitizedPath).normalize();
+            // ZipFileSystem and some other FS do not collapse ".." in Path.normalize(); resolve the path string first
+            if (sanitizedPath.contains("../") || sanitizedPath.contains("..\\")) {
+                String baseStr = PathUtils.toUnixPath(baseDir);
+                if (baseStr != null && !baseStr.isEmpty()) {
+                    String resolvedStr = resolveRelativePathString(baseStr, sanitizedPath);
+                    if (resolvedStr != null) {
+                        resolvedPathStr = resolvedStr;
+                        resolvedPath = baseDir.getFileSystem().getPath(resolvedStr);
+                    } else {
+                        resolvedPath = baseDir.resolve(sanitizedPath).normalize();
+                    }
+                } else {
+                    resolvedPath = baseDir.resolve(sanitizedPath).normalize();
+                }
+            } else {
+                resolvedPath = baseDir.resolve(sanitizedPath).normalize();
+            }
         } else {
             resolvedPath = Paths.get(sanitizedPath).normalize();
         }
 
         // Check if file exists
         if (Files.exists(resolvedPath) && Files.isRegularFile(resolvedPath)) {
-            // Validate path traversal protection
-            // If validation fails, continue to search paths instead of throwing immediately
+            // Validate path traversal: when we used resolveRelativePathString the path may be outside baseDir (e.g. ../..), so validate against search path (e.g. ZIP root) if available
+            Path validationBase = baseDir;
+            if (baseDir != null && !searchPaths.isEmpty() && (sanitizedPath.contains("../") || sanitizedPath.contains("..\\"))) {
+                validationBase = searchPaths.get(0);
+            }
             try {
-                validatePathTraversal(baseDir, resolvedPath);
+                validatePathTraversal(validationBase, resolvedPath);
                 // Validate file size
                 validateFileSize(resolvedPath);
                 return resolvedPath;
@@ -140,7 +187,21 @@ public class PathResolver {
             }
         }
 
-        // Try search paths
+        // Try search paths: when we have a resolved path string (e.g. "published/models/v4/common.yaml"), try it first
+        if (resolvedPathStr != null) {
+            for (Path searchPath : searchPaths) {
+                Path candidatePath = searchPath.resolve(resolvedPathStr).normalize();
+                if (Files.exists(candidatePath) && Files.isRegularFile(candidatePath)) {
+                    try {
+                        validatePathTraversal(searchPath, candidatePath);
+                        validateFileSize(candidatePath);
+                        return candidatePath;
+                    } catch (OASSDKException e) {
+                        continue;
+                    }
+                }
+            }
+        }
         for (Path searchPath : searchPaths) {
             Path candidatePath = searchPath.resolve(sanitizedPath).normalize();
             if (Files.exists(candidatePath) && Files.isRegularFile(candidatePath)) {
@@ -349,6 +410,44 @@ public class PathResolver {
             throw new OASSDKException("Invalid file extension: " + filePath +
                     " (allowed: .yaml, .yml, .json)");
         }
+    }
+
+    /**
+     * Resolve a relative path string against a base path string, collapsing ".." and ".".
+     * Used when the FileSystem (e.g. ZipFileSystem) does not collapse ".." in Path.normalize().
+     *
+     * @param basePathStr base path (Unix style, no trailing slash for directory)
+     * @param relativePath relative path (e.g. "../../../models/v4/common.yaml")
+     * @return resolved path string, or null if relative escapes before root
+     */
+    public static String resolveRelativePathString(String basePathStr, String relativePath) {
+        if (basePathStr == null || relativePath == null) {
+            return null;
+        }
+        String base = basePathStr.replace('\\', '/').trim();
+        String rel = relativePath.replace('\\', '/').trim();
+        if (rel.isEmpty()) {
+            return base;
+        }
+        // Treat base as directory: if it doesn't end with /, we still use its segments as the base
+        String[] baseSegments = base.isEmpty() ? new String[0] : base.split("/");
+        List<String> result = new ArrayList<>();
+        for (String s : baseSegments) {
+            if (!s.isEmpty() && !".".equals(s)) {
+                result.add(s);
+            }
+        }
+        for (String seg : rel.split("/")) {
+            if ("..".equals(seg)) {
+                if (result.isEmpty()) {
+                    return null; // escape beyond root
+                }
+                result.remove(result.size() - 1);
+            } else if (!".".equals(seg) && !seg.isEmpty()) {
+                result.add(seg);
+            }
+        }
+        return String.join("/", result);
     }
 
     /**
