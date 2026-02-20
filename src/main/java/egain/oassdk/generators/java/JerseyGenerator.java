@@ -68,10 +68,10 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             generateBuildFiles(spec, outputDir, packageName);
 
             // Generate query parameter validators
-            generateQueryParamValidators(spec, outputDir);
+            generateQueryParamValidators(spec, outputDir, packageName);
 
             // Generate Validation classes automatically
-            generateValidationClasses(outputDir);
+            generateValidationClasses(outputDir, packageName);
 
             // Generate executors
             generateExecutors(spec, outputDir, packageName);
@@ -131,8 +131,6 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 outputDir + "/src/main/java/" + packagePath + "/executor",
                 outputDir + "/src/main/java/" + packagePath + "/config",
                 outputDir + "/src/main/java/" + packagePath + "/exception",
-                outputDir + "/src/main/java/egain/ws/oas/gen",  // Validation package directory
-                outputDir + "/src/main/java/egain/ws/oas/validation",  // Validation package directory (lowercase)
                 outputDir + "/src/main/resources",
                 outputDir + "/src/test/java/" + packagePath,
                 outputDir + "/src/test/java/" + packagePath + "/resources",
@@ -4031,7 +4029,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     /**
      * Generate query parameter validators (QueryParamValidators.java and ValidationMapHelper.java)
      */
-    private void generateQueryParamValidators(Map<String, Object> spec, String outputDir) throws IOException {
+    private void generateQueryParamValidators(Map<String, Object> spec, String outputDir, String packageName) throws IOException {
         Map<String, Object> paths = Util.asStringObjectMap(spec.get("paths"));
         if (paths == null) return;
 
@@ -4078,10 +4076,10 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         }
 
         // Generate QueryParamValidators.java
-        generateQueryParamValidatorsFile(outputDir, validators);
+        generateQueryParamValidatorsFile(outputDir, validators, packageName);
 
         // Generate ValidationMapHelper.java
-        generateValidationMapHelperFile(outputDir, validators);
+        generateValidationMapHelperFile(outputDir, validators, packageName);
     }
 
     /**
@@ -4362,26 +4360,26 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     /**
      * Generate QueryParamValidators.java file
      */
-    private void generateQueryParamValidatorsFile(String outputDir, List<EndpointValidator> validators) throws IOException {
-        // Use the package from the old tool: egain.ws.oas.gen
-        String validatorPackage = "egain.ws.oas.gen";
+    private void generateQueryParamValidatorsFile(String outputDir, List<EndpointValidator> validators, String packageName) throws IOException {
+        String validatorPackage = packageName != null ? packageName : "egain.ws.oas.gen";
+        String validatorPackagePath = validatorPackage.replace(".", "/");
 
         StringBuilder content = new StringBuilder();
         content.append("package ").append(validatorPackage).append(";\n\n");
         content.append("import com.egain.platform.framework.validation.ValidationBuilder;\n");
         content.append("import egain.ws.oas.RequestInfo;\n");
-        content.append("import egain.ws.oas.validation.AllowedParameterValidator;\n");
-        content.append("import egain.ws.oas.validation.ArrayMaxItemsValidators;\n");
-        content.append("import egain.ws.oas.validation.ArrayMinItemsValidator;\n");
-        content.append("import egain.ws.oas.validation.BooleanValidator;\n");
-        content.append("import egain.ws.oas.validation.EnumValidator;\n");
-        content.append("import egain.ws.oas.validation.FormatValidator;\n");
-        content.append("import egain.ws.oas.validation.IsRequiredValidator;\n");
-        content.append("import egain.ws.oas.validation.MaxLengthValidator;\n");
-        content.append("import egain.ws.oas.validation.MinLengthValidator;\n");
-        content.append("import egain.ws.oas.validation.NumericMaxValidator;\n");
-        content.append("import egain.ws.oas.validation.NumericMinValidator;\n");
-        content.append("import egain.ws.oas.validation.PatternValidator;\n");
+        content.append("import ").append(validatorPackage).append(".AllowedParameterValidator;\n");
+        content.append("import ").append(validatorPackage).append(".ArrayMaxItemsValidators;\n");
+        content.append("import ").append(validatorPackage).append(".ArrayMinItemsValidator;\n");
+        content.append("import ").append(validatorPackage).append(".BooleanValidator;\n");
+        content.append("import ").append(validatorPackage).append(".EnumValidator;\n");
+        content.append("import ").append(validatorPackage).append(".FormatValidator;\n");
+        content.append("import ").append(validatorPackage).append(".IsRequiredValidator;\n");
+        content.append("import ").append(validatorPackage).append(".MaxLengthValidator;\n");
+        content.append("import ").append(validatorPackage).append(".MinLengthValidator;\n");
+        content.append("import ").append(validatorPackage).append(".NumericMaxValidator;\n");
+        content.append("import ").append(validatorPackage).append(".NumericMinValidator;\n");
+        content.append("import ").append(validatorPackage).append(".PatternValidator;\n");
         content.append("import java.lang.String;\n");
         content.append("import java.util.Collections;\n");
         content.append("import java.util.List;\n\n");
@@ -4395,16 +4393,15 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("}\n");
 
         // Write to proper package directory under src/main/java
-        String validatorPackagePath = "egain/ws/oas/gen";
         writeFile(outputDir + "/src/main/java/" + validatorPackagePath + "/QueryParamValidators.java", content.toString());
     }
 
     /**
      * Generate ValidationMapHelper.java file
      */
-    private void generateValidationMapHelperFile(String outputDir, List<EndpointValidator> validators) throws IOException {
-        // Use the package from the old tool: egain.ws.oas.gen
-        String validatorPackage = "egain.ws.oas.gen";
+    private void generateValidationMapHelperFile(String outputDir, List<EndpointValidator> validators, String packageName) throws IOException {
+        String validatorPackage = packageName != null ? packageName : "egain.ws.oas.gen";
+        String validatorPackagePath = validatorPackage.replace(".", "/");
 
         StringBuilder content = new StringBuilder();
         content.append("package ").append(validatorPackage).append(";\n\n");
@@ -4452,20 +4449,20 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("}\n");
 
         // Write to proper package directory under src/main/java
-        String validatorPackagePath = "egain/ws/oas/gen";
         writeFile(outputDir + "/src/main/java/" + validatorPackagePath + "/ValidationMapHelper.java", content.toString());
     }
 
     /**
      * Generate Validation classes automatically in the output directory
-     * Creates all required validator classes in the egain.ws.oas.validation package
+     * Creates all required validator classes in the passed-in package
      */
-    private void generateValidationClasses(String outputDir) throws IOException {
+    private void generateValidationClasses(String outputDir, String packageName) throws IOException {
         if (outputDir == null) {
             throw new IllegalArgumentException("Output directory cannot be null");
         }
-        String validationPackage = "egain.ws.oas.validation";
-        String validationDir = outputDir + "/src/main/java/egain/ws/oas/validation";
+        String validationPackage = packageName != null ? packageName : "egain.ws.oas.validation";
+        String packagePath = validationPackage.replace(".", "/");
+        String validationDir = outputDir + "/src/main/java/" + packagePath;
 
         // Ensure target directory exists
         Files.createDirectories(Paths.get(validationDir));

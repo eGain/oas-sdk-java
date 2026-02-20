@@ -383,7 +383,7 @@ public class JerseyGeneratorFrameworkTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validationDir = outputDir.resolve("src/main/java/egain/ws/oas/validation");
+        Path validationDir = outputDir.resolve("src/main/java/com/test/api");
         
         if (Files.exists(validationDir)) {
             try (var paths = Files.list(validationDir)) {
@@ -420,7 +420,7 @@ public class JerseyGeneratorFrameworkTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path queryParamValidatorsFile = outputDir.resolve("src/main/java/egain/ws/oas/gen/QueryParamValidators.java");
+        Path queryParamValidatorsFile = outputDir.resolve("src/main/java/com/test/api/QueryParamValidators.java");
         
         if (Files.exists(queryParamValidatorsFile)) {
             String content = Files.readString(queryParamValidatorsFile);
@@ -443,7 +443,7 @@ public class JerseyGeneratorFrameworkTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validationMapHelperFile = outputDir.resolve("src/main/java/egain/ws/oas/gen/ValidationMapHelper.java");
+        Path validationMapHelperFile = outputDir.resolve("src/main/java/com/test/api/ValidationMapHelper.java");
         
         // ValidationMapHelper is only generated if there are query parameters to validate
         if (Files.exists(validationMapHelperFile)) {
@@ -458,7 +458,7 @@ public class JerseyGeneratorFrameworkTest {
         } else {
             // If ValidationMapHelper doesn't exist, that's okay - it's only generated when needed
             // Just verify that validation classes directory exists
-            Path validationDir = outputDir.resolve("src/main/java/egain/ws/oas/validation");
+            Path validationDir = outputDir.resolve("src/main/java/com/test/api");
             assertTrue(Files.exists(validationDir), "Validation directory should exist even if ValidationMapHelper is not generated");
         }
     }
