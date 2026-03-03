@@ -1350,8 +1350,12 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      */
     private void generateObjectFactoryMethod(StringBuilder content, String className) {
         String elementName = className.substring(0, 1).toLowerCase(Locale.ROOT) + className.substring(1);
+        String createMethodName = "create" + elementName.substring(0, 1).toUpperCase(Locale.ROOT) + elementName.substring(1);
         String qnameConstant = "_" + className.toUpperCase(Locale.ROOT) + "_QNAME";
         content.append("    private static final QName ").append(qnameConstant).append(" = new QName(\"\", \"").append(elementName).append("\");\n\n");
+        content.append("    public ").append(className).append(" ").append(createMethodName).append("() {\n");
+        content.append("        return new ").append(className).append("();\n");
+        content.append("    }\n\n");
         content.append("    @XmlElementDecl(name = \"").append(elementName).append("\")\n");
         content.append("    public JAXBElement<").append(className).append("> create").append(className).append("(").append(className).append(" value) {\n");
         content.append("        return new JAXBElement<").append(className).append(">(").append(qnameConstant).append(", ").append(className).append(".class, null, value);\n");
@@ -2409,12 +2413,18 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
         // Collect referenced model types for imports (use wrapper class name for parent field; add item type for inner class)
         Set<String> modelImports = new LinkedHashSet<>();
+		Set<String> innerClasses = new HashSet<>();
         for (Map.Entry<String, Object> property : allProperties.entrySet()) {
             String fieldName = property.getKey();
             Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
             // Only generate inline inner class for true inline objects; object-with-single-array uses wrapper inner class
             if (isInlineObjectProperty(fieldSchema, spec) && !isObjectWithSingleArrayOfRef(fieldSchema, spec)) {
-                innerClassesToGenerate.add(new AbstractMap.SimpleEntry<>(fieldName, fieldSchema));
+				String innerClassName = schemaName + "_" + (fieldSchema.containsKey("title")? fieldSchema.get("title").toString() : fieldName);
+				if(!innerClasses.contains(innerClassName.toLowerCase(Locale.ENGLISH)))
+				{
+					innerClassesToGenerate.add(new AbstractMap.SimpleEntry<>(fieldName, fieldSchema));
+					innerClasses.add(innerClassName.toLowerCase(Locale.ENGLISH));
+				}
             }
             String fieldType = getFieldTypeForModelProperty(schemaName, fieldName, fieldSchema, isArrayType, spec);
             if (isObjectWithSingleArrayOfRef(fieldSchema, spec)) {
@@ -2426,6 +2436,25 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             } else {
                 addModelImportTypes(fieldType, schemaName, modelImports);
             }
+
+			// Collect imports from inner classes
+			for (Map.Entry<String, Map<String, Object>> innerClassEntry : innerClassesToGenerate) {
+				String innerClassName = getInnerClassNameForInlineProperty(innerClassEntry.getKey(), innerClassEntry.getValue());
+				Map<String, Object> innerClassSchema = innerClassEntry.getValue();
+				// Collect field types and annotations for inner class
+				Map<String, Object> innerProps = Util.asStringObjectMap(innerClassSchema.get("properties"));
+				if (innerProps != null) {
+					for (Map.Entry<String, Object> innerProp : innerProps.entrySet()) {
+						String innerFieldType = getFieldTypeForModelProperty(innerClassName, innerProp.getKey(), Util.asStringObjectMap(innerProp.getValue()), false, spec);
+						//In case import is that of an inner class of an inner class, filter those out. For now used crude way to determine. Need to improve logic.
+						if(innerFieldType!=null && !innerFieldType.contains(".") && !innerFieldType.equals(innerClassName) && !innerFieldType.equals(schemaName))
+						{
+							addModelImportTypes(innerFieldType, schemaName, modelImports);
+						}
+						// Add annotation imports if needed. Right now its not necessary
+					}
+				}
+			}
         }
 
         content.append("package ").append(packagePath).append(isModelsOnly?"."+sanitizePackageName(schemaName)+";\n\n":".model;\n\n");
@@ -2491,6 +2520,11 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             } else if (fieldType.startsWith("List<")) {
                 content.append("@XmlElementWrapper(name = \"").append(fieldName).append("\")\n    ");
                 content.append("@XmlElement()\n    ");
+				// Add @Size for maxItems if present and this is the top-level array
+				if (isArrayType && fieldName.equals("items") && schema.containsKey("maxItems")) {
+					Object maxItems = schema.get("maxItems");
+					content.append("@Size(max = ").append(maxItems).append(")\n    ");
+				}
             } else {
                 content.append("@XmlElement(name = \"").append(fieldName).append("\"");
                 if (allRequired.contains(fieldName)) {
@@ -2533,7 +2567,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         for (Map.Entry<String, Object> property : allProperties.entrySet()) {
             String fieldName = property.getKey();
             Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
-            String fieldType = computeFieldTypeForProperty(fieldName, fieldSchema, isArrayType, spec);
+            //String fieldType = computeFieldTypeForProperty(fieldName, fieldSchema, isArrayType, spec);
+			String fieldType = getFieldTypeForModelProperty(schemaName, fieldName, fieldSchema, isArrayType, spec);
 
             String javaFieldName = toModelFieldName(fieldName);
             String capitalizedFieldName = getCapitalizedPropertyNameForAccessor(javaFieldName);
@@ -2553,6 +2588,20 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             if (!readOnly) {
                 content.append("    public void set").append(capitalizedFieldName).append("(").append(fieldType).append(" ").append(javaFieldName).append(") {\n");
                 content.append("        this.").append(javaFieldName).append(" = ").append(javaFieldName).append(";\n");
+                content.append("    }\n\n");
+            }
+
+            // isSetXxx() for every attribute
+            if (fieldType.startsWith("List<")) {
+                content.append("    public boolean isSet").append(capitalizedFieldName).append("() {\n");
+                content.append("        return (this.").append(javaFieldName).append(" != null) && (!this.").append(javaFieldName).append(".isEmpty());\n");
+                content.append("    }\n\n");
+                content.append("    public void unset").append(capitalizedFieldName).append("() {\n");
+                content.append("        this.").append(javaFieldName).append(" = null;\n");
+                content.append("    }\n\n");
+            } else {
+                content.append("    public boolean isSet").append(capitalizedFieldName).append("() {\n");
+                content.append("        return (this.").append(javaFieldName).append(" != null);\n");
                 content.append("    }\n\n");
             }
         }
@@ -2646,15 +2695,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("        if (_attributes != null && _attributes.containsKey(name)) {\n");
         content.append("            return true;\n");
         content.append("        }\n");
-        // Then check if it's a field and if it's set (not null)
+        // Then check if it's a field and delegate to isSetXxx()
         if (!fieldNames.isEmpty()) {
             content.append("        switch (name) {\n");
             for (String fieldName : fieldNames) {
-                Map<String, Object> fieldSchema = Util.asStringObjectMap(allProperties.get(fieldName));
-                if (isSchemaFlagTrue(fieldSchema, "readOnly")) continue;
                 String javaFieldName = toModelFieldName(fieldName);
+                String capitalizedFieldName = getCapitalizedPropertyNameForAccessor(javaFieldName);
                 content.append("            case \"").append(fieldName).append("\":\n");
-                content.append("                return ").append(javaFieldName).append(" != null;\n");
+                content.append("                return isSet").append(capitalizedFieldName).append("();\n");
             }
             content.append("            default:\n");
             content.append("                return false;\n");
@@ -2872,6 +2920,19 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 content.append(indentBody).append("    this.").append(javaFieldName).append(" = ").append(javaFieldName).append(";\n");
                 content.append(indentBody).append("}\n\n");
             }
+
+            if (fieldType.startsWith("List<")) {
+                content.append(indentBody).append("public boolean isSet").append(capitalizedFieldName).append("() {\n");
+                content.append(indentBody).append("    return (").append(javaFieldName).append(" != null) && (!").append(javaFieldName).append(".isEmpty());\n");
+                content.append(indentBody).append("}\n\n");
+                content.append(indentBody).append("public void unset").append(capitalizedFieldName).append("() {\n");
+                content.append(indentBody).append("    this.").append(javaFieldName).append(" = null;\n");
+                content.append(indentBody).append("}\n\n");
+            } else {
+                content.append(indentBody).append("public boolean isSet").append(capitalizedFieldName).append("() {\n");
+                content.append(indentBody).append("    return (").append(javaFieldName).append(" != null);\n");
+                content.append(indentBody).append("}\n\n");
+            }
         }
 
         content.append(indentBody).append("@Override\n");
@@ -2923,9 +2984,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append(indentBody).append("@Override\n");
         content.append(indentBody).append("public boolean isSetAttribute(String name) {\n");
         for (String fn : fieldNames) {
-            Map<String, Object> fs = Util.asStringObjectMap(allProperties.get(fn));
-            if (isSchemaFlagTrue(fs, "readOnly")) continue;
-            content.append(indentBody).append("    if (\"").append(fn).append("\".equals(name)) return ").append(toModelFieldName(fn)).append(" != null;\n");
+            String cap = getCapitalizedPropertyNameForAccessor(toModelFieldName(fn));
+            content.append(indentBody).append("    if (\"").append(fn).append("\".equals(name)) return isSet").append(cap).append("();\n");
         }
         content.append(indentBody).append("    return false;\n");
         content.append(indentBody).append("}\n\n");
@@ -3422,9 +3482,48 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      */
     private String getFieldTypeForModelProperty(String parentSchemaName, String fieldName, Map<String, Object> fieldSchema, boolean isArrayType, Map<String, Object> spec) {
         // Array schema "items" property must resolve to List<ItemType>, never as inline object
-        if (isArrayType && "items".equals(fieldName)) {
-            return computeFieldTypeForProperty(fieldName, fieldSchema, isArrayType, spec);
-        }
+//        if (isArrayType && "items".equals(fieldName)) {
+//            return computeFieldTypeForProperty(fieldName, fieldSchema, isArrayType, spec);
+//        }
+				// Special handling for array schema wrapper classes (e.g., ArticleTypes)
+		if (isArrayType && "items".equals(fieldName)) {
+			String itemType = null;
+			if (fieldSchema != null) {
+				// Try to resolve $ref for array items
+				if (fieldSchema.containsKey("$ref")) {
+					String ref = (String) fieldSchema.get("$ref");
+					if (ref != null && ref.startsWith("#/components/schemas/")) {
+						String schemaRef = ref.substring(ref.lastIndexOf("/") + 1);
+						itemType = toJavaClassName(schemaRef);
+					}
+				}
+				// If $ref was resolved by parser, match the resolved schema to its name
+				if (itemType == null || itemType.isEmpty()) {
+					Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+					if (components != null) {
+						Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+						if (schemas != null) {
+							for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
+								Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
+								if (candidateSchema == fieldSchema) {
+									itemType = toJavaClassName(schemaEntry.getKey());
+									break;
+								}
+							}
+						}
+					}
+				}
+				// Fallback to getJavaType
+				if (itemType == null || itemType.isEmpty()) {
+					itemType = getJavaType(fieldSchema);
+				}
+			}
+			if (itemType == null || itemType.isEmpty()) {
+				itemType = "Object";
+			}
+			return "List<" + itemType + ">";
+		}
+		//Soumya
         // Object-with-single-array (wrapper) takes precedence so we keep unqualified wrapper class name (e.g. AccessTags)
         if (isObjectWithSingleArrayOfRef(fieldSchema, spec)) {
             return getWrapperClassName(fieldName);
