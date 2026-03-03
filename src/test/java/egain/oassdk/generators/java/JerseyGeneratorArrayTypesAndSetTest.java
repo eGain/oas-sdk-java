@@ -577,4 +577,190 @@ public class JerseyGeneratorArrayTypesAndSetTest {
                    content.contains("250") || !content.contains("maxItems"),
             "ArticleTypes should handle maxItems constraint if applicable");
     }
+
+    @Test
+    @DisplayName("Object-with-single-array-of-ref generates wrapper inner class (e.g. Personalization.accessTags -> AccessTags with tagCategory)")
+    public void testObjectWithSingleArrayOfRefGeneratesWrapperType() throws OASSDKException, IOException {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            servers:
+              - url: https://api.example.com/v1
+            paths:
+              /personalization:
+                get:
+                  summary: Get Personalization
+                  operationId: getPersonalization
+                  responses:
+                    '200':
+                      description: OK
+                      content:
+                        application/json:
+                          schema:
+                            $ref: '#/components/schemas/Personalization'
+            components:
+              schemas:
+                TagCategory:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                PublishView:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                Personalization:
+                  type: object
+                  properties:
+                    accessTags:
+                      type: object
+                      properties:
+                        tagCategory:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/TagCategory'
+                          maxItems: 20
+                    filters:
+                      type: object
+                      properties:
+                        tagCategory:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/TagCategory'
+                          maxItems: 20
+                    publishViews:
+                      type: object
+                      properties:
+                        publishView:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/PublishView'
+                          maxItems: 20
+            """;
+
+        Path testSpecFile = tempOutputDir.resolve("object-array-ref-spec.yaml");
+        Files.writeString(testSpecFile, yamlContent);
+
+        Path outputDir = tempOutputDir.resolve("generated-sdk");
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(testSpecFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path personalizationFile = outputDir.resolve("src/main/java")
+            .resolve(packageName.replace(".", "/"))
+            .resolve("model/Personalization.java");
+
+        assertTrue(Files.exists(personalizationFile),
+            "Personalization.java should be generated");
+
+        String content = Files.readString(personalizationFile);
+
+        // Parent must use wrapper types (AccessTags, Filters, PublishViews), not List or Object
+        assertTrue(content.contains("private AccessTags accessTags") || content.contains("private AccessTags accessTags;"),
+            "accessTags should be wrapper type AccessTags");
+        assertTrue(content.contains("private Filters filters") || content.contains("private Filters filters;"),
+            "filters should be wrapper type Filters");
+        assertTrue(content.contains("private PublishViews publishViews") || content.contains("private PublishViews publishViews;"),
+            "publishViews should be wrapper type PublishViews");
+
+        assertFalse(content.contains("private Object accessTags") || content.contains("private Object accessTags;"),
+            "accessTags must not be Object");
+
+        // Static inner class AccessTags with List<TagCategory> tagCategory and correct XML element name
+        assertTrue(content.contains("public static class AccessTags"),
+            "Should have static inner class AccessTags");
+        assertTrue(content.contains("@XmlElement(name = \"tagCategory\")"),
+            "Inner class should have @XmlElement(name = \"tagCategory\") for list items");
+        assertTrue(content.contains("private List<TagCategory> tagCategory"),
+            "AccessTags should contain List<TagCategory> tagCategory");
+        assertTrue(content.contains("getTagCategory()"),
+            "AccessTags should have getTagCategory()");
+
+        // Static inner class Filters with List<TagCategory> tagCategory
+        assertTrue(content.contains("public static class Filters"),
+            "Should have static inner class Filters");
+        assertTrue(content.contains("private List<TagCategory> tagCategory") && content.contains("class Filters"),
+            "Filters should contain List<TagCategory> tagCategory");
+        assertTrue(content.contains("getTagCategory()"),
+            "Filters should have getTagCategory()");
+
+        // Static inner class PublishViews with List<PublishView> publishView
+        assertTrue(content.contains("public static class PublishViews"),
+            "Should have static inner class PublishViews");
+        assertTrue(content.contains("private List<PublishView> publishView"),
+            "PublishViews should contain List<PublishView> publishView");
+        assertTrue(content.contains("getPublishView()"),
+            "PublishViews should have getPublishView()");
+    }
+
+    @Test
+    @DisplayName("getJavaType returns List for inlined object-with-single-array response schema")
+    public void testGetJavaTypeReturnsListForInlinedObjectWithSingleArrayResponse() throws OASSDKException, IOException {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            servers:
+              - url: https://api.example.com/v1
+            paths:
+              /tag-categories:
+                get:
+                  summary: Get tag categories list
+                  operationId: getTagCategories
+                  responses:
+                    '200':
+                      description: OK
+                      content:
+                        application/json:
+                          schema:
+                            type: object
+                            properties:
+                              tagCategory:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/TagCategory'
+            components:
+              schemas:
+                TagCategory:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+            """;
+
+        Path testSpecFile = tempOutputDir.resolve("inline-array-ref-response-spec.yaml");
+        Files.writeString(testSpecFile, yamlContent);
+
+        Path outputDir = tempOutputDir.resolve("generated-sdk");
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(testSpecFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path executorFile = outputDir.resolve("src/main/java")
+            .resolve(packageName.replace(".", "/"))
+            .resolve("executor/GetTagCategoriesBOExecutor.java");
+
+        assertTrue(Files.exists(executorFile),
+            "GetTagCategoriesBOExecutor.java should be generated");
+
+        String content = Files.readString(executorFile);
+
+        // getJavaType() should resolve inlined object-with-single-array to List<TagCategory>, not Object
+        assertTrue(content.contains("GetBOExecutor_2<"),
+            "Executor base class should be GetBOExecutor_2<List<TagCategory>> for inlined object-with-single-array schema");
+        assertTrue(content.contains("private List<TagCategory> mResponseData") || content.contains("List<TagCategory> mResponseData"),
+            "Executor should declare mResponseData as List<TagCategory>");
+    }
 }

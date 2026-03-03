@@ -2360,11 +2360,24 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
         List<String> fieldNames = new ArrayList<>(allProperties.keySet());
 
-        // Collect referenced model types for imports
+        // Wrappers to generate as static inner classes (object-with-single-array properties)
+        List<WrapperToGenerate> wrappersToGenerate = new ArrayList<>();
+
+        // Collect referenced model types for imports (use wrapper class name for parent field; add item type for inner class)
         Set<String> modelImports = new LinkedHashSet<>();
         for (Map.Entry<String, Object> property : allProperties.entrySet()) {
-            String fieldType = computeFieldTypeForProperty(property.getKey(), Util.asStringObjectMap(property.getValue()), isArrayType, spec);
-            addModelImportTypes(fieldType, schemaName, modelImports);
+            String fieldName = property.getKey();
+            Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
+            String fieldType = getFieldTypeForModelProperty(fieldName, fieldSchema, isArrayType, spec);
+            if (isObjectWithSingleArrayOfRef(fieldSchema, spec)) {
+                ObjectWithSingleArrayInfo info = getObjectWithSingleArrayInfo(fieldSchema, spec);
+                if (info != null) {
+                    wrappersToGenerate.add(new WrapperToGenerate(fieldName, getWrapperClassName(fieldName), info.innerPropertyName, info.itemTypeName));
+                    addModelImportTypes("List<" + info.itemTypeName + ">", schemaName, modelImports);
+                }
+            } else {
+                addModelImportTypes(fieldType, schemaName, modelImports);
+            }
         }
 
         content.append("package ").append(packagePath).append(isModelsOnly?"."+sanitizePackageName(schemaName)+";\n\n":".model;\n\n");
@@ -2421,10 +2434,13 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
             // Add JAXB @XmlElement annotation
             String javaFieldName = toModelFieldName(fieldName);
-            String fieldType = computeFieldTypeForProperty(fieldName, fieldSchema, isArrayType, spec);
+            String fieldType = getFieldTypeForModelProperty(fieldName, fieldSchema, isArrayType, spec);
+            boolean isWrapperType = isObjectWithSingleArrayOfRef(fieldSchema, spec);
 
-            // Handle arrays/lists with @XmlElementWrapper
-            if (fieldType.startsWith("List<")) {
+            // Wrapper type: single @XmlElement(name=fieldName). Direct list: @XmlElementWrapper + @XmlElement(). Else: @XmlElement(name=fieldName).
+            if (isWrapperType) {
+                content.append("@XmlElement(name = \"").append(fieldName).append("\")\n    ");
+            } else if (fieldType.startsWith("List<")) {
                 content.append("@XmlElementWrapper(name = \"").append(fieldName).append("\")\n    ");
                 content.append("@XmlElement()\n    ");
             } else {
@@ -2678,7 +2694,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     }
                     fieldType = "List<" + itemType + ">";
                 } else {
-                    fieldType = fieldSchema != null ? getJavaType(fieldSchema) : "Object";
+                    fieldType = getFieldTypeForModelProperty(fieldName, fieldSchema, isArrayType, spec);
                 }
                 // readOnly properties have no setter; setAttribute must not call setXxx for them
                 boolean readOnly = isSchemaFlagTrue(fieldSchema, "readOnly");
@@ -2704,9 +2720,73 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             content.append("        _attributes.put(name, value);\n");
         }
         content.append("    }\n");
+
+        // Generate static inner wrapper classes (object-with-single-array)
+        for (WrapperToGenerate w : wrappersToGenerate) {
+            appendWrapperInnerClass(content, w, schemaName);
+        }
+
         content.append("}\n");
 
         writeFile(outputDir + (isModelsOnly?"/":"/src/main/java/") + packagePath.replace(".", "/") + (isModelsOnly?"/"+sanitizePackageName(schemaName)+"/":"/model/") + schemaName + ".java", content.toString());
+    }
+
+    /**
+     * Append a static inner class for an object-with-single-array property (e.g. AccessTags with List<TagCategory> tagCategory).
+     */
+    private void appendWrapperInnerClass(StringBuilder content, WrapperToGenerate w, String parentSchemaName) {
+        String innerJavaField = toModelFieldName(w.innerPropertyName);
+        String innerCapitalized = getCapitalizedPropertyNameForAccessor(innerJavaField);
+
+        content.append("\n    @XmlAccessorType(XmlAccessType.FIELD)\n");
+        content.append("    @XmlType(name = \"\", propOrder = {\"").append(innerJavaField).append("\"})\n");
+        content.append("    public static class ").append(w.wrapperClassName).append(" implements Serializable, JAXBBean {\n\n");
+        content.append("        private static final long serialVersionUID = 1L;\n\n");
+        content.append("        @XmlElement(name = \"").append(w.innerPropertyName).append("\")\n");
+        content.append("        private List<").append(w.itemTypeName).append("> ").append(innerJavaField).append(";\n\n");
+        content.append("        public ").append(w.wrapperClassName).append("() {\n");
+        content.append("        }\n\n");
+        content.append("        public List<").append(w.itemTypeName).append("> get").append(innerCapitalized).append("() {\n");
+        content.append("            if (").append(innerJavaField).append(" == null) {\n");
+        content.append("                ").append(innerJavaField).append(" = new ArrayList<>();\n");
+        content.append("            }\n");
+        content.append("            return ").append(innerJavaField).append(";\n");
+        content.append("        }\n\n");
+        content.append("        public void set").append(innerCapitalized).append("(List<").append(w.itemTypeName).append("> ").append(innerJavaField).append(") {\n");
+        content.append("            this.").append(innerJavaField).append(" = ").append(innerJavaField).append(";\n");
+        content.append("        }\n\n");
+        content.append("        public boolean isSet").append(innerCapitalized).append("() {\n");
+        content.append("            return ").append(innerJavaField).append(" != null && !").append(innerJavaField).append(".isEmpty();\n");
+        content.append("        }\n\n");
+        content.append("        public void unset").append(innerCapitalized).append("() {\n");
+        content.append("            this.").append(innerJavaField).append(" = null;\n");
+        content.append("        }\n\n");
+        content.append("        @Override\n");
+        content.append("        public Object getAttribute(String name) {\n");
+        content.append("            if (\"").append(w.innerPropertyName).append("\".equals(name)) {\n");
+        content.append("                return get").append(innerCapitalized).append("();\n");
+        content.append("            }\n");
+        content.append("            return null;\n");
+        content.append("        }\n\n");
+        content.append("        @Override\n");
+        content.append("        public void setAttribute(String name, Object value) {\n");
+        content.append("            if (\"").append(w.innerPropertyName).append("\".equals(name)) {\n");
+        content.append("                set").append(innerCapitalized).append("((List<").append(w.itemTypeName).append(">) value);\n");
+        content.append("                return;\n");
+        content.append("            }\n");
+        content.append("        }\n\n");
+        content.append("        @Override\n");
+        content.append("        public boolean isSetAttribute(String name) {\n");
+        content.append("            return \"").append(w.innerPropertyName).append("\".equals(name) && isSet").append(innerCapitalized).append("();\n");
+        content.append("        }\n\n");
+        content.append("        @Override\n");
+        content.append("        public List<String> getAttributeNames() {\n");
+        content.append("            List<String> names = new ArrayList<>();\n");
+        content.append("            names.add(\"").append(w.innerPropertyName).append("\");\n");
+        content.append("            return names;\n");
+        content.append("        }\n");
+        content.append("    }\n");
+
     }
 
     /**
@@ -3030,6 +3110,106 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         if (segment.endsWith(".yml")) return segment.substring(0, segment.length() - 4);
         if (segment.endsWith(".json")) return segment.substring(0, segment.length() - 5);
         return segment;
+    }
+
+    /**
+     * If the schema is an object with exactly one property that is an array of a $ref,
+     * return the Java type as List&lt;ResolvedRefType&gt; (e.g. "List&lt;TagCategory&gt;").
+     * Otherwise return null. Used to avoid generating Object for "object wrapping array of ref" properties.
+     */
+    private String getListTypeForObjectWithSingleArrayOfRef(Map<String, Object> schema, Map<String, Object> spec) {
+        ObjectWithSingleArrayInfo info = getObjectWithSingleArrayInfo(schema, spec);
+        return info == null ? null : "List<" + info.itemTypeName + ">";
+    }
+
+    /**
+     * True if the schema is an object with exactly one property that is an array of a $ref.
+     * Used to generate a wrapper inner class instead of flattening to List.
+     */
+    private boolean isObjectWithSingleArrayOfRef(Map<String, Object> schema, Map<String, Object> spec) {
+        return getObjectWithSingleArrayInfo(schema, spec) != null;
+    }
+
+    /**
+     * Inner class name for an object-with-single-array property (e.g. accessTags -> AccessTags).
+     */
+    private String getWrapperClassName(String propertyName) {
+        return getCapitalizedPropertyNameForAccessor(toModelFieldName(propertyName));
+    }
+
+    /** Holder for (innerPropertyName, itemTypeName) when schema is object with single array of ref. */
+    private static final class ObjectWithSingleArrayInfo {
+        final String innerPropertyName;
+        final String itemTypeName;
+
+        ObjectWithSingleArrayInfo(String innerPropertyName, String itemTypeName) {
+            this.innerPropertyName = innerPropertyName;
+            this.itemTypeName = itemTypeName;
+        }
+    }
+
+    /**
+     * If the schema is an object with exactly one property that is an array of a $ref,
+     * return (innerPropertyName, itemTypeName) e.g. ("tagCategory", "TagCategory"). Otherwise null.
+     */
+    private ObjectWithSingleArrayInfo getObjectWithSingleArrayInfo(Map<String, Object> schema, Map<String, Object> spec) {
+        if (schema == null || spec == null) return null;
+        Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+        if (properties == null || properties.size() != 1) return null;
+        Map.Entry<String, Object> single = properties.entrySet().iterator().next();
+        Map<String, Object> nested = Util.asStringObjectMap(single.getValue());
+        if (nested == null || !"array".equals(nested.get("type"))) return null;
+        Object itemsObj = nested.get("items");
+        if (itemsObj == null || !(itemsObj instanceof Map)) return null;
+        Map<String, Object> items = Util.asStringObjectMap(itemsObj);
+        if (items == null) return null;
+        String itemSchemaName = getSchemaNameFromRef(items);
+        if (itemSchemaName == null && items.containsKey("$ref")) {
+            String ref = (String) items.get("$ref");
+            if (ref != null && ref.startsWith("#/components/schemas/")) {
+                itemSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+            }
+        }
+        if (itemSchemaName == null && items.containsKey("$ref")) {
+            String ref = (String) items.get("$ref");
+            if (ref != null && (ref.endsWith(".yaml") || ref.endsWith(".yml") || ref.endsWith(".json"))) {
+                String externalSchemaName = deriveSchemaNameFromExternalRef(ref);
+                if (externalSchemaName != null) {
+                    Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+                    Map<String, Object> schemas = components != null ? Util.asStringObjectMap(components.get("schemas")) : null;
+                    if (schemas != null && schemas.containsKey(externalSchemaName)) {
+                        itemSchemaName = externalSchemaName;
+                    }
+                }
+            }
+        }
+        if (itemSchemaName == null || itemSchemaName.isEmpty()) return null;
+        return new ObjectWithSingleArrayInfo(single.getKey(), toJavaClassName(itemSchemaName));
+    }
+
+    /**
+     * Field type for a property when generating the parent model: wrapper class name if object-with-single-array, else computeFieldTypeForProperty.
+     */
+    private String getFieldTypeForModelProperty(String fieldName, Map<String, Object> fieldSchema, boolean isArrayType, Map<String, Object> spec) {
+        if (isObjectWithSingleArrayOfRef(fieldSchema, spec)) {
+            return getWrapperClassName(fieldName);
+        }
+        return computeFieldTypeForProperty(fieldName, fieldSchema, isArrayType, spec);
+    }
+
+    /** Holder for wrapper inner class to generate: outer property name, wrapper class name, inner property name, item type name. */
+    private static final class WrapperToGenerate {
+        final String fieldName;
+        final String wrapperClassName;
+        final String innerPropertyName;
+        final String itemTypeName;
+
+        WrapperToGenerate(String fieldName, String wrapperClassName, String innerPropertyName, String itemTypeName) {
+            this.fieldName = fieldName;
+            this.wrapperClassName = wrapperClassName;
+            this.innerPropertyName = innerPropertyName;
+            this.itemTypeName = itemTypeName;
+        }
     }
 
     /** Types that do not require a model import (primitives, java/javax types, current class). */
@@ -3931,6 +4111,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 // Check if this is an in-lined schema
                 if (inlinedSchemas.containsKey(schema)) {
                     return inlinedSchemas.get(schema);
+                }
+                // Object with single property that is array of $ref -> List<RefType> (e.g. Personalization accessTags/filters/publishViews)
+                Map<String, Object> spec = currentSpecForResolution.get();
+                if (spec != null) {
+                    String listType = getListTypeForObjectWithSingleArrayOfRef(schema, spec);
+                    if (listType != null) {
+                        return listType;
+                    }
                 }
                 return "Object";
             }
