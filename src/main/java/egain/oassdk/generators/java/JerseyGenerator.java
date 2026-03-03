@@ -2695,10 +2695,12 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("        if (_attributes != null && _attributes.containsKey(name)) {\n");
         content.append("            return true;\n");
         content.append("        }\n");
-        // Then check if it's a field and delegate to isSetXxx()
+        // Then check if it's a field and delegate to isSetXxx() (skip readOnly - no case for readOnly)
         if (!fieldNames.isEmpty()) {
             content.append("        switch (name) {\n");
             for (String fieldName : fieldNames) {
+                Map<String, Object> fieldSchema = Util.asStringObjectMap(allProperties.get(fieldName));
+                if (isSchemaFlagTrue(fieldSchema, "readOnly")) continue;
                 String javaFieldName = toModelFieldName(fieldName);
                 String capitalizedFieldName = getCapitalizedPropertyNameForAccessor(javaFieldName);
                 content.append("            case \"").append(fieldName).append("\":\n");
@@ -2984,6 +2986,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append(indentBody).append("@Override\n");
         content.append(indentBody).append("public boolean isSetAttribute(String name) {\n");
         for (String fn : fieldNames) {
+            Map<String, Object> fs = Util.asStringObjectMap(allProperties.get(fn));
+            if (isSchemaFlagTrue(fs, "readOnly")) continue;
             String cap = getCapitalizedPropertyNameForAccessor(toModelFieldName(fn));
             content.append(indentBody).append("    if (\"").append(fn).append("\".equals(name)) return isSet").append(cap).append("();\n");
         }
