@@ -996,6 +996,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
      */
     private boolean isInlineObjectProperty(Map<String, Object> fieldSchema, Map<String, Object> spec) {
         if (fieldSchema == null || spec == null) return false;
+        // Do not create inner class for $ref: use separate model class (x-resolved-ref set when parser resolves $ref)
+        if (getSchemaNameFromRef(fieldSchema) != null) return false;
         if (!"object".equals(fieldSchema.get("type"))) return false;
         Map<String, Object> props = Util.asStringObjectMap(fieldSchema.get("properties"));
         if (props == null || props.isEmpty()) return false;
