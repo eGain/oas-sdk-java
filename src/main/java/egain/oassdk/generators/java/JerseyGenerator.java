@@ -2410,7 +2410,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         for (Map.Entry<String, Object> property : allProperties.entrySet()) {
             String fieldName = property.getKey();
             Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
-            if (isInlineObjectProperty(fieldSchema, spec)) {
+            // Only generate inline inner class for true inline objects; object-with-single-array uses wrapper inner class
+            if (isInlineObjectProperty(fieldSchema, spec) && !isObjectWithSingleArrayOfRef(fieldSchema, spec)) {
                 innerClassesToGenerate.add(new AbstractMap.SimpleEntry<>(fieldName, fieldSchema));
             }
             String fieldType = getFieldTypeForModelProperty(schemaName, fieldName, fieldSchema, isArrayType, spec);
@@ -3414,15 +3415,20 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     }
 
     /**
-     * Field type for a property when generating the parent model: inner class if inline object, wrapper class if object-with-single-array, else computeFieldTypeForProperty.
+     * Field type for a property when generating the parent model: array items use List&lt;...&gt;; object-with-single-array uses wrapper class; inline object uses inner class; else computeFieldTypeForProperty.
      * @param parentSchemaName current model or enclosing class name (e.g. "KnowledgeExport" or "KnowledgeExport.DataDestination")
      */
     private String getFieldTypeForModelProperty(String parentSchemaName, String fieldName, Map<String, Object> fieldSchema, boolean isArrayType, Map<String, Object> spec) {
-        if (isInlineObjectProperty(fieldSchema, spec)) {
-            return parentSchemaName + "." + getInnerClassNameForInlineProperty(fieldName, fieldSchema);
+        // Array schema "items" property must resolve to List<ItemType>, never as inline object
+        if (isArrayType && "items".equals(fieldName)) {
+            return computeFieldTypeForProperty(fieldName, fieldSchema, isArrayType, spec);
         }
+        // Object-with-single-array (wrapper) takes precedence so we keep unqualified wrapper class name (e.g. AccessTags)
         if (isObjectWithSingleArrayOfRef(fieldSchema, spec)) {
             return getWrapperClassName(fieldName);
+        }
+        if (isInlineObjectProperty(fieldSchema, spec)) {
+            return parentSchemaName + "." + getInnerClassNameForInlineProperty(fieldName, fieldSchema);
         }
         return computeFieldTypeForProperty(fieldName, fieldSchema, isArrayType, spec);
     }
