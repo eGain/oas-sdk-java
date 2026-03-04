@@ -2427,7 +2427,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 				}
             }
             String fieldType = getFieldTypeForModelProperty(schemaName, fieldName, fieldSchema, isArrayType, spec);
-            if (isObjectWithSingleArrayOfRef(fieldSchema, spec)) {
+            if (isObjectWithSingleArrayOfRef(fieldSchema, spec) && getSchemaNameFromRef(fieldSchema) == null) {
                 ObjectWithSingleArrayInfo info = getObjectWithSingleArrayInfo(fieldSchema, spec);
                 if (info != null) {
                     wrappersToGenerate.add(new WrapperToGenerate(fieldName, getWrapperClassName(fieldName), info.innerPropertyName, info.itemTypeName));
@@ -3528,8 +3528,12 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 			return "List<" + itemType + ">";
 		}
 		//Soumya
-        // Object-with-single-array (wrapper) takes precedence so we keep unqualified wrapper class name (e.g. AccessTags)
+        // Object-with-single-array: use ref'd schema name if present (separate class), else wrapper inner class name
         if (isObjectWithSingleArrayOfRef(fieldSchema, spec)) {
+            String refSchemaName = getSchemaNameFromRef(fieldSchema);
+            if (refSchemaName != null) {
+                return toJavaClassName(refSchemaName);
+            }
             return getWrapperClassName(fieldName);
         }
         if (isInlineObjectProperty(fieldSchema, spec)) {
