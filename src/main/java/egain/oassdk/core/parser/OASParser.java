@@ -389,9 +389,8 @@ public class OASParser {
                         // IMPORTANT: For external file references, the resolved content is the schema definition itself
                         // (e.g., User.yaml contains type: object, properties: {...} directly)
                         // We need to replace the entire map content with this schema definition
-                        
-                        // Mark the original map as visited before replacing content
-                        visitedObjects.add(map);
+                        // Do NOT add map to visitedObjects here: the recursive call below must process the resolved
+                        // content so nested $refs (e.g. Alias.properties.id, name) get resolved.
                         // Replace the map content completely - this ensures $ref is removed
                         map.clear();
                         map.putAll(resolvedCopy);
