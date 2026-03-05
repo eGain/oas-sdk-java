@@ -394,43 +394,47 @@ public class OASParser {
                         // This can happen if the resolved content itself contains a $ref
                         // but for external file references, the resolved content should be the schema itself
                         map.remove("$ref");
-                        // Preserve original ref path for internal refs so generators (e.g. XSD) can emit imports/type refs
-                        if (ref != null && ref.startsWith("#/components/schemas/")) {
-                            map.put("x-resolved-ref", ref);
-                        } else if (isExternalFileRef && ref != null) {
-                            // For external file refs, set x-resolved-ref so generators emit type refs and imports.
-                            // Prefer schema name from fragment (e.g. common.yaml#/components/schemas/L10NString -> L10NString).
-                            String schemaName = null;
-                            if (ref.contains("#/components/schemas/")) {
+                        // For primitive schemas (string, integer, array of primitives, etc.), do not set x-resolved-ref
+                        // or register in main spec so generators treat the property as inline (e.g. String with enum).
+                        if (!isPrimitiveSchema(map)) {
+                            // Preserve original ref path for internal refs so generators (e.g. XSD) can emit imports/type refs
+                            if (ref != null && ref.startsWith("#/components/schemas/")) {
+                                map.put("x-resolved-ref", ref);
+                            } else if (isExternalFileRef && ref != null) {
+                                // For external file refs, set x-resolved-ref so generators emit type refs and imports.
+                                // Prefer schema name from fragment (e.g. common.yaml#/components/schemas/L10NString -> L10NString).
+                                String schemaName = null;
+                                if (ref.contains("#/components/schemas/")) {
+                                    String fragment = ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length());
+                                    schemaName = fragment.contains("/") ? fragment.substring(fragment.lastIndexOf("/") + 1) : fragment;
+                                }
+                                if (schemaName == null || schemaName.isEmpty()) {
+                                    schemaName = deriveSchemaNameFromRef(ref);
+                                }
+                                if (schemaName != null && !schemaName.isEmpty()) {
+                                    map.put("x-resolved-ref", "#/components/schemas/" + schemaName);
+                                }
+                            } else if (ref != null && ref.contains("#/components/schemas/")) {
+                                // External ref with fragment (e.g. common.yaml#/components/schemas/L10NString) that did not
+                                // match isExternalFileRef (ref does not end with .yaml). Set x-resolved-ref so generators
+                                // can emit the correct type (e.g. for property-level allOf single-ref).
+                                String schemaName = null;
                                 String fragment = ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length());
                                 schemaName = fragment.contains("/") ? fragment.substring(fragment.lastIndexOf("/") + 1) : fragment;
+                                if (schemaName == null || schemaName.isEmpty()) {
+                                    schemaName = deriveSchemaNameFromRef(ref);
+                                }
+                                if (schemaName != null && !schemaName.isEmpty()) {
+                                    map.put("x-resolved-ref", "#/components/schemas/" + schemaName);
+                                }
                             }
-                            if (schemaName == null || schemaName.isEmpty()) {
-                                schemaName = deriveSchemaNameFromRef(ref);
+                            
+                            // When we inline an external schema file, register it in the main spec's components/schemas
+                            // so that the full schema (e.g. User from User.yaml) is available even if the main spec
+                            // had a wrong or missing entry for that name (e.g. User pointing at Users.yaml).
+                            if (isExternalFileRef && ref != null) {
+                                addResolvedExternalSchemaToMainSpec(ref, resolvedCopy, loadedFiles, baseFileKey);
                             }
-                            if (schemaName != null && !schemaName.isEmpty()) {
-                                map.put("x-resolved-ref", "#/components/schemas/" + schemaName);
-                            }
-                        } else if (ref != null && ref.contains("#/components/schemas/")) {
-                            // External ref with fragment (e.g. common.yaml#/components/schemas/L10NString) that did not
-                            // match isExternalFileRef (ref does not end with .yaml). Set x-resolved-ref so generators
-                            // can emit the correct type (e.g. for property-level allOf single-ref).
-                            String schemaName = null;
-                            String fragment = ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length());
-                            schemaName = fragment.contains("/") ? fragment.substring(fragment.lastIndexOf("/") + 1) : fragment;
-                            if (schemaName == null || schemaName.isEmpty()) {
-                                schemaName = deriveSchemaNameFromRef(ref);
-                            }
-                            if (schemaName != null && !schemaName.isEmpty()) {
-                                map.put("x-resolved-ref", "#/components/schemas/" + schemaName);
-                            }
-                        }
-                        
-                        // When we inline an external schema file, register it in the main spec's components/schemas
-                        // so that the full schema (e.g. User from User.yaml) is available even if the main spec
-                        // had a wrong or missing entry for that name (e.g. User pointing at Users.yaml).
-                        if (isExternalFileRef && ref != null) {
-                            addResolvedExternalSchemaToMainSpec(ref, resolvedCopy, loadedFiles, baseFileKey);
                         }
 
                         // Recursively resolve any references in the resolved content. Use the source file's
@@ -484,6 +488,49 @@ public class OASParser {
     }
 
     /**
+     * Returns true if the schema is a primitive type (string, integer, number, boolean, or array of primitives).
+     * Such schemas should be inlined at reference sites and not registered as separate model classes.
+     */
+    private static boolean isPrimitiveSchema(Map<String, Object> schema) {
+        if (schema == null || schema.isEmpty()) {
+            return false;
+        }
+        if (schema.containsKey("properties")) {
+            return false;
+        }
+        Object typeObj = schema.get("type");
+        if (typeObj == null) {
+            // No type but has enum only (string enum) -> treat as primitive
+            return schema.containsKey("enum") && !schema.containsKey("properties");
+        }
+        String type = typeObj.toString();
+        if ("string".equals(type) || "integer".equals(type) || "number".equals(type) || "boolean".equals(type)) {
+            return true;
+        }
+        if ("object".equals(type)) {
+            return false;
+        }
+        if ("array".equals(type)) {
+            Object items = schema.get("items");
+            if (items instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> itemsMap = (Map<String, Object>) items;
+                if (itemsMap.containsKey("properties")) {
+                    return false;
+                }
+                Object itemsType = itemsMap.get("type");
+                if (itemsType != null) {
+                    String itemsTypeStr = itemsType.toString();
+                    return "string".equals(itemsTypeStr) || "integer".equals(itemsTypeStr)
+                            || "number".equals(itemsTypeStr) || "boolean".equals(itemsTypeStr);
+                }
+            }
+            return false;
+        }
+        return false;
+    }
+
+    /**
      * When an external file ref (e.g. User.yaml) is resolved and inlined, register that schema
      * in the main spec's components/schemas under the derived name. This ensures the full schema
      * is available to generators even when the only reference was nested (e.g. Users.user.items).
@@ -491,6 +538,9 @@ public class OASParser {
     private void addResolvedExternalSchemaToMainSpec(String ref, Map<String, Object> resolvedCopy,
                                                      Map<String, Map<String, Object>> loadedFiles, String baseFileKey) {
         if (ref == null || resolvedCopy == null || loadedFiles == null || baseFileKey == null) {
+            return;
+        }
+        if (isPrimitiveSchema(resolvedCopy)) {
             return;
         }
         // Only register if the resolved content looks like a schema definition (type or properties at top level)
@@ -1027,15 +1077,22 @@ public class OASParser {
         String fileDerivedSchemaName = (fileKey != null && !fileKey.isEmpty()) ? deriveSchemaNameFromRef(fileKey) : null;
 
         // Merge external schemas into main schemas. When mergeAll is false, only merge schemas whose path was referenced.
+        // Skip primitive schemas (string, integer, etc.) so they are not registered as model classes.
         for (Map.Entry<String, Object> schemaEntry : externalSchemas.entrySet()) {
             String schemaName = schemaEntry.getKey();
             if (!mergeAll && (referencedFragments == null || !isSchemaPathReferenced(referencedFragments, schemaName))) {
                 continue;
             }
+            Object schemaValue = schemaEntry.getValue();
+            if (schemaValue instanceof Map) {
+                Map<String, Object> schemaMap = Util.asStringObjectMap(schemaValue);
+                if (schemaMap != null && isPrimitiveSchema(schemaMap)) {
+                    continue;
+                }
+            }
             boolean overwrite = fileDerivedSchemaName != null && fileDerivedSchemaName.equals(schemaName);
             if (overwrite || !mainSchemas.containsKey(schemaName)) {
                 // Create a copy to avoid modifying the original
-                Object schemaValue = schemaEntry.getValue();
                 if (schemaValue instanceof Map) {
                     Map<String, Object> schemaMap = Util.asStringObjectMap(schemaValue);
                     if (schemaMap != null) {
