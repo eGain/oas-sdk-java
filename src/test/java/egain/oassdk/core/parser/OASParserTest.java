@@ -395,5 +395,64 @@ public class OASParserTest {
         assertTrue(schemas.containsKey("UserEditRequest"),
                 "UserEditRequest schema must be merged when referenced via external requestBody fragment");
     }
+
+    @Test
+    public void testPrimitiveSchemaRefNotRegisteredInComponentsSchemas(@TempDir Path tempDir) throws IOException, OASSDKException {
+        // When an external ref resolves to a primitive-only schema (e.g. type: string or array of primitives),
+        // the parser should inline it and NOT register it under components/schemas (PR #44).
+        Path modelsDir = tempDir.resolve("models");
+        Files.createDirectories(modelsDir);
+
+        String primitiveStringYaml = """
+            type: string
+            """;
+        Files.writeString(modelsDir.resolve("StringRef.yaml"), primitiveStringYaml);
+
+        String arrayOfStringsYaml = """
+            type: array
+            items:
+              type: string
+            """;
+        Files.writeString(modelsDir.resolve("StringListRef.yaml"), arrayOfStringsYaml);
+
+        String wrapperYaml = """
+            type: object
+            title: Wrapper
+            properties:
+              name:
+                $ref: "./StringRef.yaml"
+              tags:
+                $ref: "./StringListRef.yaml"
+            """;
+        Files.writeString(modelsDir.resolve("Wrapper.yaml"), wrapperYaml);
+
+        String apiYaml = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            paths: {}
+            components:
+              schemas:
+                Wrapper:
+                  $ref: models/Wrapper.yaml
+            """;
+        Path apiPath = tempDir.resolve("api.yaml");
+        Files.writeString(apiPath, apiYaml);
+
+        OASParser parserWithSearch = new OASParser(List.of(tempDir.toString()));
+        Map<String, Object> spec = parserWithSearch.parse(apiPath.toString());
+        Map<String, Object> resolved = parserWithSearch.resolveReferences(spec, apiPath.toString());
+
+        Map<String, Object> components = Util.asStringObjectMap(resolved.get("components"));
+        assertNotNull(components);
+        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+        assertNotNull(schemas);
+        assertTrue(schemas.containsKey("Wrapper"), "Wrapper (object) schema must be registered");
+        assertFalse(schemas.containsKey("StringRef"),
+            "Primitive schema StringRef (type: string) must not be registered when inlined");
+        assertFalse(schemas.containsKey("StringListRef"),
+            "Primitive schema StringListRef (array of strings) must not be registered when inlined");
+    }
 }
 

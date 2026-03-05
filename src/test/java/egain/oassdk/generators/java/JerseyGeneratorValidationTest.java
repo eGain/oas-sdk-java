@@ -563,5 +563,64 @@ public class JerseyGeneratorValidationTest {
         assertFalse(getAttributeNamesSection.contains("allNames.add(\"password\")"),
             "getAttributeNames should not include writeOnly property password");
     }
+
+    @Test
+    @DisplayName("Test that boolean/Boolean properties use isXxx() getter prefix not getXxx()")
+    public void testBooleanGetterUsesIsPrefix() throws OASSDKException, IOException {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            paths:
+              /item:
+                get:
+                  operationId: getItem
+                  responses:
+                    '200':
+                      content:
+                        application/json:
+                          schema:
+                            $ref: '#/components/schemas/Item'
+            components:
+              schemas:
+                Item:
+                  type: object
+                  properties:
+                    active:
+                      type: boolean
+                    enabled:
+                      type: boolean
+                    name:
+                      type: string
+            """;
+        Path testSpecFile = tempOutputDir.resolve("boolean-getter-spec.yaml");
+        Files.writeString(testSpecFile, yamlContent);
+        Path outputDir = tempOutputDir.resolve("boolean-getter-sdk");
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(testSpecFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path modelDir = outputDir.resolve("src/main/java").resolve(TEST_PACKAGE_PATH).resolve("model");
+        Path itemModel = modelDir.resolve("Item.java");
+        assertTrue(Files.exists(itemModel), "Item model should be generated");
+
+        String content = Files.readString(itemModel);
+
+        // Boolean/boolean properties must use "is" prefix for getter (PR #45)
+        assertTrue(content.contains("public boolean isActive()") || content.contains("public Boolean isActive()"),
+            "boolean property active should have isActive() getter");
+        assertFalse(content.contains("public boolean getActive()") || content.contains("public Boolean getActive()"),
+            "boolean property active should not have getActive() getter");
+        assertTrue(content.contains("public boolean isEnabled()") || content.contains("public Boolean isEnabled()"),
+            "boolean property enabled should have isEnabled() getter");
+        assertFalse(content.contains("public boolean getEnabled()") || content.contains("public Boolean getEnabled()"),
+            "boolean property enabled should not have getEnabled() getter");
+        // Non-boolean property keeps get prefix
+        assertTrue(content.contains("public String getName()"),
+            "non-boolean property name should have getName() getter");
+    }
 }
 

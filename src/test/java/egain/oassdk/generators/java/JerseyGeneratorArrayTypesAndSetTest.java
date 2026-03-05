@@ -579,6 +579,234 @@ public class JerseyGeneratorArrayTypesAndSetTest {
     }
 
     @Test
+    @DisplayName("ObjectFactory has no-arg constructor and createXxx() no-arg factory methods per model (PR #41)")
+    public void testObjectFactoryHasNoArgCreateMethods() throws OASSDKException, IOException {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            paths:
+              /items:
+                get:
+                  operationId: getItems
+                  responses:
+                    '200':
+                      content:
+                        application/json:
+                          schema:
+                            $ref: '#/components/schemas/ArticleTypes'
+            components:
+              schemas:
+                ArticleTypeInfo:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                ArticleTypes:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ArticleTypeInfo'
+            """;
+        Path testSpecFile = tempOutputDir.resolve("objectfactory-spec.yaml");
+        Files.writeString(testSpecFile, yamlContent);
+        Path outputDir = tempOutputDir.resolve("generated-sdk");
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(testSpecFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path objectFactoryPath = outputDir.resolve("src/main/java")
+            .resolve(packageName.replace(".", "/"))
+            .resolve("model/ObjectFactory.java");
+        assertTrue(Files.exists(objectFactoryPath), "ObjectFactory.java should be generated");
+
+        String content = Files.readString(objectFactoryPath);
+
+        assertTrue(content.contains("public ObjectFactory()"),
+            "ObjectFactory should have public no-arg constructor");
+        assertTrue(content.contains("public ArticleTypes createArticleTypes()"),
+            "ObjectFactory should have no-arg createArticleTypes() method");
+        assertTrue(content.contains("return new ArticleTypes();"),
+            "createArticleTypes() should return new ArticleTypes()");
+        assertTrue(content.contains("public ArticleTypeInfo createArticleTypeInfo()"),
+            "ObjectFactory should have no-arg createArticleTypeInfo() method");
+        assertTrue(content.contains("return new ArticleTypeInfo();"),
+            "createArticleTypeInfo() should return new ArticleTypeInfo()");
+    }
+
+    @Test
+    @DisplayName("Model class uses schema key (name) not title for class name (PR #43)")
+    public void testSchemaNameNotTitleForModelClass() throws OASSDKException, IOException {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            paths:
+              /entity:
+                get:
+                  operationId: getEntity
+                  responses:
+                    '200':
+                      content:
+                        application/json:
+                          schema:
+                            $ref: '#/components/schemas/MyModel'
+            components:
+              schemas:
+                MyModel:
+                  title: Different Title
+                  type: object
+                  properties:
+                    value:
+                      type: string
+            """;
+        Path testSpecFile = tempOutputDir.resolve("schema-name-spec.yaml");
+        Files.writeString(testSpecFile, yamlContent);
+        Path outputDir = tempOutputDir.resolve("generated-sdk");
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(testSpecFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path modelDir = outputDir.resolve("src/main/java").resolve(packageName.replace(".", "/")).resolve("model");
+        Path myModelFile = modelDir.resolve("MyModel.java");
+        assertTrue(Files.exists(myModelFile), "MyModel.java should be generated (schema key is MyModel)");
+        assertFalse(Files.exists(modelDir.resolve("DifferentTitle.java")),
+            "Class file must not be named from title");
+
+        String content = Files.readString(myModelFile);
+        assertTrue(content.contains("public class MyModel "),
+            "Generated class must be MyModel (schema key), not Different Title (title)");
+        assertFalse(content.contains("public class DifferentTitle "),
+            "Generated class must not use title as class name");
+    }
+
+    @Test
+    @DisplayName("Inline primitive schema ref does not generate separate model class (PR #44)")
+    public void testInlinePrimitiveRefNoSeparateModel() throws OASSDKException, IOException {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            paths:
+              /item:
+                get:
+                  operationId: getItem
+                  responses:
+                    '200':
+                      content:
+                        application/json:
+                          schema:
+                            $ref: '#/components/schemas/Item'
+            components:
+              schemas:
+                Label:
+                  type: string
+                Item:
+                  type: object
+                  properties:
+                    name:
+                      $ref: '#/components/schemas/Label'
+                    tags:
+                      $ref: '#/components/schemas/StringList'
+                StringList:
+                  type: array
+                  items:
+                    type: string
+            """;
+        Path testSpecFile = tempOutputDir.resolve("primitive-ref-spec.yaml");
+        Files.writeString(testSpecFile, yamlContent);
+        Path outputDir = tempOutputDir.resolve("generated-sdk");
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(testSpecFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path modelDir = outputDir.resolve("src/main/java").resolve(packageName.replace(".", "/")).resolve("model");
+        assertTrue(Files.exists(modelDir), "model dir should exist");
+        assertTrue(Files.exists(modelDir.resolve("Item.java")), "Item model should be generated");
+        assertFalse(Files.exists(modelDir.resolve("Label.java")),
+            "Label (primitive string schema) must not get a separate model class");
+        assertFalse(Files.exists(modelDir.resolve("StringList.java")),
+            "StringList (array of primitives) must not get a separate model class");
+        String itemContent = Files.readString(modelDir.resolve("Item.java"));
+        assertTrue(itemContent.contains("String ") && itemContent.contains("name"),
+            "Item.name should be inlined as String, not Label");
+    }
+
+    @Test
+    @DisplayName("Ref'd object-with-single-array generates as separate top-level class not inner class (PR #42)")
+    public void testRefedObjectWithSingleArrayAsSeparateClass() throws OASSDKException, IOException {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Test API
+              version: 1.0.0
+            paths:
+              /container:
+                get:
+                  operationId: getContainer
+                  responses:
+                    '200':
+                      content:
+                        application/json:
+                          schema:
+                            $ref: '#/components/schemas/Container'
+            components:
+              schemas:
+                Foo:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                ItemsWrapper:
+                  type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Foo'
+                Container:
+                  type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ItemsWrapper'
+            """;
+        Path testSpecFile = tempOutputDir.resolve("ref-object-array-spec.yaml");
+        Files.writeString(testSpecFile, yamlContent);
+        Path outputDir = tempOutputDir.resolve("generated-sdk");
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(testSpecFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path modelDir = outputDir.resolve("src/main/java").resolve(packageName.replace(".", "/")).resolve("model");
+        Path itemsWrapperFile = modelDir.resolve("ItemsWrapper.java");
+        assertTrue(Files.exists(itemsWrapperFile),
+            "ItemsWrapper ($ref'd object-with-single-array) must be generated as separate class");
+        String itemsWrapperContent = Files.readString(itemsWrapperFile);
+        assertTrue(itemsWrapperContent.contains("public class ItemsWrapper "),
+            "ItemsWrapper must be a top-level class, not inner class");
+        assertFalse(itemsWrapperContent.contains("public static class ItemsWrapper"),
+            "ItemsWrapper must not be generated as static inner class of another model");
+        assertTrue(itemsWrapperContent.contains("List<Foo>") && itemsWrapperContent.contains("items"),
+            "ItemsWrapper should have List<Foo> items field");
+
+        Path containerFile = modelDir.resolve("Container.java");
+        assertTrue(Files.exists(containerFile), "Container should be generated");
+        String containerContent = Files.readString(containerFile);
+        assertTrue(containerContent.contains("ItemsWrapper") && containerContent.contains("data"),
+            "Container should reference ItemsWrapper for data property");
+    }
+
+    @Test
     @DisplayName("Object-with-single-array-of-ref generates wrapper inner class (e.g. Personalization.accessTags -> AccessTags with tagCategory)")
     public void testObjectWithSingleArrayOfRefGeneratesWrapperType() throws OASSDKException, IOException {
         String yamlContent = """
