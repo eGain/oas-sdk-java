@@ -354,8 +354,9 @@ public class OASParser {
                                            (ref.endsWith(".yaml") || ref.endsWith(".yml") || ref.endsWith(".json"));
                 
                 // If it's an external file reference, always resolve it (even if map.size() > 1)
-                // because external file refs should replace the entire schema
-                if (isExternalFileRef || map.size() == 1) {
+                // because external file refs should replace the entire schema.
+                // Also resolve when the only other keys are title/description (doc-only); then primitive refs inline correctly.
+                if (isExternalFileRef || map.size() == 1 || isRefWithOnlyDocKeys(map)) {
                     // Create a unique key for this reference (file + path)
                     String refKey = createRefKey(ref, baseDir, currentFileKey);
 
@@ -381,6 +382,10 @@ public class OASParser {
                         // Create a copy to avoid modifying the original
                         Map<String, Object> resolvedCopy = new HashMap<>(resolvedMap);
                         
+                        // When resolving $ref + doc keys, preserve property-level title/description so they override the resolved schema
+                        Object origTitle = map.get("title");
+                        Object origDescription = map.get("description");
+                        
                         // IMPORTANT: For external file references, the resolved content is the schema definition itself
                         // (e.g., User.yaml contains type: object, properties: {...} directly)
                         // We need to replace the entire map content with this schema definition
@@ -394,6 +399,12 @@ public class OASParser {
                         // This can happen if the resolved content itself contains a $ref
                         // but for external file references, the resolved content should be the schema itself
                         map.remove("$ref");
+                        if (origTitle != null) {
+                            map.put("title", origTitle);
+                        }
+                        if (origDescription != null) {
+                            map.put("description", origDescription);
+                        }
                         // For primitive schemas (string, integer, array of primitives, etc.), do not set x-resolved-ref
                         // or register in main spec so generators treat the property as inline (e.g. String with enum).
                         if (!isPrimitiveSchema(map)) {
@@ -485,6 +496,22 @@ public class OASParser {
                 resolveReferencesRecursive(o, baseDir, currentFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);
             }
         }
+    }
+
+    /**
+     * Returns true if the map contains $ref and the only other keys are documentation-only (title, description).
+     * Such maps should be resolved so that the $ref is inlined; OpenAPI allows $ref with optional title/description.
+     */
+    private static boolean isRefWithOnlyDocKeys(Map<String, Object> map) {
+        if (map == null || !map.containsKey("$ref") || map.size() <= 1) {
+            return false;
+        }
+        for (String key : map.keySet()) {
+            if (!key.equals("$ref") && !key.equals("title") && !key.equals("description")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
