@@ -1016,6 +1016,10 @@ public class OASParser {
             if (!mergeAll) {
                 return;
             }
+            // Skip primitive-only schemas (string, integer, array of primitives) so they are inlined, not registered (PR #44).
+            if (isPrimitiveSchema(externalSpec)) {
+                return;
+            }
             // This is a schema definition file - merge it as a schema.
             // Use stable name from file path (e.g. User.yaml -> "User", Users.yaml -> "Users")
             // so that the correct schema always wins (full User from User.yaml, not inlined placeholder).
