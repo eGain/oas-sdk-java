@@ -959,31 +959,23 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     }
 
     /**
-     * Generate a name for an inline schema from a property
+     * Generate a name for an inline schema from a property.
+     * Uses schema name (from resolved ref) or property name; optional title is not used.
      */
     private String generateInlineSchemaNameFromProperty(Map<String, Object> schema, String propertyName) {
-        // First, try to use the title if available
-        if (schema.containsKey("title")) {
-            String title = (String) schema.get("title");
-            if (title != null && !title.isEmpty()) {
-                return toJavaClassName(title);
-            }
-        }
-
-        // Use the property name if available
-        if (propertyName != null && !propertyName.isEmpty()) {
-            return toJavaClassName(capitalize(propertyName));
-        }
-
-        // Check if "x-resolved-ref" is set in schema. We can use the resolved ref name as the model name.
+        // Use schema name from resolved ref when present
         if (schema.containsKey("x-resolved-ref")) {
             String resolvedRef = (String) schema.get("x-resolved-ref");
             if (resolvedRef != null && !resolvedRef.isEmpty()) {
-                // Extract the last part of the resolved ref as the model name
                 String[] parts = resolvedRef.split("/");
                 String lastPart = parts[parts.length - 1];
                 return toJavaClassName(lastPart);
             }
+        }
+
+        // Use the property name (key in parent schema)
+        if (propertyName != null && !propertyName.isEmpty()) {
+            return toJavaClassName(capitalize(propertyName));
         }
 
         // Fallback to generic name
@@ -1017,15 +1009,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
     /**
      * Java class name for a static inner class representing an inline object property.
-     * Uses schema title if present and valid, otherwise capitalizes the property name.
+     * Uses the property name (key in parent schema); optional schema title is not used.
      */
     private String getInnerClassNameForInlineProperty(String propertyName, Map<String, Object> fieldSchema) {
-        if (fieldSchema != null && fieldSchema.containsKey("title")) {
-            String title = (String) fieldSchema.get("title");
-            if (title != null && !title.isEmpty()) {
-                return toJavaClassName(title);
-            }
-        }
         if (propertyName != null && !propertyName.isEmpty()) {
             return toJavaClassName(capitalize(propertyName));
         }
@@ -1033,19 +1019,12 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     }
 
     /**
-     * Generate a name for an in-lined schema
+     * Generate a name for an in-lined schema.
+     * Uses schema name (from resolved ref) first, then property-based or operation-based fallbacks; optional title is not used.
      */
     private String generateInlinedSchemaName(String operationId, Map<String, Object> schema, int counter) {
 
-        // First, try to use the title if available
-        if (schema.containsKey("title")) {
-            String title = (String) schema.get("title");
-            if (title != null && !title.isEmpty()) {
-                return toJavaClassName(title);
-            }
-        }
-
-        // Check if "x-resolved-ref" is set in schema. We can use the resolved ref name as the model name.
+        // Use schema name from resolved ref (component schema name) when present
         if (schema.containsKey("x-resolved-ref")) {
             String resolvedRef = (String) schema.get("x-resolved-ref");
             if (resolvedRef != null && !resolvedRef.isEmpty()) {
@@ -2419,7 +2398,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
             // Only generate inline inner class for true inline objects; object-with-single-array uses wrapper inner class
             if (isInlineObjectProperty(fieldSchema, spec) && !isObjectWithSingleArrayOfRef(fieldSchema, spec)) {
-				String innerClassName = schemaName + "_" + (fieldSchema.containsKey("title")? fieldSchema.get("title").toString() : fieldName);
+				String innerClassName = schemaName + "_" + getInnerClassNameForInlineProperty(fieldName, fieldSchema);
 				if(!innerClasses.contains(innerClassName.toLowerCase(Locale.ENGLISH)))
 				{
 					innerClassesToGenerate.add(new AbstractMap.SimpleEntry<>(fieldName, fieldSchema));

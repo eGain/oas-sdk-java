@@ -938,7 +938,7 @@ public class OASParser {
      * only components whose paths were referenced are merged (e.g. only schema X if
      * "/components/schemas/X" was referenced).
      *
-     * @param fileKey the file path key (e.g. from loadedFiles) used to derive schema name when title is absent
+     * @param fileKey the file path key (e.g. from loadedFiles) used to derive schema name (from path only; optional schema title is not used)
      * @param referencedFragments set of JSON paths that were referenced in this file (e.g. /components/parameters/accept).
      *                            Null or empty = merge all (backward compatible). Contains REF_FRAGMENT_WHOLE_FILE = merge all.
      */
@@ -972,11 +972,6 @@ public class OASParser {
             String schemaName = null;
             if (fileKey != null && !fileKey.isEmpty()) {
                 schemaName = deriveSchemaNameFromRef(fileKey);
-            }
-            if (schemaName == null || schemaName.isEmpty()) {
-                if (externalSpec.containsKey("title")) {
-                    schemaName = (String) externalSpec.get("title");
-                }
             }
             if (schemaName == null || schemaName.isEmpty()) {
                 return;
