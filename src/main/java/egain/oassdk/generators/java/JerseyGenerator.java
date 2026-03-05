@@ -2558,7 +2558,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
             // Getter: generate when not writeOnly (readOnly and normal properties get getter)
             if (!writeOnly) {
-                content.append("    public ").append(fieldType).append(" get").append(capitalizedFieldName).append("() {\n");
+                String methodPrefix = fieldType.equals("boolean") || fieldType.equals("Boolean") ? "is" : "get";
+                content.append("    public ").append(fieldType).append(" " + methodPrefix).append(capitalizedFieldName).append("() {\n");
                 content.append("        return ").append(javaFieldName).append(";\n");
                 content.append("    }\n\n");
             }
@@ -2892,7 +2893,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             boolean writeOnly = isSchemaFlagTrue(fieldSchema, "writeOnly");
             if (readOnly && writeOnly) writeOnly = false;
             if (!writeOnly) {
-                content.append(indentBody).append("public ").append(fieldType).append(" get").append(capitalizedFieldName).append("() {\n");
+                String methodPrefix = fieldType.equals("boolean") || fieldType.equals("Boolean") ? "is" : "get";
+                content.append(indentBody).append("public ").append(fieldType).append(" " + methodPrefix).append(capitalizedFieldName).append("() {\n");
                 content.append(indentBody).append("    return ").append(javaFieldName).append(";\n");
                 content.append(indentBody).append("}\n\n");
             }
