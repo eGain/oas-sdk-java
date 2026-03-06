@@ -1,0 +1,66 @@
+type: object
+x-stoplight:
+  id: rho0j4byhjjpb
+title: Alias
+properties:
+  id:
+    description: ID of the alias
+    $ref: "./common.yaml#/components/schemas/id"
+  name:
+    description: Name of the alias
+    $ref: "./common.yaml#/components/schemas/name"
+  description:
+    description: Description of the alias
+    $ref: "./common.yaml#/components/schemas/description"
+  department:
+    description: Department of the alias
+    allOf:
+      - $ref: "./common.yaml#/components/schemas/departmentView"
+  lastModified:
+    description: Date and time when alias was last modified
+    $ref: "./common.yaml#/components/schemas/lastModified"
+  lastModifiedBy:
+    description: User detail who last modified the alias
+    allOf:
+      - $ref: "./common.yaml#/components/schemas/lastModifiedBy"
+  emailAddress:
+    title: emailAddress
+    description: Email address of the alias. This is applicable only when alias is not secure.
+    $ref: "./common.yaml#/components/schemas/emailAddress"
+  active:
+    title: active
+    description: Indicates whether the alias is active or not.
+    allOf:
+      - type: boolean
+  default:
+    title: default
+    description: Indicates whether this is the default alias for the department.
+    allOf:
+      - type: boolean
+  secure:
+    title: secure
+    description: Indicates whether this is secure email alias.
+    allOf:
+      - type: boolean
+  sharedMailbox:
+    title: sharedMailbox
+    description: Indicates whether the mailbox is shared or not.
+    allOf:
+      - type: boolean
+  automaticBCC:
+    title: automaticBCC
+    description: Email address to which BCC copy of the email will be sent.
+    $ref: "./common.yaml#/components/schemas/emailAddress"
+  sendEmailTo:
+    title: sendEmailTo
+    description: Email address to which all outgoing emails from this alias should be sent.
+    $ref: "./common.yaml#/components/schemas/emailAddress"
+  redirectionEmailAddresses:
+    title: redirectionEmailAddresses
+    description: A list of email addresses, from where emails are redirected to this alias.
+    allOf:
+      - type: array
+        items:
+          $ref: "./common.yaml#/components/schemas/emailAddress"
+        minItems: 0
+        maxItems: 50

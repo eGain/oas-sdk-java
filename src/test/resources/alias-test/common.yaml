@@ -1,0 +1,2220 @@
+openapi: 3.0.0
+servers:
+  - url: https://api-na.egain.cloud/
+  - url: https://ecosystem.egain.cloud/
+info:
+  version: 3.0.0
+  title: Common Paths, Parametres, Request/Response Schemas, Examples used across all Hubs
+paths:
+  /:
+    get:
+      responses:
+        '200':
+          description: Place Holder
+      operationId: placeholder
+components:
+  securitySchemes:
+    oAuthUser:
+      type: oauth2
+      description: Authenticate as a user (agent) using code flow with PKCE.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://${LOGIN_DOMAIN}/${GATEWAY_ID}/${USER_SIGNIN_POLICY_NAME}/oauth2/v2.0/authorize
+          tokenUrl: https://${LOGIN_DOMAIN}/${GATEWAY_ID}/${USER_SIGNIN_POLICY_NAME}/oauth2/v2.0/token
+          scopes:
+            '${SCOPE_PREFIX}analytics.resourcemgr.api': Allows full access to the eGain Analytics Resource Manager APIs.
+    oAuthCustomer:
+      type: oauth2
+      description: Authenticate as a customer using code flow with PKCE.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://${LOGIN_DOMAIN}/${GATEWAY_ID}/${CUSTOMER_SIGNIN_POLICY_NAME}/oauth2/v2.0/authorize
+          tokenUrl: https://${LOGIN_DOMAIN}/${GATEWAY_ID}/${CUSTOMER_SIGNIN_POLICY_NAME}/oauth2/v2.0/token
+          scopes:
+            '${SCOPE_PREFIX}analytics.resourcemgr.api': Allows full access to the eGain Analytics Resource Manager APIs.
+    oAuthAnonymousCustomer:
+      type: oauth2
+      description: Authenticate as an anonymous customer.
+      flows:
+        clientCredentials:
+          tokenUrl: https://${LOGIN_DOMAIN}/internal/oauth2/v2.0/anonymous/token?user_type=customer
+          scopes:
+            '${SCOPE_PREFIX}analytics.resourcemgr.api': Allows full access to the eGain Analytics Resource Manager APIs.
+    oAuthClient:
+      type: oauth2
+      description: Authenticate as a client (Server to Server).
+      flows:
+        clientCredentials:
+          tokenUrl: https://${LOGIN_DOMAIN}/global/${GATEWAY_ID}/oauth2/v2.0/token
+          scopes:
+            '${SCOPE_PREFIX}.default': Default scope
+    bearerAuth:            # arbitrary name for the security scheme
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    mandatoryLanguageQueryParameter:
+      name: $lang
+      in: query
+      description: The language used for fetching the details of a resource. Resources available in different languages may differ from each other.
+      required: true
+      schema:
+        type: string
+        enum:
+          - en-US
+          - fr-FR
+          - en-GB
+          - es-ES
+          - it-IT
+          - nl-NL
+          - da-DA
+          - sv-SE
+          - pt-PT
+          - fi-FI
+          - no-NB
+          - no-NN
+          - ja-JA
+          - de-DE
+          - pt-BR
+          - zh-CN
+          - zh-TW
+          - ko-KO
+          - ru-RU
+          - el-EL
+          - tr-TR
+          - pl-PL
+          - cs-CS
+          - sk-SK
+          - hu-HU
+          - sr-SR
+          - ar-SA
+          - hr-HR
+          - ro-RO
+          - th-TH
+        example: en-US
+    acceptLanguage:
+      name: Accept-Language
+      in: header
+      description: The Language locale accepted by the client (used for locale specific fields
+        in resource representation and in error responses).
+      required: true
+      schema:
+        type: string
+        enum:
+          - en-US
+          - es-ES
+          - fr-FR
+          - it-IT
+          - de-DE
+          - nl-NL
+          - pt-BR
+          - pt-PT
+          - da-DK
+          - ru-RU
+          - fr-CA
+          - zh-CN
+          - ja-JP
+          - ko-KR
+          - sv-SE
+        example: en-US
+    xEgainIdpSession:
+      name: x-egain-idp-session-id
+      in: header
+      description: Session ID obtained from eGain Idp.
+      required: true
+      schema:
+        type: string
+        maxLength: 36
+        pattern: \b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b
+        example: 3155180e-0c13-43e9-9c38-e9045bcbf176
+    xEgainSession:
+      name: X-egain-session
+      in: header
+      description: Session ID obtained from Login API response header.
+      required: true
+      schema:
+        type: string
+        maxLength: 36
+    xEgainTenantId:
+      name: X-egain-tenant-id
+      in: header
+      description: The unique numeric identifier for a tenant, used in self-service functionality as well as third-party integrations.<br>*Note that if x-egain-activity-id is not provided, then this must be passed along with x-interaction-id.*
+      required: true
+      schema:
+        type: string
+        maxLength: 256
+        pattern: ^[0-9]{0,256}$
+        example: "228920"
+    xEgainTenantIdOptional:
+      name: X-egain-tenant-id
+      in: header
+      description: The unique numeric identifier for a tenant, used in self-service functionality as well as third-party integrations.<br>*Note that if x-egain-activity-id is not provided, then this must be passed along with x-interaction-id.*
+      required: false
+      schema:
+        type: string   
+        maxLength: 256 
+        pattern: ^[0-9]{0,256}$
+        example: "228920"
+    xExtIntegrationId:
+      name: x-ext-integration-id
+      in: header
+      description: "The unique numeric identifier for a tenant, used in self-service functionality as well as third-party integrations.<br><br>*Note: The x-ext-integration-id and x-ext-interaction-id headers must always be provided together and cannot be supplied independently.<br><br>The x-egain-activity-id may be provided on its own, or it may be provided along with both x-ext-integration-id and x-ext-interaction-id.*"
+      required: false
+      schema:
+        type: string   
+        maxLength: 40
+        pattern: ^[\w\W]+$
+      examples: 
+        uuid: 
+          value: "3155180e-0c13-43e9-9c38-e9045bcbf176"
+        hex:
+          value: "00Dbn00000IxGnx"
+    xEgainSessionOptional:
+      name: X-egain-session
+      in: header
+      description: The Session ID obtained from the Login API response header.
+      required: false
+      schema:
+        type: string
+    xEgainActivityId:
+      name: x-egain-activity-id
+      in: header
+      description: A unique numeric interaction identifier from eGain.
+      required: false
+      schema:
+        type: string
+        minLength: 4
+        maxLength: 9
+        pattern: ^[0-9]{4,9}$
+      example: "59237"
+    XInteractionId:
+      name: X-interaction-id
+      in: header
+      description: A unique interaction identifier from other CRM applications.<br>*Note that if x-egain-activity-id is not provided, then this must be passed along with x-egain-tenant-id.*
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+        pattern: ^[\w\W]+$
+        example: test-test23-test4
+    xExtInteractionId:
+      name: x-ext-interaction-id
+      in: header
+      description: "A unique interaction identifier from other CRM applications.<br><br>*Note: The x-ext-integration-id and x-ext-interaction-id headers must always be provided together and cannot be supplied independently.<br><br>The x-egain-activity-id may be provided on its own, or it may be provided along with both x-ext-integration-id and x-ext-interaction-id.*"
+      required: false
+      schema:
+        type: string
+        maxLength: 40
+        pattern: ^[\w\W]+$
+      examples: 
+        uuid: 
+          value: "3155180e-0c13-43e9-9c38-e9045bcbf176"
+        hex:
+          value: "00Dbn00000IxGnx"
+        # Can't include '%' symbol surrounding 'InteractionId' example due to the following rules:
+        # https://stackoverflow.com/questions/68022396/how-to-escape-the-percent-sign-in-url-in-openapi
+
+    authorization:
+      name: Authorization
+      in: header
+      description: Access token for the client. The value must be "Bearer" followed by access token and must be provided if actor is client application.
+      required: true
+      schema:
+        type: string
+    authorizationOptional:
+      name: Authorization
+      in: header
+      description: Access token for the client. The value must be "Bearer" followed by access token and must be provided if actor is client application.
+      required: false
+      schema:
+        type: string
+    forceLogin:
+      name: forceLogin
+      in: query
+      description: Terminate the oldest created session of this user and create a mew session.
+      required: false
+      schema:
+        type: string
+        enum:
+          - 'yes'
+    attributeCommon:
+      name: "$attribute"
+      in: path
+      description: Common query attributes list.
+      required: true
+      style: simple
+      explode: false
+      schema:
+        type: string
+      examples:
+        All:
+          value: "all"
+        Individual Attributes:
+          value: "$pagenum, $pagesize, $rangestart, $rangesize, $sort, $order, $lang, $level, $count"
+    attributeArticleWithAllValue:
+      name: "$attribute"
+      in: query
+      description: Common query parameter $attribute.
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: string
+      example: "id, lastModified, created, suggestionState, folder, lock, language, department, macro, articleType, description, keywords, summary, additionInfo, content, label, imageUrl, translationStatus, relatedQuestions, notes, linkAlias, attachments, name, versionNumber, articleState, availabilityDate, expirationDate, custom.<name>, all"
+    attributeArticle:
+      name: "$attribute"
+      in: query
+      description: Common query parameter $attribute.
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: string
+      example: "id, lastModified, created, suggestionState, folder, lock, language, department, macro, articleType, description, keywords, summary, additionInfo, content, label, imageUrl, translationStatus, relatedQuestions, notes, linkAlias, attachments, name, versionNumber, articleState, availabilityDate, expirationDate, custom.<name>"
+    sort:
+      name: "$sort"
+      in: query
+      description: Common query parameter $sort.
+      required: false
+      schema:
+        type: string
+    sortIdName:
+      name: "$sort"
+      in: query
+      description: Objects returned in server response are sorted based on the attribute supplied under $sort.
+      required: false
+      schema:
+        type: string
+        enum:
+          - id
+          - name
+        example: id
+    sortIdNameDepartment:
+      name: "$sort"
+      in: query
+      description: 'Objects returned in server response are sorted based on the attribute supplied under $sort. <br>_Default value_: name.'
+      required: false
+      schema:
+        type: string
+        enum:
+          - id
+          - name
+          - departmentName
+    order:
+      name: "$order"
+      in: query
+      description: 'Common query parameter $order.<br>_Default value_: asc'
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
+        example: asc
+    pagenum:
+      name: "$pagenum"
+      in: query
+      description: 'Pagination parameter that specifies the page number of results to be returned. This is used in conjunction with $pagesize.<br>_Default value_: 1'
+      required: false
+      schema:
+        type: string
+        example: '1'
+    pagesize:
+      name: "$pagesize"
+      in: query
+      description: 'Pagination parameter that specifies the number of results per page. This is used in conjunction with $pagenum.<br>_Default value_: 25'
+      required: false
+      schema:
+        type: string      
+        example: '25'  
+    rangestart:
+      name: "$rangestart"
+      in: query
+      description: 'Range parameter that specifies the starting index of the range of results to be returned. This is used in conjunction with $rangesize.<br>_Default value_: 1'
+      required: false
+      schema:
+        type: string
+    rangesize:
+      name: "$rangesize"
+      in: query
+      description: 'Range parameter that specifies the number (range) of results to be returned. This is used in conjunction with $rangestart.<br>_Default value_: 25'
+      required: false
+      schema:
+        type: string
+    ids:
+      name: "ids"
+      in: path
+      description: Pass one ID or comma sperated list of ID(s).
+      required: true
+      style: simple
+      explode: false
+      schema:
+        type: string
+        maxLength: 20000
+      examples:
+        Single Id:
+          value: '1001'
+          description: Providing single ID.
+        Multiple Ids:
+          value: '1001,1002'
+          description: Providing multiple IDs.
+    id:
+      name: id
+      in: path
+      description: The ID of the object.
+      required: true
+      style: simple
+      explode: false
+      schema:
+        type: string
+        pattern: ^[\w\W]+$
+        minLength: 1
+        maxLength: 255
+      example: '1001' 
+    accept:
+      name: Accept
+      in: header
+      description: The content type accepted by the client.
+      required: true
+      schema:
+        type: string
+        default: application/json
+        enum:
+          - application/json
+    contentType:
+      name: Content-Type
+      in: header
+      description: The media type sent by the client.
+      required: true
+      schema:
+        type: string
+        default: application/json
+        enum:
+          - application/json        
+  responses:
+    Success:
+      description: Success
+    Created:
+      description: When created successfully
+    NoContent:
+      description: No content
+    NoContentSearchWithPagination:
+      description: |
+        NO Content
+        * No matches were found for given search criteria.
+        * Matches found for this search, however the requested page or range doesn't contain any results.
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Not found:
+              $ref: "#/components/examples/NotFound"
+    OK:
+      description: Fetched successfully
+    Accepted:
+      description: Message accepted for processing
+    MethodNotAllowed:
+      description: Method is not allowed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+    PreConditionFailed:
+      description: PreCondition failed
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Conflict:
+              $ref: "#/components/examples/Conflict"
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Unsupported Parameters:
+              $ref: "#/components/examples/UnsupportedParameters"
+            Invalid Value:
+              $ref: "#/components/examples/InvalidValue"
+            Missing required query parameter:
+              $ref: "#/components/examples/MissingParameter"
+    BadImportContentRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            LimitExceeded Value:
+              $ref: "#/components/examples/LimitExceeded"          
+            Invalid Value:
+              $ref: "#/components/examples/InvalidValue"
+    BadRequestUnSupportedQueryParameters:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Unsupported parameters:
+              $ref: "#/components/examples/UnsupportedParameters"
+    BadRequestUnSupportedQueryParameterAnd$attributeValue:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Unsupported parameters:
+              $ref: "#/components/examples/UnsupportedParameters"
+            Invalid value of common parameter:
+              $ref: "#/components/examples/InvalidValueForAttribute"
+    BadRequestForRequestBodyWithoutQueryParam:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Unsupported parameters:
+              $ref: "#/components/examples/UnsupportedParameters"
+            Invalid value:
+              $ref: "#/components/examples/InvalidValue"
+            Required attribute not provided:
+              $ref: "#/components/examples/RequiredAttributeMissingRequestBody"
+            Request body not provided:
+              $ref: "#/components/examples/RequestBodyNotProvided"
+    BadRequestForRequestBodyWithQueryParam:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Unsupported parameters:
+              $ref: "#/components/examples/UnsupportedParameters"
+            Invalid query parameter value:
+              $ref: "#/components/examples/InvalidValueQueryParameter"
+            Invalid attribute value:
+              $ref: "#/components/examples/InvalidValue"
+            Required attribute not provided:
+              $ref: "#/components/examples/RequiredAttributeMissingRequestBody"
+            Request body not provided:
+              $ref: "#/components/examples/RequestBodyNotProvided"
+    BadRequestForRequestBodyWithMacrosAndQueryParam:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Unsupported parameters:
+              $ref: "#/components/examples/UnsupportedParameters"
+            Invalid query parameter value:
+              $ref: "#/components/examples/InvalidValueQueryParameter"
+            Invalid attribute value:
+              $ref: "#/components/examples/InvalidValue"
+            Required attribute not provided:
+              $ref: "#/components/examples/RequiredAttributeMissingRequestBody"
+            Request body not provided:
+              $ref: "#/components/examples/RequestBodyNotProvided"
+            Invalid macro provided:
+              $ref: "#/components/examples/InvalidValueMacro"
+            Empty macro provided:
+              $ref: "#/components/examples/EmptyMacro"
+            Macro expansion failed:
+              $ref: "#/components/examples/MacroExpansionFailed"
+    BadRequestSearchWithPagination:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Unsupported query parameters:
+              $ref: "#/components/examples/UnsupportedParameters"
+            Invalid query parameter value:
+              $ref: "#/components/examples/InvalidQueryParamValue"
+            None of the API specific query parameter provided:
+              $ref: "#/components/examples/NoQueryParamProvided"
+            Unsupported combination of common query parameters:
+              $ref: "#/components/examples/UnallowedCombination"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Unauthorized:
+              $ref: "#/components/examples/Unauthorized"
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Internal Server Error:
+              $ref: "#/components/examples/InternalServerError"
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Forbidden:
+              $ref: "#/components/examples/Forbidden"
+    NotAcceptable:
+      description: Not Acceptable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+          examples:
+            Invalid Accept-Language:
+              $ref: "#/components/examples/InvalidAcceptLanguage"
+    # Error response definitions
+    WSErrorCommon:
+      description: Error message
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WSErrorCommon"
+    ErrorCommon:
+      description: Error message
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ErrorKnowledge:
+      description: Error message
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorKnowledge"
+  schemas:
+    BaseAccessToken:
+      type: object
+      properties:
+        grant_type:
+          type: string
+          example: client_credentials
+          required:
+            - grant_type
+    Login:
+      type: object
+      properties:
+        userName:
+          type: string
+        password:
+          type: string
+    AccessTokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: Access token value
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ
+        accessTokenType:
+          type: string
+          description: Type of token
+          enum: ['Bearer']
+          example: Bearer
+        expireAt:
+          type: string
+          description: Expire Date is (in GMT)
+          example: "2019-07-14 12:02:15.843"
+    ClientApplication:
+      type: object
+      required:
+        - name
+        - type
+        - roles
+      properties:
+        id:
+          description: The UUID generated for the client application
+          type: string
+          pattern: \b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b
+          minLength: 36
+          maxLength: 36
+          example: c987d07a-d59c-11ea-87d0-0242ac130000
+        versionId:
+          type: integer
+          description: Version Id of object
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Name for client application
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1023
+        status:
+          type: string
+          default: active
+          enum: [ 'active','inactive']
+        created:
+          type: string
+          format: date-time
+          description: When authentication type was created (in GMT)
+          example: '2020-08-11 03:19:21.070'
+        isCurrent:
+          type: boolean
+        roles:
+          type: array
+          minItems: 1
+          maxItems: 7
+          items:
+            $ref: "#/components/schemas/Role"
+        oauth:
+          type: object
+          description: OAuth client generated for on Messaging Hub side for this client application. Client application needs to use this to generate accessToken required for sending message.
+          properties:
+            clientId:
+              type: string
+              description: oauth clientId
+            clientSecret:
+              type: string
+              description: oauth clientId
+            accessTokenExpiryHours:
+              type: integer
+              default: 24
+              description: Access Token generated using this oauth client will expire after these many hours
+              example: 24
+    Role:
+      type: object
+      required:
+        - name
+        - version
+        - callback
+        - notificationEmail
+        - authentication
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          uniqueItems: true
+          description: role participant will be playing. Use this name as value of 'scope' attribute while generating access token.
+          enum: ['custom_bot', 'customer','egain_agent', 'decorator', 'recorder', 'custom_agent' ]
+        version:
+          type: string
+          description: Messaging Hub sends version specific payload. Information based on version of Messaging Hub payload your client application supports.
+          enum: ['v1']
+          example: v1
+        callback:
+          type: string
+          minLength: 1
+          maxLength: 1023
+          description: Callback API to client application to recieve messages from various participants
+          example: https://example.support.com/messaging/callback/customer
+        notificationEmail:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: If client application callback is not reachable, Messaging Hub sends a notification to this email address.
+          example: example@example.com
+        authentication:
+          type: object
+          properties:
+            id:
+              type: string
+              description: The UUID generated for the client application
+              pattern: \b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b
+              minLength: 36
+              maxLength: 36
+              example: a987d07a-d59c-11ea-87d0-0242ac130001
+    OauthClient:
+      type: object
+      properties:
+        scope:
+          type: string
+          description: Include value for scope if you are generating token for sending message.
+          enum: ['custom_bot', 'customer','egain_agent', 'decorator', 'recorder', 'custom_agent' ]
+        clientId:
+          type: string
+          description: oauth clientId
+        clientSecret:
+          type: string
+          description: oauth client secret
+    EmailAddresses:
+      type: "object"
+      title: "EmailAddresses"
+      properties:
+        emailAddress:
+          title: "emailAddress"
+          type: "array"
+          items:
+            type: "string"
+          minItems: 0
+    L10NString:
+      type: "object"
+      title: "L10NString"
+      properties:
+        value:
+          title: "value"
+          description: "A string that indicates the value."
+          type: "string"
+          minLength: 0
+          maxLength: 255
+          pattern: ^[\w\W]*$
+        displayValue:
+          title: "displayValue"
+          description: "Localized string of the value element."
+          type: "string"
+          minLength: 0
+          maxLength: 255
+          pattern: ^[\w\W]*$
+
+    L10NStringCustomAttributeForCreateUpdate:
+      type: "object"
+      title: "L10NString"
+      properties:
+        value:
+          title: "value"
+          description: "A string that indicates the value."
+          type: "string"
+          pattern: ^[\w\W]+$
+          minLength: 1
+          maxLength: 4000
+
+    L10NStringCustomAttribute:
+      type: "object"
+      title: "L10NString"
+      properties:
+        value:
+          title: "value"
+          description: "A string that indicates the value."
+          type: "string"
+          pattern: ^[\x20-\x7E\u0080-\uFFFF?=&#@!$'()*+,;:._~-]*$
+          minLength: 1
+          maxLength: 4000
+        displayValue:
+          title: "displayValue"
+          description: "The localized string of the value element."
+          type: "string"
+          pattern: ^[\w\W]+$
+          minLength: 1
+          maxLength: 4000
+    L10NStringTitle:
+      type: "object"
+      title: "L10NString"
+      properties:
+        value:
+          title: "value"
+          description: "A string that indicates the value."
+          type: "string"
+          enum:
+            - "Mr."
+            - "Mrs."
+            - "Ms."
+            - "Miss"
+        displayValue:
+          title: "displayValue"
+          description: "Localized string of the value element."
+          type: "string"
+    String0To255:
+      type: "object"
+      title: "String0To255"
+      properties:
+        value:
+          title: "value"
+          type: "string"
+    Attributes:
+      type: "object"
+      title: "Attributes"
+      properties:
+        attribute:
+          title: "attribute"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/NameValuePair"
+          minItems: 0
+    Links:
+      type: "object"
+      title: "Links"
+      properties:
+        link:
+          title: "link"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Link"
+          minItems: 0
+        unlink:
+          title: "unlink"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Link"
+          minItems: 0
+    Row:
+      type: "object"
+      title: "Row"
+      properties:
+        column:
+          title: "column"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Column"
+          minItems: 0
+        rows:
+          title: "rows"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Rows"
+          minItems: 0
+    Note:
+      type: "object"
+      title: "Note"
+      properties:
+        content:
+          title: "content"
+          type: "string"
+        created: 
+          $ref: "#/components/schemas/DateAndTime"
+        id:
+          title: "id"
+          type: "integer"
+          format: "int64"
+
+    CustomAttributesForCreateUpdate:
+      type: "object"
+      title: "CustomAttribute"
+      required:
+        - "customAttribute"
+      properties:
+        customAttribute:
+          title: "customAttribute"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/CustomAttributeForCreateUpdate"
+          minItems: 1
+          maxItems: 15
+
+    CustomAttributes:
+      type: "object"
+      title: "CustomAttributes"
+      required: 
+        -  customAttribute
+      properties:
+        customAttribute:
+          title: "customAttribute"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/CustomAttribute"
+          minItems: 1
+          maxItems: 15
+    Result:
+      type: "object"
+      title: "Result"
+      properties:
+        status:
+          title: "status"
+          type: "string"
+        rows:
+          title: "rows"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Rows"
+          minItems: 0
+        error: 
+          $ref: "#/components/schemas/Error"
+        errors: 
+          $ref: "#/components/schemas/Errors"
+    Content:
+      type: "object"
+      title: "Content"
+      properties:
+        html:
+          title: "html"
+          description: "HTML content"
+          type: "string"
+        text:
+          title: "text"
+          description: "Text content"
+          type: "string"
+        article:
+          title: "article" 
+          type: string
+    Criterion:
+      type: "object"
+      title: "Criterion"
+      properties:
+        attribute:
+          title: "attributes"
+          type: string
+        operator: 
+          $ref: "#/components/schemas/L10NString"
+        value: 
+          $ref: "#/components/schemas/L10NString"
+        joinType: 
+          $ref: "#/components/schemas/L10NString"
+        required: 
+          type: "boolean"
+    Rows:
+      type: "object"
+      title: "Rows"
+      properties:
+        row:
+          title: "row"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Row"
+          minItems: 0
+        type:
+          title: "type"
+          type: "string"
+    Link:
+      type: "object"
+      title: "Link"
+      description: Defines the relationship between this resource and another object.
+      properties:
+        rel:
+          title: "rel"
+          description: "Defines the relationship between a linked resource and the current object.<br><br>For example: *self*, *prev*, *next* or an object name such as *'user'*, *'folder'* etc."
+          type: "string"
+          pattern: ^[a-zA-Z]+$
+          maxLength: 50
+        href:
+          title: "href"
+          description: "The URL that specifies the link's destination."
+          type: "string"
+          pattern: '(\/[^?#]*)'
+          maxLength: 1000
+    File:
+      type: "object"
+      title: "File"
+      properties:
+        name:
+          title: "name"
+          type: "string"
+        maxSize: 
+          $ref: "#/components/schemas/FileSize"
+        contentType:
+          title: "contentType"
+          type: "string"
+        size:
+          title: "size"
+          type: "integer"
+          format: "int64"
+        content:
+          title: "content"
+          type: "string"
+        contentUrl:
+          title: "contentUrl"
+          type: "string"
+    FileObjects:
+      type: "object"
+      title: "FileObjects"
+      properties:
+        fileObject:
+          title: "fileObject"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/FileObject"
+          minItems: 0
+    LocalizedValue:
+      type: "object"
+      title: "LocalizedValue"
+      properties:
+        uiLanguage: 
+          $ref: "#/components/schemas/Language"
+        value:
+          title: "value"
+          type: "string"
+
+    languageCode:
+      type: string
+      description: Language code of the resource's language.
+      enum:
+          - en-US
+          - fr-FR
+          - en-GB
+          - es-ES
+          - it-IT
+          - nl-NL
+          - da-DA
+          - sv-SE
+          - pt-PT
+          - fi-FI
+          - no-NB
+          - no-NN
+          - ja-JA
+          - de-DE
+          - pt-BR
+          - zh-CN
+          - zh-TW
+          - ko-KO
+          - ru-RU
+          - el-EL
+          - tr-TR
+          - pl-PL
+          - cs-CS
+          - sk-SK
+          - hu-HU
+          - sr-SR
+          - ar-SA
+          - hr-HR
+          - ro-RO
+          - th-TH
+
+    LanguageForCreateUpdate:
+      type: "object"
+      title: "Language"
+      description: The language.
+      required:
+        - "code"
+      properties:
+        code:
+          description: The code of the language.
+          type: "string"
+          enum:
+          - en-US
+          - fr-FR
+          - en-GB
+          - es-ES
+          - it-IT
+          - nl-NL
+          - da-DA
+          - sv-SE
+          - pt-PT
+          - fi-FI
+          - no-NB
+          - no-NN
+          - ja-JA
+          - de-DE
+          - pt-BR
+          - zh-CN
+          - zh-TW
+          - ko-KO
+          - ru-RU
+          - el-EL
+          - tr-TR
+          - pl-PL
+          - cs-CS
+          - sk-SK
+          - hu-HU
+          - sr-SR
+          - ar-SA
+          - hr-HR
+          - ro-RO
+          - th-TH
+
+    LanguageForGet:
+      type: "object"
+      title: "Language"
+      description: The language.
+      required:
+        - "code"
+      properties:
+        code:
+          title: "code"
+          description: The language that describes the details of the resource. Resources available in different languages may differ from each other.
+          type: "string"  
+          enum:
+            - en-US
+            - fr-FR
+            - en-GB
+            - es-ES
+            - it-IT
+            - nl-NL
+            - da-DA
+            - sv-SE
+            - pt-PT
+            - fi-FI
+            - no-NB
+            - no-NN
+            - ja-JA
+            - de-DE
+            - pt-BR
+            - zh-CN
+            - zh-TW
+            - ko-KO
+            - ru-RU
+            - el-EL
+            - tr-TR
+            - pl-PL
+            - cs-CS
+            - sk-SK
+            - hu-HU
+            - sr-SR
+            - ar-SA
+            - hr-HR
+            - ro-RO
+            - th-TH
+        label:
+          title: "label"
+          description: The name of the language.
+          type: "string"
+          enum: 
+            - English (US)
+            - French
+            - English (UK)
+            - Spanish
+            - Italian
+            - Dutch
+            - Danish
+            - Swedish
+            - Portuguese
+            - Finnish
+            - Norwegian (Bokmal)
+            - Norwegian (Nynorsk)
+            - Japanese
+            - German
+            - Portuguese (Brazilian)
+            - Chinese (Simplified)
+            - Chinese (Traditional)
+            - Korean
+            - Russian
+            - Greek
+            - Turkish
+            - Polish
+            - Czech
+            - Slovak
+            - Hungarian
+            - Serbian
+            - Arabic
+            - Croatian
+            - Romanian
+            - Thai
+    Language:
+      type: "object"
+      title: "Language"
+      required:
+        - "code"
+      properties:
+        link:
+          title: "link"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Link"
+          minItems: 0
+        code:
+          title: "code"
+          description: The language that describes the details of a resource. Resources available in different languages may differ from each other.
+          type: "string"
+          enum:
+            - en-US
+            - fr-FR
+            - en-GB
+            - es-ES
+            - it-IT
+            - nl-NL
+            - da-DA
+            - sv-SE
+            - pt-PT
+            - fi-FI
+            - no-NB
+            - no-NN
+            - ja-JA
+            - de-DE
+            - pt-BR
+            - zh-CN
+            - zh-TW
+            - ko-KO
+            - ru-RU
+            - el-EL
+            - tr-TR
+            - pl-PL
+            - cs-CS
+            - sk-SK
+            - hu-HU
+            - sr-SR
+            - ar-SA
+            - hr-HR
+            - ro-RO
+            - th-TH
+        label:
+          title: "label"
+          description: The label of the language.
+          type: "string"
+          enum: 
+            - English (US)
+            - French
+            - English (UK)
+            - Spanish
+            - Italian
+            - Dutch
+            - Danish
+            - Swedish
+            - Portuguese
+            - Finnish
+            - Norwegian (Bokmal)
+            - Norwegian (Nynorsk)
+            - Japanese
+            - German
+            - Portuguese (Brazilian)
+            - Chinese (Simplified)
+            - Chinese (Traditional)
+            - Korean
+            - Russian
+            - Greek
+            - Turkish
+            - Polish
+            - Czech
+            - Slovak
+            - Hungarian
+            - Serbian
+            - Arabic
+            - Croatian
+            - Romanian
+            - Thai
+        isEnabled:
+          title: "isEnabled"
+          description: If this is set to 'true', then the language is enabled for the current user.
+          type: "boolean"
+        languageName: 
+          $ref: "#/components/schemas/L10NString"
+        lastModified: 
+          $ref: "#/components/schemas/DateAndUser"
+        status: 
+          $ref: "#/components/schemas/L10NString"
+        id:
+          title: "id"
+          description: The numerical ID of the language.
+          type: "integer"
+        isDefault:
+          title: "isDefault"
+          description: If this is set to true, then this language object is the default language.
+          type: "boolean"
+        isExplicit:
+          title: "isExplicit"
+          description: '???'
+          type: "boolean"
+    Sessions:
+      type: "object"
+      title: "Sessions"
+      properties:
+        session:
+          title: "session"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Session"
+          minItems: 0
+    LoadBalancer:
+      type: "object"
+      title: "LoadBalancer"
+      properties:
+        url:
+          title: "url"
+          type: "string"
+    LocalizedValues:
+      type: "object"
+      title: "LocalizedValues"
+      properties:
+        localizedValue:
+          title: "localizedValue"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/LocalizedValue"
+          minItems: 0
+    Image:
+      type: "object"
+      title: "Image"
+      properties:
+        name:
+          title: "name"
+          type: "string"
+        contentUrl:
+          title: "contentUrl"
+          type: "string"
+
+    AttribValuesForCreateUpdate:
+      type: "object"
+      title: "AttribValues"
+      required:
+        - "attribValue"
+      properties:
+        attribValue:
+          title: "attribValue"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/L10NStringCustomAttributeForCreateUpdate"
+          minItems: 1
+          maxItems: 75
+          # 75 is the max value that can be passed via API request.
+
+    AttribValues:
+      type: "object"
+      title: "AttribValues"
+      required:
+        - "attribValue"
+      properties:
+        attribValue:
+          title: "attribValue"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/L10NStringCustomAttribute"
+          minItems: 0
+          maxItems: 75
+          # 75 is the max value that can be passed via API request.
+    Oauth2BasicAuthentication:
+      type: "object"
+      title: "Oauth2BasicAuthentication"
+      properties:
+        key:
+          title: "key"
+          type: "string"
+        secret:
+          title: "secret"
+          type: "string"
+    NameValuePair:
+      type: "object"
+      title: "NameValuePair"
+      properties:
+        name:
+          title: "name"
+          type: "string"
+        value:
+          title: "value"
+          type: "string"
+    Files:
+      type: "object"
+      title: "Files"
+      properties:
+        file:
+          title: "file"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/File"
+          minItems: 0
+    
+    createdDate:
+          type: string
+          format: DateAndTime
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+          minLength: 20
+          maxLength: 25
+          description: The date on which the resource was last modified.
+    
+    modifiedDate:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$'
+          minLength: 20
+          maxLength: 25
+          description: The date on which the resource was last modified.
+
+    createdBy:
+          type: object
+          properties: 
+            id:
+              description: The ID of the user that created this resource.
+              type: string
+              pattern: ^[1-9]\d*$
+              minLength: 1
+              maxLength: 8
+            userName:
+              type: string
+              description: The resource creator's username.
+              pattern: ^(?=(.*[a-zA-Z0-9_&@.\-]){2,})[a-zA-Z0-9_&@.\s\-]+$
+              minLength: 2
+              maxLength: 255
+            firstName:
+              type: string
+              description: The resource creator's first name.
+              pattern: ^(?!\s*$)(?!.*[~`!#$%\^*=\[\];"|<>\/?+\{\}]).*$
+              minLength: 1
+              maxLength: 255
+            middleName:
+              type: string
+              description: The resource creator's middle name.
+              pattern: ^(?!.*[~`!#$%\^*=\[\];"|<>\/?+\{\}])(\s*\S.*|)$
+              minLength: 0
+              maxLength: 255
+            lastName:
+              type: string
+              description: The resource creator's last name.
+              pattern: ^(?!\s*$)(?!.*[~`!#$%\^*=\[\];"|<>\/?+\{\}]).*$
+              minLength: 1
+              maxLength: 255
+    modifiedBy:
+          type: object
+          properties: 
+            id:
+              description: The ID of the user that modified this resource.
+              type: string
+              pattern: ^[1-9]\d*$
+              minLength: 1
+              maxLength: 8
+            userName:
+              type: string
+              description: The resource modifier's username.
+              pattern: ^(?=(.*[a-zA-Z0-9_&@.\-]){2,})[a-zA-Z0-9_&@.\s\-]+$
+              minLength: 2
+              maxLength: 255
+            firstName:
+              type: string
+              description: The resource modifier's first name.
+              pattern: ^(?!\s*$)(?!.*[~`!#$%\^*=\[\];"|<>\/?+\{\}]).*$
+              minLength: 1
+              maxLength: 255
+            middleName:
+              type: string
+              description: The resource modifier's middle name.
+              pattern: ^(?!.*[~`!#$%\^*=\[\];"|<>\/?+\{\}])(\s*\S.*|)$
+              minLength: 0
+              maxLength: 255
+            lastName:
+              type: string
+              description: The resource modifier's last name.
+              pattern: ^(?!\s*$)(?!.*[~`!#$%\^*=\[\];"|<>\/?+\{\}]).*$
+              minLength: 1
+              maxLength: 255
+    ownedBy:
+      type: object
+      properties: 
+        id:
+          description: The ID of the user that owns this resource.
+          type: string
+          pattern: ^[1-9]\d*$
+          minLength: 1
+          maxLength: 8
+        userName:
+          type: string
+          description: The resource owner's username.
+          pattern: ^(?=(.*[a-zA-Z0-9_&@.\-]){2,})[a-zA-Z0-9_&@.\s\-]+$
+          minLength: 2
+          maxLength: 255
+        firstName:
+          type: string
+          description: The resource owner's first name.
+          pattern: ^(?!\s*$)(?!.*[~`!#$%\^*=\[\];"|<>\/?+\{\}]).*$
+          minLength: 1
+          maxLength: 255
+        middleName:
+          type: string
+          description: The resource owner's middle name.
+          pattern: ^(?!.*[~`!#$%\^*=\[\];"|<>\/?+\{\}])(\s*\S.*|)$
+          minLength: 0
+          maxLength: 255
+        lastName:
+          type: string
+          description: The resource owner's last name.
+          pattern: ^(?!\s*$)(?!.*[~`!#$%\^*=\[\];"|<>\/?+\{\}]).*$
+          minLength: 1
+          maxLength: 255
+    DateAndTime:
+      type: "object"
+      title: "DateAndTime"
+      required:
+        - "date"
+      properties:
+        user: 
+          $ref: "./UserView.yaml#/components/schemas/UserView"
+        date:
+          title: "date"
+          description: The date in the format <code>YYYY-MM-DDTHH:MM:SS</code>.
+          type: "string"
+          format: "date-time"
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+    DateAndTimeComplianceForArticle:
+      type: "object"
+      title: "DateAndTime"
+      required:
+        - "date"
+      properties:
+        date:
+          title: "date"
+          description: The date in the format <code>YYYY-MM-DDTHH:MM:SS</code>.
+          type: "string"
+          format: "date-time"
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+
+    CustomAttributeForCreateUpdate:
+      type: "object"
+      title: "CustomAttribute"
+      required:
+        - "attribName"
+        - "attribValues"
+      properties:
+        attribName:
+          title: "attribName"
+          type: "string"
+          pattern: ^[\w\W]+$
+          minLength: 1
+          maxLength: 255
+        attribValues: 
+          $ref: "#/components/schemas/AttribValuesForCreateUpdate"
+
+    CustomAttribute:
+      type: object
+      properties:
+        name:
+          description: The custom attribute's name.
+          type: string
+          pattern: ^[\w\W]+$
+          minLength: 1
+          maxLength: 4000
+        value:
+          description: The custom attribute's value.
+          type: string
+          pattern: ^[\w\W]*$
+          minLength: 0
+          maxLength: 4000
+        type:
+          description: The custom attribute's type.
+          type: string
+          enum: [ 'STRING', 'INTEGER', 'BOOLEAN', 'DATETIME' ]          
+    DataValue:
+      type: "object"
+      title: "DataValue"
+      properties:
+        type:
+          title: "type"
+          type: "string"
+        text:
+          title: "text"
+          type: "string"
+        macro:
+          title: "macro" 
+          type: string
+    Parameters:
+      type: "object"
+      title: "Parameters"
+      properties:
+        parameter:
+          title: "parameter"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Parameter"
+          minItems: 0
+    Session:
+      type: "object"
+      title: "Session"
+      properties:
+        id:
+          title: "id"
+          type: "string"
+    Notes:
+      type: "object"
+      title: "Notes"
+      required:
+        - "note"
+      properties:
+        link: 
+          $ref: "#/components/schemas/Link"
+        paginationInfo: 
+          $ref: "#/components/schemas/PaginationInfo"
+        note:
+          title: "note"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Note"
+          minItems: 1
+        count:
+          title: "count"
+          type: "integer"
+    FileObject:
+      type: "object"
+      title: "FileObject"
+      properties:
+        name:
+          title: "name"
+          type: "string"
+        link:
+          title: "link"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Link"
+          minItems: 0
+        department:
+          title: "department" 
+          type: string
+        isSystemCreated:
+          title: "isSystemCreated"
+          type: "boolean"
+        created: 
+          $ref: "#/components/schemas/DateAndUser"
+        lastModified: 
+          $ref: "#/components/schemas/DateAndUser"
+        isGlobal:
+          title: "isGlobal"
+          type: "boolean"
+        file: 
+          $ref: "#/components/schemas/File"
+        id:
+          title: "id"
+          type: "string"
+    Criteria:
+      type: "object"
+      title: "Criteria"
+      properties:
+        criterion:
+          title: "criterion"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Criterion"
+          minItems: 0
+    Column:
+      type: "object"
+      title: "Column"
+      properties:
+        name:
+          title: "name"
+          type: "string"
+        value:
+          title: "value"
+          type: "string"
+        displayValue:
+          title: "displayValue"
+          type: "string"
+    SourceObject:
+      type: "object"
+      title: "SourceObject"
+      properties:
+        attributes: 
+          $ref: "#/components/schemas/Attributes"
+        resource:
+          title: "resource"
+          type: "string"
+    FileSize:
+      type: "object"
+      title: "FileSize"
+      properties:
+        value:
+          title: "value"
+          type: "integer"
+          format: "int64"
+        unit:
+          title: "unit"
+          type: "string"
+    Type:
+      type: "object"
+      title: "Type"
+      properties:
+        value:
+          title: "value"
+          type: "string"
+        displayValue:
+          title: "displayValue"
+          type: "string"
+        id:
+          title: "id"
+          type: "integer"
+          format: "int64"
+    Parameter:
+      type: "object"
+      title: "Parameter"
+      properties:
+        name:
+          title: "name"
+          type: "string"
+        dataType:
+          title: "dataType"
+          type: "string"
+        value:
+          title: "value"
+          type: "string"
+        internalName:
+          title: "internalName"
+          type: "string"
+        dataValue: 
+          $ref: "#/components/schemas/DataValue"
+    Urls:
+      type: "object"
+      title: "Urls"
+      properties:
+        type: 
+          $ref: "#/components/schemas/L10NString"
+        url:
+          title: "url"
+          type: "array"
+          items:
+            type: "string"
+          minItems: 0
+    DateAndUser:
+      type: "object"
+      title: "DateAndUser"
+      required:
+        - "date"
+      properties:
+        user: 
+          $ref: "./UserView.yaml#/components/schemas/UserView"
+        date:
+          title: "date"
+          description: The date and time associated with this object.
+          type: "string"
+          format: "date-time"
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+          minLength: 20
+          maxLength: 24
+
+    XsDateTime:
+      type: object
+      title: XsDateTime
+      description: The date and time in the xs:dateTime format.
+      properties:
+        dateTime:
+          type: string
+          pattern: ^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(Z|([+-](0[0-9]|1[0-3]):([0-5][0-9])))$
+          minLength: 22
+          maxLength: 22
+    PaginationInfo:
+      type: "object"
+      title: "PaginationInfo"
+      required:
+        - "count"
+        - "pagenum"
+        - "pagesize"
+      properties:
+        count:
+          title: "count"
+          description: "The total number of pages."
+          type: "integer"
+          minimum: 0
+          maximum: 999
+        pagenum:
+          title: "pagenum"
+          description: "The page number requested. Page numbers start from 1."
+          type: "integer"
+          minimum: 1
+          maximum: 999
+        pagesize:
+          title: "pagesize"
+          description: "The number of objects requested per page. The maximum number of objects per page is 75."
+          type: "integer"
+          minimum: 1
+          maximum: 75
+        link:
+          title: "link"
+          description: "Can include the *prev* and *next* link."
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Link"
+          maxItems: 2
+          minItems: 0
+    
+    AISPaginationInfo:
+      type: "object"
+      title: "PaginationInfo"
+      required:
+        - "count"
+        - "pagenum"
+        - "pagesize"
+      properties:
+        count:
+          title: "count"
+          description: "The total number of pages."
+          type: "integer"
+          minimum: 0
+          maximum: 1
+          default: 1
+        pagenum:
+          title: "pagenum"
+          description: "The page number requested. Page numbers start from 1."
+          type: "integer"
+          minimum: 1
+          maximum: 1
+          default: 1
+        pagesize:
+          title: "pagesize"
+          description: "The number of objects requested per page. The maximum number of objects per page is 75."
+          type: "integer"
+          minimum: 1
+          maximum: 30
+          default: 20
+        link:
+          title: "link"
+          description: "Can include the *prev* and *next* link."
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Link"
+          maxItems: 2
+          minItems: 0
+    
+    String1To255:
+      type: "object"
+      title: "String1To255"
+      properties:
+        value:
+          title: "value"
+          type: "string"
+  
+    Images:
+      type: "object"
+      title: "Images"
+      properties:
+        image:
+          title: "image"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Image"
+          minItems: 0
+  
+    Sender:
+      type: "object"
+      title: "Sender"
+      properties:
+        type:
+          title: "type"
+          type: "string"
+          enum:
+            - "email"
+            - "alias"
+        email: 
+          $ref: "#/components/schemas/EmailSender"
+        alias: 
+          $ref: "./Alias.yaml"
+    
+    EmailSender:
+      type: "object"
+      title: "EmailSender"
+      properties:
+        name:
+          title: "name"
+          type: "string"
+        emailAddress:
+          title: "emailAddress"
+          type: "string"
+
+    Account:
+      type: "object"
+      title: "Account"
+      properties:
+        loginId:
+          title: "loginId"
+          type: "string"
+        password:
+          title: "password"
+          type: "string"
+              
+    InternalRecipient:
+      type: "object"
+      title: "InternalRecipient"
+      required:
+        - "type"
+      properties:
+        type:
+          title: "type"
+          type: "string"
+          enum:
+          - "email"
+          - "message"
+        users:
+          title: "users"
+          type: array
+          items:
+            $ref: "./UserView.yaml#/components/schemas/UserView"
+          minItems: 0
+          maxItems: 25
+        groups:
+          title: "groups"
+          type: array
+          items:
+            $ref: "./GroupView.yaml"
+          minItems: 0
+          maxItems: 25
+        departments:
+          title: "departments"
+          type: "array"
+          items:
+            $ref: "./DepartmentView.yaml"
+          minItems: 0
+          maxItems: 25
+        notifyPartition:
+          title: "notifyPartition"
+          type: "string"
+        link:
+          title: "link"
+          type: "array"
+          items:
+            $ref: "./common.yaml#/components/schemas/Link"
+          minItems: 0
+        unlink:
+          title: "unlink"
+          type: "array"
+          items:
+            $ref: "./common.yaml#/components/schemas/Link"
+          minItems: 0
+    # Reusable schema definitions
+    id:
+      title: id
+      description: ID of the object
+      type: string
+    name:
+      title: name
+      description: Name of the object
+      type: string
+      maxLength: 255
+    description:
+      title: description
+      description: Description of the object
+      type: string
+      maxLength: 255
+    departmentView: 
+      $ref: "./DepartmentView.yaml"
+    lastModified:
+      title: lastModified
+      description: Date and time when object was last modified
+      format: date-time
+      type: string
+    lastModifiedBy: 
+      $ref: "./UserView.yaml#/components/schemas/UserView"
+    emailAddress:
+      title: emailAddress
+      description: Email address of the object
+      format: email
+      type: string
+      maxLength: 255 
+    Errors:
+      type: "object"
+      title: "Errors"
+      properties:
+        error:
+          title: "error"
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Error"
+          minItems: 0
+    Error:
+      type: "object"
+      title: "Error"
+      properties:
+        sourceObject: 
+          $ref: "#/components/schemas/SourceObject"
+        code:
+          title: "code"
+          type: "string"
+        message:
+          title: "message"
+          type: "string"
+    Provider:
+      type: object
+      title: Provider
+      properties:
+        provider1:
+          type: object
+          properties:
+            idp:
+              type: object
+              properties:
+                idpLoginURL:
+                  type: string
+                idpLogoutURL:
+                  type: string
+                samelRequest:
+                  type: string
+            default:
+              type: boolean
+            id:
+              type: string
+    ErrorKnowledge:
+      type: "object"
+      title: "Error Knowledge"
+      required:
+        - "message"
+      properties:
+        message:
+          title: "message"
+          type: "string"
+    WSErrorCommon:
+      type: "object"
+      title: "Error Response"
+      required:
+        - "code"
+        - "developerMessage"
+      properties:
+        code:
+          title: "Code Identifier"
+          description: |
+            A string that follows the pattern *{integer}-{integer}*.
+
+            The first *{integer}* is the http status code.  This code as a whole is unique.
+            * For example, error codes "400-101" and "404-101" are distinctly different.
+          type: "string"
+        developerMessage:
+          title: "Developer Message"
+          description: A summary of the error.
+          type: "string"
+          minLength: 0
+          maxLength: 2048
+        details:
+          title: "Response Details"
+          type: "array"
+          items:
+            type: "object"
+            required:
+              - "key"
+            properties:
+              key:
+                title: "Key"
+                type: "string"
+                minLength: 0
+                maxLength: 255
+              value:
+                title: "Value"
+                type: "string"
+                minLength: 0
+                maxLength: 255
+          minItems: 0
+          maxItems: 30
+        userMessage:
+          title: "User Message"
+          description: |
+            UI friendly messages are only supported by some APIs.  
+              * The client must explicitly request UI friendly messages by passing the *X-egain-error-message=yes* header.
+          type: "string"
+          minLength: 0
+          maxLength: 1024
+    WSErrorLegacy:
+      type: "object"
+      title: "Error Response"
+      required:
+        - "message"
+      properties:
+        message:
+          title: "Developer Message"
+          description: A summary of the error.
+          type: "string"
+  examples:
+    # 400
+    UnsupportedParameters:
+      value:
+        code: 400-101
+        developerMessage: 'Unsupported query parameter(s) supplied: ''<query_parameter>''.'
+    InvalidValueQueryParameter:
+      value:
+        code: 400-244
+        developerMessage: 'Invalid value provided for query parameter: ''<query_parameter>''.'
+    InvalidValueMacro:
+      value:
+        code: 400-249
+        developerMessage: 'Following macros could not be expanded as they do not exist: ''<macro_name>''.'
+    EmptyMacro:
+      value:
+        code: 400-248
+        developerMessage: 'Empty macro provided in the request body.'
+    MacroExpansionFailed:
+      value:
+        code: 400-247
+        developerMessage: 'Following macros could not be expanded: ''<macro_name>''.'
+    InvalidValue:
+      value:
+        code: 400-152
+        developerMessage: 'Invalid value is provided in the request body for the following attribute:''<attribute_name>''.'
+    InvalidValueForAttribute:
+      value:
+        code: 400-116
+        developerMessage: 'Unsupported value for $attribute query parameter: ''<$attribute_value>''. Only the following attributes are supported: ''<supported_attribute_list>''.'
+    MissingParameter:
+      value:
+        code: 400-112
+        developerMessage: 'Required query parameter(s) is missing. The following parameters are required: ''<query_parameter>''.'
+    MaxIDsExceeded:
+      value:
+        code: TBD Max IDs Exceeded
+        developerMessage: TBD Max IDs Exceeded
+    MaxIDs:
+      value:
+        code: 400-TBD
+        developerMessage: TBD More than 75 IDs are supplied in request URL
+    UnallowedCombination:
+      value:
+        code: '400-120'
+        developerMessage: 'Unsupported combination of query parameters: pagination and range query parameters cannot be mixed in the same request.'
+    InvalidQueryParamValue:
+      value:
+        code: '400-102'
+        developerMessage: 'Unsupported value for query parameter ''<query_parameter>''. Only the following values are supported: ''<allowed_values>''.'
+    NoQueryParamProvided:
+      value:
+        code: '400-245'
+        developerMessage: 'At least one of the following API specific query parameters is required: ''<query_parameter_list>''.'
+    LimitExceeded:
+      value:
+        code: '400-10424'
+        developerMessage: 'Limit exceeded. The allowed limit for ''{0}'' is ''{1}''.'
+    # 401
+    SessionHeaderMissing:
+      value:
+        code: 401-TBD
+        developerMessage: TBD X-egain-session request header is missing.
+    SessionInvalid:
+      value:
+        code: 401-TBD
+        developerMessage: TBD Session is invalid or expired.
+    Unauthorized:
+      value:
+        code: 401-101
+        developerMessage: Invalid or expired 'Authorization' header provided. New login is required.
+    InternalServerError:
+      value:
+        code: 500-100
+        developerMessage: System is unable to process this request. Please contact your administrator.
+    Forbidden:
+      value:
+        code: 403-178
+        developerMessage: 'User is not allowed to perform the following action: <action_name>.'
+    InvalidAcceptLanguage:
+      value:
+        code: 406-100
+        developerMessage: Invalid 'Accept-Language' header value provided.
+    NotFound:
+      value:
+        code: 404-100
+        developerMessage: 'The following IDs supplied in the URI path were not found: ''<resource_id>''.'
+    EmptyValue:
+
+      value:
+        code: 400-387
+        developerMessage: 'The following attribute in request body cannot be empty: ''<attribute_name>''.'
+    UnAllowedRequestBody:
+      value:
+        code: 400-203
+        developerMessage: Request body is not allowed.
+    Conflict:
+      value:
+        code: 409-100
+        developerMessage: 'Last modified date provided in the request body for the following <resource> do not match: <resource_id>.'
+    OrderWithoutSort:
+      value:
+        code: 400-124
+        developerMessage: $order query parameter must be accompanied by $sort.
+    RequestBodyNotProvided:
+      value:
+        code: 400-264
+        developerMessage: Request body is mandatory. Please provide body for the request.
+    MixingPageAndRangeQueryParameter:
+      value:
+        code: 400-120
+        developerMessage: 'Unsupported combination of query parameters: pagination and range query parameters cannot be mixed in the same request.'
+    NotFoundRequestBody:
+      value:
+        code: 400-194
+        developerMessage: 'The following IDs supplied in the request body were not found: ''<resource_id>''.'
+    RequiredAttributeMissingRequestBody:
+      value:
+        code: 400-146
+        developerMessage: 'Required attribute is missing in request body: ''<attribute_name>''.'
+    UnsupportedAttributeInRequestBody:
+      value:
+        code: 400-147
+        developerMessage: 'Unsupported attribute is present in request body: ''<attribute_name>''.'
+    TargetCustomerRequestBodyNotExist:
+      value:
+        code: 400-127
+        developerMessage: 'Target customer sent in the request body does not exist: <customer_id>.'
+    SameCustomerSourceAndTarget:
+      value:
+        code: 400-126
+        developerMessage: Target customer in the request body and original customer of the case are same.
+    Activity_Locked_By_Other_Users:
+      value:
+        code: 400-177
+        developerMessage: 'The following activities are locked by other users: ''<user_ids>''.'
+    Resource_Not_In_Open_State:
+      value:
+        code: 400-253
+        developerMessage: 'This operation cannot be performed on the following <resource> as they are not in open status: <resource_id>.'

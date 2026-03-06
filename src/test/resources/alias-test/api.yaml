@@ -1,0 +1,22 @@
+openapi: 3.0.0
+info:
+  title: Alias API Test
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/
+paths:
+  /alias:
+    get:
+      summary: Get alias
+      operationId: getAlias
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alias'
+components:
+  schemas:
+    Alias:
+      $ref: './Alias.yaml'
