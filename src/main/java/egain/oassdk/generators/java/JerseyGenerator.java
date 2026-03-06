@@ -3345,7 +3345,10 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     }
 
     private String generateResourceName(String path) {
-        String name = path.replaceAll("[^a-zA-Z0-9]", "");
+        String name = path != null ? path.replaceAll("[^a-zA-Z0-9]", "") : "";
+        if (name.isEmpty()) {
+            return "RootResource";
+        }
         return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1) + "Resource";
     }
 
