@@ -114,6 +114,9 @@ public class RegressionTest {
                 } catch (OASSDKException slaEx) {
                     fail("SLA file should be loadable: " + yamlFilePath, slaEx);
                 }
+            } else if (isSchemaOrFragmentOnly(e.getMessage())) {
+                // Schema/fragment YAMLs (e.g. Alias.yaml, DepartmentView.yaml) are not root OpenAPI specs
+                return;
             } else if (e.getMessage() != null && e.getMessage().contains("Reference not found")) {
                 // Some test YAML files may have incomplete references
                 // This is acceptable for regression testing - we're mainly checking for StackOverflowError
@@ -189,6 +192,16 @@ public class RegressionTest {
             .map(Arguments::of);
     }
     
+    /**
+     * Returns true if the exception message indicates the YAML is a schema/fragment
+     * (not a root OpenAPI spec), e.g. Alias.yaml, DepartmentView.yaml under alias-test.
+     */
+    private static boolean isSchemaOrFragmentOnly(String message) {
+        if (message == null) return false;
+        return message.contains("Missing 'openapi'") || message.contains("Missing required 'info'")
+            || message.contains("Missing required 'paths'");
+    }
+
     /**
      * Recursively finds all YAML files in the given directory
      */
