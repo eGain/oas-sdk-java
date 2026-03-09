@@ -2547,32 +2547,42 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             String fieldName = property.getKey();
             Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
             //String fieldType = computeFieldTypeForProperty(fieldName, fieldSchema, isArrayType, spec);
-			String fieldType = getFieldTypeForModelProperty(schemaName, fieldName, fieldSchema, isArrayType, spec);
+            String fieldType = getFieldTypeForModelProperty(schemaName, fieldName, fieldSchema, isArrayType, spec);
 
             String javaFieldName = toModelFieldName(fieldName);
             String capitalizedFieldName = getCapitalizedPropertyNameForAccessor(javaFieldName);
 
             boolean readOnly = isSchemaFlagTrue(fieldSchema, "readOnly");
             boolean writeOnly = isSchemaFlagTrue(fieldSchema, "writeOnly");
+            // List fields: lazy-init in getter, no setter (mutate via getXxx()), setAttribute adds one element.
+            boolean isListTypeField = fieldType.startsWith("List<");
             if (readOnly && writeOnly) writeOnly = false; // invalid spec: prefer readOnly
 
             // Getter: generate when not writeOnly (readOnly and normal properties get getter)
             if (!writeOnly) {
                 String methodPrefix = fieldType.equals("boolean") || fieldType.equals("Boolean") ? "is" : "get";
                 content.append("    public ").append(fieldType).append(" " + methodPrefix).append(capitalizedFieldName).append("() {\n");
-                content.append("        return ").append(javaFieldName).append(";\n");
+                if (isListTypeField) {
+                    content.append("        if (").append(javaFieldName).append(" == null) {\n");
+                    content.append("            ").append(javaFieldName).append(" = new Array").append(fieldType).append("();\n");
+                    content.append("        }\n");
+                    content.append("        return this.").append(javaFieldName).append(";\n");
+                } else {
+                    content.append("        return ").append(javaFieldName).append(";\n");
+                }
                 content.append("    }\n\n");
             }
 
-            // Setter: generate when not readOnly (writeOnly and normal properties get setter)
-            if (!readOnly) {
+            // Setter: generate when not readOnly (writeOnly and normal properties get setter).
+            // No setter for list fields: callers use getXxx() and mutate to avoid replacing the whole list.
+            if (!readOnly && !isListTypeField) {
                 content.append("    public void set").append(capitalizedFieldName).append("(").append(fieldType).append(" ").append(javaFieldName).append(") {\n");
                 content.append("        this.").append(javaFieldName).append(" = ").append(javaFieldName).append(";\n");
                 content.append("    }\n\n");
             }
 
             // isSetXxx() for every attribute
-            if (fieldType.startsWith("List<")) {
+            if (isListTypeField) {
                 content.append("    public boolean isSet").append(capitalizedFieldName).append("() {\n");
                 content.append("        return (this.").append(javaFieldName).append(" != null) && (!this.").append(javaFieldName).append(".isEmpty());\n");
                 content.append("    }\n\n");
@@ -2586,63 +2596,66 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             }
         }
 
-        // Generate equals method
-        content.append("    @Override\n");
-        content.append("    public boolean equals(Object o) {\n");
-        content.append("        if (this == o) return true;\n");
-        content.append("        if (o == null || getClass() != o.getClass()) return false;\n");
-        content.append("        ").append(schemaName).append(" that = (").append(schemaName).append(") o;\n");
-        content.append("        return ");
+        // When isModelsOnly, skip equals/hashCode/toString (models use Object identity).
+        if (!isModelsOnly) {
+            // Generate equals method
+            content.append("    @Override\n");
+            content.append("    public boolean equals(Object o) {\n");
+            content.append("        if (this == o) return true;\n");
+            content.append("        if (o == null || getClass() != o.getClass()) return false;\n");
+            content.append("        ").append(schemaName).append(" that = (").append(schemaName).append(") o;\n");
+            content.append("        return ");
 
-        if (!fieldNames.isEmpty()) {
-            for (int i = 0; i < fieldNames.size(); i++) {
-                if (i > 0) content.append("                ");
-                String modelField = toModelFieldName(fieldNames.get(i));
-                content.append("Objects.equals(").append(modelField).append(", that.").append(modelField).append(")");
-                if (i < fieldNames.size() - 1) {
-                    content.append(" &&\n");
-                } else {
-                    content.append(";\n");
+            if (!fieldNames.isEmpty()) {
+                for (int i = 0; i < fieldNames.size(); i++) {
+                    if (i > 0) content.append("                ");
+                    String modelField = toModelFieldName(fieldNames.get(i));
+                    content.append("Objects.equals(").append(modelField).append(", that.").append(modelField).append(")");
+                    if (i < fieldNames.size() - 1) {
+                        content.append(" &&\n");
+                    } else {
+                        content.append(";\n");
+                    }
+                }
+            } else {
+                content.append("true;\n");
+            }
+            content.append("    }\n\n");
+
+            // Generate hashCode method
+            content.append("    @Override\n");
+            content.append("    public int hashCode() {\n");
+            content.append("        return Objects.hash(");
+            if (!fieldNames.isEmpty()) {
+                for (int i = 0; i < fieldNames.size(); i++) {
+                    if (i > 0) content.append(", ");
+                    content.append(toModelFieldName(fieldNames.get(i)));
                 }
             }
-        } else {
-            content.append("true;\n");
-        }
-        content.append("    }\n\n");
+            content.append(");\n");
+            content.append("    }\n\n");
 
-        // Generate hashCode method
-        content.append("    @Override\n");
-        content.append("    public int hashCode() {\n");
-        content.append("        return Objects.hash(");
-        if (!fieldNames.isEmpty()) {
-            for (int i = 0; i < fieldNames.size(); i++) {
-                if (i > 0) content.append(", ");
-                content.append(toModelFieldName(fieldNames.get(i)));
-            }
-        }
-        content.append(");\n");
-        content.append("    }\n\n");
+            // Generate toString method
+            content.append("    @Override\n");
+            content.append("    public String toString() {\n");
+            content.append("        return \"").append(schemaName).append("{\" +\n");
 
-        // Generate toString method
-        content.append("    @Override\n");
-        content.append("    public String toString() {\n");
-        content.append("        return \"").append(schemaName).append("{\" +\n");
-
-        if (!fieldNames.isEmpty()) {
-            for (int i = 0; i < fieldNames.size(); i++) {
-                String fieldName = fieldNames.get(i);
-                String javaFieldName = toModelFieldName(fieldName);
-                content.append("                \"").append(javaFieldName).append("=\" + ").append(javaFieldName);
-                if (i < fieldNames.size() - 1) {
-                    content.append(" + \", \" +\n");
-                } else {
-                    content.append(" +\n");
+            if (!fieldNames.isEmpty()) {
+                for (int i = 0; i < fieldNames.size(); i++) {
+                    String fieldName = fieldNames.get(i);
+                    String javaFieldName = toModelFieldName(fieldName);
+                    content.append("                \"").append(javaFieldName).append("=\" + ").append(javaFieldName);
+                    if (i < fieldNames.size() - 1) {
+                        content.append(" + \", \" +\n");
+                    } else {
+                        content.append(" +\n");
+                    }
                 }
             }
-        }
 
-        content.append("                '}';\n");
-        content.append("    }\n\n");
+            content.append("                '}';\n");
+            content.append("    }\n\n");
+        }
 
         // Generate JAXBBean interface methods
         content.append("    @Override\n");
@@ -2656,9 +2669,12 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             for (String fieldName : fieldNames) {
                 Map<String, Object> fieldSchema = Util.asStringObjectMap(allProperties.get(fieldName));
                 if (isSchemaFlagTrue(fieldSchema, "writeOnly")) continue;
+                String fieldType = getFieldTypeForModelProperty(schemaName, fieldName, fieldSchema, isArrayType, spec);
+                String methodPrefix = fieldType.equals("boolean") || fieldType.equals("Boolean") ? "is" : "get";
                 String javaFieldName = toModelFieldName(fieldName);
+                String capitalizedFieldName = getCapitalizedPropertyNameForAccessor(javaFieldName);
                 content.append("            case \"").append(fieldName).append("\":\n");
-                content.append("                return ").append(javaFieldName).append(";\n");
+                content.append("                return ").append(methodPrefix).append(capitalizedFieldName).append("();\n");
             }
             content.append("            default:\n");
             content.append("                return null;\n");
@@ -2780,7 +2796,15 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 if (readOnly) {
                     content.append("                return; // readOnly, no setter\n");
                 } else {
-                    content.append("                set").append(capitalizedFieldName).append("((").append(fieldType).append(") value);\n");
+                    // List attributes: setAttribute adds one element (caller passes single item, not full list).
+                    if (fieldType.startsWith("List<")) {
+                        String itemType = fieldType.substring(5, fieldType.length() - 1);
+                        content.append("                get").append(capitalizedFieldName).append("().add((").append(
+                                        itemType).append(") value);\n");
+                    } else {
+                        content.append("                set").append(capitalizedFieldName).append("((").append(
+                                        fieldType).append(") value);\n");
+                    }
                     content.append("                return;\n");
                 }
             }
@@ -2891,20 +2915,29 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             String capitalizedFieldName = getCapitalizedPropertyNameForAccessor(javaFieldName);
             boolean readOnly = isSchemaFlagTrue(fieldSchema, "readOnly");
             boolean writeOnly = isSchemaFlagTrue(fieldSchema, "writeOnly");
+            boolean isListTypeField = fieldType.startsWith("List<");
             if (readOnly && writeOnly) writeOnly = false;
             if (!writeOnly) {
                 String methodPrefix = fieldType.equals("boolean") || fieldType.equals("Boolean") ? "is" : "get";
-                content.append(indentBody).append("public ").append(fieldType).append(" " + methodPrefix).append(capitalizedFieldName).append("() {\n");
-                content.append(indentBody).append("    return ").append(javaFieldName).append(";\n");
+                content.append(indentBody).append("public ").append(fieldType).append(" " + methodPrefix).append(
+                                capitalizedFieldName).append("() {\n");
+                if (isListTypeField) {
+                    content.append(indentBody).append("    if (").append(javaFieldName).append(" == null) {\n");
+                    content.append(indentBody).append("        ").append(javaFieldName).append(" = new Array").append(fieldType).append("();\n");
+                    content.append(indentBody).append("    }\n");
+                    content.append(indentBody).append("    return this.").append(javaFieldName).append(";\n");
+                } else {
+                    content.append(indentBody).append("    return ").append(javaFieldName).append(";\n");
+                }
                 content.append(indentBody).append("}\n\n");
             }
-            if (!readOnly) {
+            if (!readOnly && !isListTypeField) { // No setter for list fields; mutate via getXxx()
                 content.append(indentBody).append("public void set").append(capitalizedFieldName).append("(").append(fieldType).append(" ").append(javaFieldName).append(") {\n");
                 content.append(indentBody).append("    this.").append(javaFieldName).append(" = ").append(javaFieldName).append(";\n");
                 content.append(indentBody).append("}\n\n");
             }
 
-            if (fieldType.startsWith("List<")) {
+            if (isListTypeField) {
                 content.append(indentBody).append("public boolean isSet").append(capitalizedFieldName).append("() {\n");
                 content.append(indentBody).append("    return (").append(javaFieldName).append(" != null) && (!").append(javaFieldName).append(".isEmpty());\n");
                 content.append(indentBody).append("}\n\n");
@@ -2918,48 +2951,54 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             }
         }
 
-        content.append(indentBody).append("@Override\n");
-        content.append(indentBody).append("public boolean equals(Object o) {\n");
-        content.append(indentBody).append("    if (this == o) return true;\n");
-        content.append(indentBody).append("    if (o == null || getClass() != o.getClass()) return false;\n");
-        content.append(indentBody).append("    ").append(innerClassName).append(" that = (").append(innerClassName).append(") o;\n");
-        content.append(indentBody).append("    return ");
-        for (int i = 0; i < fieldNames.size(); i++) {
-            if (i > 0) content.append(indentBody).append("    ");
-            String mf = toModelFieldName(fieldNames.get(i));
-            content.append("Objects.equals(").append(mf).append(", that.").append(mf).append(")");
-            content.append(i < fieldNames.size() - 1 ? " &&\n" : ";\n");
-        }
-        if (fieldNames.isEmpty()) content.append("true;\n");
-        content.append(indentBody).append("}\n\n");
+        // When isModelsOnly, skip equals/hashCode/toString for inner class as well.
+        if (!isModelsOnly) {
+            content.append(indentBody).append("@Override\n");
+            content.append(indentBody).append("public boolean equals(Object o) {\n");
+            content.append(indentBody).append("    if (this == o) return true;\n");
+            content.append(indentBody).append("    if (o == null || getClass() != o.getClass()) return false;\n");
+            content.append(indentBody).append("    ").append(innerClassName).append(" that = (").append(innerClassName).append(") o;\n");
+            content.append(indentBody).append("    return ");
+            for (int i = 0; i < fieldNames.size(); i++) {
+                if (i > 0) content.append(indentBody).append("    ");
+                String mf = toModelFieldName(fieldNames.get(i));
+                content.append("Objects.equals(").append(mf).append(", that.").append(mf).append(")");
+                content.append(i < fieldNames.size() - 1 ? " &&\n" : ";\n");
+            }
+            if (fieldNames.isEmpty()) content.append("true;\n");
+            content.append(indentBody).append("}\n\n");
 
-        content.append(indentBody).append("@Override\n");
-        content.append(indentBody).append("public int hashCode() {\n");
-        content.append(indentBody).append("    return Objects.hash(");
-        for (int i = 0; i < fieldNames.size(); i++) {
-            if (i > 0) content.append(", ");
-            content.append(toModelFieldName(fieldNames.get(i)));
-        }
-        content.append(");\n");
-        content.append(indentBody).append("}\n\n");
+            content.append(indentBody).append("@Override\n");
+            content.append(indentBody).append("public int hashCode() {\n");
+            content.append(indentBody).append("    return Objects.hash(");
+            for (int i = 0; i < fieldNames.size(); i++) {
+                if (i > 0) content.append(", ");
+                content.append(toModelFieldName(fieldNames.get(i)));
+            }
+            content.append(");\n");
+            content.append(indentBody).append("}\n\n");
 
-        content.append(indentBody).append("@Override\n");
-        content.append(indentBody).append("public String toString() {\n");
-        content.append(indentBody).append("    return \"").append(innerClassName).append("{\" +\n");
-        for (int i = 0; i < fieldNames.size(); i++) {
-            String jf = toModelFieldName(fieldNames.get(i));
-            content.append(indentBody).append("            \"").append(jf).append("=\" + ").append(jf);
-            content.append(i < fieldNames.size() - 1 ? " + \", \" +\n" : " +\n");
+            content.append(indentBody).append("@Override\n");
+            content.append(indentBody).append("public String toString() {\n");
+            content.append(indentBody).append("    return \"").append(innerClassName).append("{\" +\n");
+            for (int i = 0; i < fieldNames.size(); i++) {
+                String jf = toModelFieldName(fieldNames.get(i));
+                content.append(indentBody).append("            \"").append(jf).append("=\" + ").append(jf);
+                content.append(i < fieldNames.size() - 1 ? " + \", \" +\n" : " +\n");
+            }
+            content.append(indentBody).append("            '}';\n");
+            content.append(indentBody).append("}\n\n");
         }
-        content.append(indentBody).append("            '}';\n");
-        content.append(indentBody).append("}\n\n");
 
         content.append(indentBody).append("@Override\n");
         content.append(indentBody).append("public Object getAttribute(String name) {\n");
         for (String fn : fieldNames) {
             Map<String, Object> fs = Util.asStringObjectMap(allProperties.get(fn));
             if (isSchemaFlagTrue(fs, "writeOnly")) continue;
-            content.append(indentBody).append("    if (\"").append(fn).append("\".equals(name)) return ").append(toModelFieldName(fn)).append(";\n");
+            String fieldType = getFieldTypeForModelProperty(fullEnclosing, fn, fs, false, spec);
+            String methodPrefix = fieldType.equals("boolean") || fieldType.equals("Boolean") ? "is" : "get";
+            String cap = getCapitalizedPropertyNameForAccessor(toModelFieldName(fn));
+            content.append(indentBody).append("    if (\"").append(fn).append("\".equals(name)) return ").append(methodPrefix).append(cap).append("();\n");
         }
         content.append(indentBody).append("    return null;\n");
         content.append(indentBody).append("}\n\n");
@@ -2994,7 +3033,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             String jf = toModelFieldName(fn);
             String cap = getCapitalizedPropertyNameForAccessor(jf);
             String ft = getFieldTypeForModelProperty(fullEnclosing, fn, Util.asStringObjectMap(allProperties.get(fn)), false, spec);
-            content.append(indentBody).append("    if (\"").append(fn).append("\".equals(name)) { set").append(cap).append("((").append(ft).append(") value); return; }\n");
+            if (ft.startsWith("List<")) {
+                String it = ft.substring(5, ft.length() - 1);
+                content.append(indentBody).append("    if (\"").append(fn).append("\".equals(name)) { get").append(cap).append(
+                                "().add((").append(it).append(") value); return; }\n");
+            } else {
+                content.append(indentBody).append("    if (\"").append(fn).append("\".equals(name)) { set").append(cap).append(
+                                "((").append(ft).append(") value); return; }\n");
+            }
         }
         content.append(indentBody).append("}\n");
 
@@ -3026,9 +3072,6 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("            }\n");
         content.append("            return ").append(innerJavaField).append(";\n");
         content.append("        }\n\n");
-        content.append("        public void set").append(innerCapitalized).append("(List<").append(w.itemTypeName).append("> ").append(innerJavaField).append(") {\n");
-        content.append("            this.").append(innerJavaField).append(" = ").append(innerJavaField).append(";\n");
-        content.append("        }\n\n");
         content.append("        public boolean isSet").append(innerCapitalized).append("() {\n");
         content.append("            return ").append(innerJavaField).append(" != null && !").append(innerJavaField).append(".isEmpty();\n");
         content.append("        }\n\n");
@@ -3045,7 +3088,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("        @Override\n");
         content.append("        public void setAttribute(String name, Object value) {\n");
         content.append("            if (\"").append(w.innerPropertyName).append("\".equals(name)) {\n");
-        content.append("                set").append(innerCapitalized).append("((List<").append(w.itemTypeName).append(">) value);\n");
+        // setAttribute for list: adds one element (caller passes single item)
+        content.append("                get").append(innerCapitalized).append("().add((").append(w.itemTypeName).append(") value);\n");
         content.append("                return;\n");
         content.append("            }\n");
         content.append("        }\n\n");
@@ -6798,5 +6842,3 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         }
     }
 }
-
-
