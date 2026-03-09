@@ -93,11 +93,11 @@ public class JerseyGeneratorArrayTypesAndSetTest {
                    content.contains("private List<ArticleTypeInfo> items;"),
             "ArticleTypes should have List<ArticleTypeInfo> items field");
         
-        // Should have proper getter/setter with List type
+        // Should have getter for List type (list fields have no setter; mutate via getItems())
         assertTrue(content.contains("public List<ArticleTypeInfo> getItems()"),
             "Getter should return List<ArticleTypeInfo>");
-        assertTrue(content.contains("public void setItems(List<ArticleTypeInfo> items)"),
-            "Setter should accept List<ArticleTypeInfo>");
+        assertFalse(content.contains("public void setItems(List<ArticleTypeInfo>"),
+            "List-type fields do not get a setter; callers use getItems() and mutate");
         
         // Should have JAXB annotations for List
         assertTrue(content.contains("@XmlElementWrapper") || content.contains("@XmlElement"),
