@@ -3913,13 +3913,15 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 boolean hasEnum = enumValues != null && !enumValues.isEmpty();
 
                 if (hasEnum && enumValues != null) {
-                    // Build regex pattern that matches any of the enum values
-                    StringBuilder enumPattern = new StringBuilder("^(");
+                    // Build regex pattern that matches any of the enum values (XJC-style: (v1)|(v2)|...).
+                    // Structural parentheses are appended as literals and only enum value content is escaped,
+                    // so the regex uses grouping parentheses, not literal "(" and ")".
+                    StringBuilder enumPattern = new StringBuilder("^");
                     for (int i = 0; i < enumValues.size(); i++) {
                         if (i > 0) {
                             enumPattern.append("|");
                         }
-                        // Escape special regex characters in enum values
+                        // Escape special regex characters in enum values only (not the grouping parens we add)
                         String enumValue = enumValues.get(i).toString();
                         enumValue = enumValue.replace("\\", "\\\\")
                                 .replace("^", "\\^")
@@ -3936,9 +3938,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                 .replace("{", "\\{")
                                 .replace("}", "\\}")
                                 .replace("\"", "\\\"");
-                        enumPattern.append(enumValue);
+                        enumPattern.append("(").append(enumValue).append(")");
                     }
-                    enumPattern.append(")$");
+                    enumPattern.append("$");
                     String enumPatternStr = escapePatternForJavaStringLiteral(enumPattern.toString());
                     annotations.append("@Pattern(regexp = \"").append(enumPatternStr).append("\")\n    ");
                 }
@@ -5033,7 +5035,8 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
     /**
      * Escape a regex pattern for use inside a Java string literal (e.g. in @Pattern(regexp = "...")).
-     * Doubles every backslash; adds \\ before ( and ) only when not already escaped.
+     * Escapes only backslashes and double quotes for the Java string; parentheses are left as-is
+     * so they remain regex grouping metacharacters (e.g. (\.\d{3})? for optional milliseconds).
      */
     private String escapePatternForJavaStringLiteral(String pattern) {
         if (pattern == null) return "";
@@ -5046,10 +5049,6 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 afterBackslash = !afterBackslash;
             } else if (c == '"') {
                 sb.append("\\\"");
-                afterBackslash = false;
-            } else if (c == '(' || c == ')') {
-                if (!afterBackslash) sb.append("\\\\");
-                sb.append(c);
                 afterBackslash = false;
             } else {
                 sb.append(c);

@@ -7,7 +7,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.lang.reflect.Method;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.*;
 import java.util.Arrays;
 import java.util.List;
@@ -267,6 +269,171 @@ public class JerseyGeneratorValidationTest {
             "Should have getPatternForFormat method");
         assertTrue(content.contains("import java.util.regex.Pattern;"),
             "Should import Pattern");
+    }
+
+    @Test
+    @DisplayName("escapePatternForJavaStringLiteral preserves regex grouping parentheses")
+    public void testEscapePatternPreservesGroupingParens() throws Exception {
+        String pattern = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$";
+        Method m = JerseyGenerator.class.getDeclaredMethod("escapePatternForJavaStringLiteral", String.class);
+        m.setAccessible(true);
+        JerseyGenerator gen = new JerseyGenerator();
+        String result = (String) m.invoke(gen, pattern);
+        // Method doubles backslashes for Java string; grouping parens ( ) must stay unescaped
+        assertTrue(result.contains("(\\\\.\\\\d{3})?"), "Result should contain (\\\\.\\\\d{3})? i.e. grouping for optional milliseconds");
+        assertFalse(result.contains("\\\\(\\.\\\\d{3}\\)"), "Result must not escape grouping parentheses as \\( \\)");
+    }
+
+    @Test
+    @DisplayName("Pattern with grouping parentheses is not escaped (e.g. optional milliseconds in date-time)")
+    public void testPatternGroupingParenthesesNotEscaped() throws OASSDKException, IOException {
+        Path outputDir = tempOutputDir.resolve("datetime-pattern-test");
+        String packageName = "com.test.api";
+
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Date-time pattern test
+              version: "4.0.0"
+            servers:
+              - url: https://api.example.com
+            paths:
+              /test:
+                get:
+                  operationId: getTest
+                  responses:
+                    '200':
+                      description: OK
+                      content:
+                        application/json:
+                          schema:
+                            $ref: '#/components/schemas/ItemWithDate'
+            components:
+              schemas:
+                ItemWithDate:
+                  type: object
+                  properties:
+                    modifiedDate:
+                      type: string
+                      format: date-time
+                      pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$'
+                      minLength: 20
+                      maxLength: 25
+            """;
+        Path specFile = tempOutputDir.resolve("datetime-pattern-spec.yaml");
+        Files.writeString(specFile, yamlContent);
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(specFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path javaDir = outputDir.resolve("src/main/java").resolve(TEST_PACKAGE_PATH);
+        assertTrue(Files.exists(javaDir), "Generated Java directory should exist");
+
+        StringBuilder allContent = new StringBuilder();
+        try (var stream = Files.walk(javaDir)) {
+            stream.filter(p -> p.toString().endsWith(".java"))
+                .forEach(p -> {
+                    try {
+                        allContent.append(Files.readString(p));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
+        }
+
+        String generated = allContent.toString();
+        assertTrue(generated.contains("ItemWithDate"), "ItemWithDate model should be generated");
+        assertTrue(generated.contains("@Pattern") && generated.contains("\\d{3}"),
+            "Generated code should contain @Pattern with date-time regex (\\d{3})");
+        // Correct: in Java source we have doubled backslashes; grouping parens ( ) must be unescaped
+        assertTrue(generated.contains("(\\\\.\\\\d{3})?"),
+            "Generated code should contain regex grouping for optional milliseconds (e.g. (\\\\.\\\\d{3})?), not escaped parens");
+        // Wrong: parentheses must not be escaped (would match literal "(" and ")" in input)
+        assertFalse(generated.contains("\\\\(\\.\\\\d{3}\\)"),
+            "Generated code must not escape grouping parentheses in pattern (would break date-time validation)");
+    }
+
+    @Test
+    @DisplayName("Enum-derived @Pattern uses unescaped grouping parentheses and matches values like en-US (XJC-style)")
+    public void testEnumPatternUsesGroupingParensNotEscaped() throws OASSDKException, IOException {
+        Path outputDir = tempOutputDir.resolve("enum-pattern-test");
+        String packageName = "com.test.api";
+
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Enum pattern test
+              version: "1.0.0"
+            servers:
+              - url: https://api.example.com
+            paths:
+              /test:
+                get:
+                  operationId: getTest
+                  responses:
+                    '200':
+                      description: OK
+                      content:
+                        application/json:
+                          schema:
+                            $ref: '#/components/schemas/LanguageItem'
+            components:
+              schemas:
+                LanguageItem:
+                  type: object
+                  properties:
+                    code:
+                      type: string
+                      enum: [en-US, en-GB, fr-FR, es-ES, zh-CN, ja-JP, ko-KR]
+            """;
+        Path specFile = tempOutputDir.resolve("enum-pattern-spec.yaml");
+        Files.writeString(specFile, yamlContent);
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(specFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path javaDir = outputDir.resolve("src/main/java").resolve(TEST_PACKAGE_PATH);
+        assertTrue(Files.exists(javaDir), "Generated Java directory should exist");
+
+        StringBuilder allContent = new StringBuilder();
+        try (var stream = Files.walk(javaDir)) {
+            stream.filter(p -> p.toString().endsWith(".java"))
+                .forEach(p -> {
+                    try {
+                        allContent.append(Files.readString(p));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
+        }
+
+        String generated = allContent.toString();
+        assertTrue(generated.contains("LanguageItem"), "LanguageItem model should be generated");
+        assertTrue(generated.contains("@Pattern") && generated.contains("en-US"),
+            "Generated code should contain @Pattern with enum regex including en-US");
+
+        // Must not escape grouping parentheses (would match literal "(en-US)" instead of "en-US")
+        assertFalse(generated.contains("\\(") || generated.contains("\\)"),
+            "Generated @Pattern must not contain escaped grouping parentheses \\( or \\)");
+
+        // Should contain XJC-style grouping: (en-US)|(en-GB)|... i.e. unescaped ( and )
+        assertTrue(generated.contains("(en-US)") && generated.contains("(en-GB)"),
+            "Generated pattern should use unescaped grouping parentheses (en-US)|(en-GB)|...");
+
+        // Extract regexp from first @Pattern(regexp = "...") for code and compile to verify behavior
+        int start = generated.indexOf("@Pattern(regexp = \"");
+        assertTrue(start >= 0, "Should find @Pattern(regexp = \"");
+        start = generated.indexOf("\"", start) + 1;
+        int end = start;
+        while (end < generated.length() && (generated.charAt(end) != '"' || (end > 0 && generated.charAt(end - 1) == '\\')))
+            end++;
+        String regexp = generated.substring(start, end).replace("\\\"", "\"");
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(regexp);
+        assertTrue(pattern.matcher("en-US").matches(), "Regex should match \"en-US\"");
+        assertFalse(pattern.matcher("(en-US)").matches(), "Regex should not match literal \"(en-US)\"");
+        assertFalse(pattern.matcher("en-USx").matches(), "Regex should not match \"en-USx\" (anchored)");
     }
     
     @Test
