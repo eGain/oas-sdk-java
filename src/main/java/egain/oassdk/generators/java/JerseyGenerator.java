@@ -2440,6 +2440,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("import com.egain.platform.common.JAXBBean;\n");
         content.append("import com.fasterxml.jackson.annotation.JsonProperty;\n");
         content.append("import javax.validation.constraints.*;\n");
+		content.append("import javax.validation.Valid;\n");
         content.append("import javax.xml.bind.annotation.*;\n");
         content.append("import javax.xml.bind.JAXBElement;\n");
         content.append("import javax.xml.namespace.QName;\n");
@@ -2532,6 +2533,11 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             String validationAnnotations = generateValidationAnnotations(fieldSchema, allRequired.contains(fieldName));
             if (!validationAnnotations.isEmpty()) {
                 content.append(validationAnnotations);
+            }
+
+            // Add @Valid for non-primitive/non-boxed types (nested object validation)
+            if (isEligibleForCascadingValidation(fieldType)) {
+                content.append("@Valid\n    ");
             }
 
             // Add field type and name
@@ -2901,6 +2907,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             if (!validationAnnotations.isEmpty()) {
                 content.append(validationAnnotations.replace("\n    ", "\n" + indentBody));
             }
+			if (isEligibleForCascadingValidation(fieldType)) {
+				content.append("@Valid\n").append(indentBody);
+			}
             content.append("private ").append(fieldType).append(" ").append(javaFieldName).append(";\n\n");
         }
 
@@ -4560,6 +4569,30 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 	}
 
     /**
+     * Returns true if the given type is a Java primitive, boxed primitive, or String.
+     * Used to decide when to add @Valid (add when this returns false).
+     */
+    private boolean isJavaPrimitiveOrBoxed(String fieldType) {
+        return switch (fieldType) {
+            case "int", "long", "boolean", "double", "float", "short", "byte", "char",
+                 "Integer", "Long", "Boolean", "Double", "Float", "Short", "Byte", "Character",
+                 "String" -> true;
+            default -> false;
+        };
+    }
+
+	private boolean isEligibleForCascadingValidation(String fieldType) {
+		if (fieldType == null) return false;
+		// if fieldType starts with List< then check the inner type for eligibility
+		if (fieldType.startsWith("List<") && fieldType.endsWith(">")) {
+			String innerType = fieldType.substring(5, fieldType.length() - 1);
+			return !isJavaPrimitiveOrBoxed(innerType);
+		}
+		// Add @Valid for non-primitive, non-boxed types (e.g. custom classes, lists)
+		return !isJavaPrimitiveOrBoxed(fieldType);
+	}
+
+    /**
      * Convert OpenAPI property name to a valid Java field name for model classes.
      * Prepends underscore if the camelCase form is a Java keyword (e.g. "case" -> "_case").
      */
@@ -4953,6 +4986,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     if (i > 0) enumStr.append(",");
                     enumStr.append(enumValues.get(i).toString());
                 }
+				getNextArgCounter();//call this to keep argument counter correct
                 sb.append("    v.add(new EnumValidator(\"").append(paramName).append("\", \"").append(enumStr)
                         .append("\", \"L10N_INVALID_VALUE_FOR_ENUM_ATTRIBUTE\", Collections.emptyList(), Collections.emptyList(), \"")
                         .append(paramType).append("\" ,").append(isArray).append("));\n");
@@ -4961,6 +4995,40 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
         // Number validations
         if ("integer".equals(type) || "number".equals(type)) {
+
+			if (isModelsOnly)
+			{
+				// have fixed validation for integer number with at least 1 digit
+				String format = "^-?\\\\d+$";
+				String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_FORMAT";
+				sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(
+												paramName)
+								.append("\", \"").append(format).append("\");\n");
+				sb.append("    v.add(new FormatValidator(\"").append(paramName).append("\", \"").append(format)
+								.append("\", \"").append(errorCode).append("\", arguments").append(
+												getCurrentArgCounter())
+								.append(", Collections.emptyList(), \"").append(paramType).append("\", false));\n");
+			}
+			else
+			{
+				// Format (int32, int64, float, double)
+				if (schema.containsKey("format"))
+				{
+					String format = (String) schema.get("format");
+					if (format != null && !format.isEmpty())
+					{
+						String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_FORMAT";
+						sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(
+														paramName)
+										.append("\", \"").append(format).append("\");\n");
+						sb.append("    v.add(new FormatValidator(\"").append(paramName).append("\", \"").append(format)
+										.append("\", \"").append(errorCode).append("\", arguments").append(
+														getCurrentArgCounter())
+										.append(", Collections.emptyList(), \"").append(paramType).append("\", false));\n");
+					}
+				}
+			}
+
             // Maximum
             if (schema.containsKey("maximum")) {
                 Object maximum = schema.get("maximum");
@@ -4989,25 +5057,49 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             // Max items
             if (schema.containsKey("maxItems")) {
                 Object maxItems = schema.get("maxItems");
-                sb.append("    v.add(new ArrayMaxItemsValidators(\"").append(paramName).append("\", ")
-                        .append(maxItems).append(", \"L10N_INVALID_VALUE_FOR_ARRAY_MAX_ITEMS\", Collections.emptyList(), Collections.emptyList(), \"")
+				getNextArgCounter();//call this to keep argument counter correct
+                sb.append("    v.add(new ArrayMaxItemsValidators(\"").append(paramName).append("\", \"")
+                        .append(maxItems).append("\", \"L10N_INVALID_VALUE_FOR_ARRAY_MAX_ITEMS\", Collections.emptyList(), Collections.emptyList(), \"")
                         .append(paramType).append("\",false));\n");
             }
 
             // Min items
             if (schema.containsKey("minItems")) {
                 Object minItems = schema.get("minItems");
-                sb.append("    v.add(new ArrayMinItemsValidator(\"").append(paramName).append("\", ")
-                        .append(minItems).append(", \"L10N_INVALID_VALUE_FOR_ARRAY_MIN_ITEMS\", Collections.emptyList(), Collections.emptyList(), \"")
+				getNextArgCounter();//call this to keep argument counter correct
+                sb.append("    v.add(new ArrayMinItemsValidator(\"").append(paramName).append("\", \"")
+                        .append(minItems).append("\", \"L10N_INVALID_VALUE_FOR_ARRAY_MIN_ITEMS\", Collections.emptyList(), Collections.emptyList(), \"")
                         .append(paramType).append("\",false));\n");
+            }
+
+            // Enum on items: validate each array element against allowed values
+            if (schema.containsKey("items")) {
+                Map<String, Object> itemsSchema = Util.asStringObjectMap(schema.get("items"));
+                if (itemsSchema != null) {
+                    List<?> enumValues = itemsSchema.get("enum") instanceof List<?> list ? list : null;
+                    if (enumValues != null && !enumValues.isEmpty()) {
+                        StringBuilder enumStr = new StringBuilder();
+                        for (int i = 0; i < enumValues.size(); i++) {
+                            if (i > 0) enumStr.append(",");
+                            enumStr.append(enumValues.get(i).toString());
+                        }
+						getNextArgCounter();//call this to keep argument counter correct
+                        sb.append("    v.add(new EnumValidator(\"").append(paramName).append("\", \"").append(enumStr)
+                                .append("\", \"L10N_INVALID_VALUE_FOR_ENUM_ATTRIBUTE\", Collections.emptyList(), Collections.emptyList(), \"")
+                                .append(paramType).append("\", true));\n");
+                    }
+                }
             }
         }
 
         // Boolean validator
         if ("boolean".equals(type)) {
-            sb.append("    v.add(new BooleanValidator(\"").append(paramName)
-                    .append("\", \"L10N_INVALID_VALUE_FOR_BOOLEAN\", Collections.emptyList(), Collections.emptyList(), \"")
-                    .append(paramType).append("\",false));\n");
+			String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_BOOLEAN";
+			sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(paramName)
+							.append("\", \"placeholder\");\n");
+            sb.append("    v.add(new BooleanValidator(\"").append(paramName).append("\", \"").append(paramName)
+							.append("\", \"").append(errorCode).append("\", arguments").append(getCurrentArgCounter())
+							.append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
         }
     }
 
@@ -5899,6 +5991,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     private static final Pattern URI_PATTERN = Pattern.compile("^https?://.*");
                     private static final Pattern UUID_PATTERN = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
                 
+                    private static final long INT32_MIN = -2147483648L;
+                    private static final long INT32_MAX = 2147483647L;
+                
                     public FormatValidator(String parameterName, String format, String l10nKey, List<String> arguments,
                         List<String> localizedArguments, String nameSpace, boolean isArray)
                     {
@@ -5940,8 +6035,72 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                     }
                                 }
                             }
+                            else if (isNumericFormat(format))
+                            {
+                                if (isArray)
+                                {
+                                    String[] items = input.split(",");
+                                    for (String item : items)
+                                    {
+                                        if (!validateNumericFormat(format, item.trim()))
+                                        {
+                                            return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    if (!validateNumericFormat(format, input.trim()))
+                                    {
+                                        return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                    }
+                                }
+                            }
                         }
                         return null;
+                    }
+                
+                    private boolean isNumericFormat(String format)
+                    {
+                        if (format == null) return false;
+                        String f = format.toLowerCase();
+                        return "int32".equals(f) || "int64".equals(f) || "float".equals(f) || "double".equals(f);
+                    }
+                
+                    private boolean validateNumericFormat(String format, String input)
+                    {
+                        if (input == null || input.isEmpty()) return true;
+                        try
+                        {
+                            switch (format.toLowerCase())
+                            {
+                                case "int32" ->
+                                {
+                                    long v = Long.parseLong(input);
+                                    return v >= INT32_MIN && v <= INT32_MAX;
+                                }
+                                case "int64" ->
+                                {
+                                    Long.parseLong(input);
+                                    return true;
+                                }
+                                case "float" ->
+                                {
+                                    Float.parseFloat(input);
+                                    return true;
+                                }
+                                case "double" ->
+                                {
+                                    Double.parseDouble(input);
+                                    return true;
+                                }
+                                default -> { return true; }
+                            }
+                        }
+                        catch (NumberFormatException e)
+                        {
+                            return false;
+                        }
                     }
                 
                     private Pattern getPatternForFormat(String format)
@@ -6029,40 +6188,39 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 public class ArrayMaxItemsValidators implements ValidatorAction<RequestInfo>
                 {
                     private final String parameterName;
-                    private final int maxItems;
-                    private final String l10nKey;
-                    private final List<String> arguments;
-                    private final List<String> localizedArgs;
-                    private final String nameSpace;
-                    private final boolean isArray;
-                
-                    public ArrayMaxItemsValidators(String parameterName, int maxItems, String l10nKey, List<String> arguments,
-                        List<String> localizedArguments, String nameSpace, boolean isArray)
-                    {
-                        this.parameterName = parameterName;
-                        this.maxItems = maxItems;
-                        this.l10nKey = l10nKey;
-                        this.arguments = new ArrayList<>(arguments);
-                        this.localizedArgs = new ArrayList<>(localizedArguments);
-                        this.nameSpace = nameSpace;
-                        this.isArray = isArray;
-                    }
-                
-                    @Override
-                    public ValidationError call(RequestInfo val)
-                    {
-                        String input = this.nameSpace.equalsIgnoreCase("query") ? Validations.getQueryParameterValue.apply(val, parameterName)
-                            : Validations.getPathParameterValue.apply(val, parameterName);
-                        if (input != null)
-                        {
-                            String[] items = input.split(",");
-                            if (items.length > maxItems)
-                            {
-                                return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
-                            }
-                        }
-                        return null;
-                    }
+					private final String val;
+					private final String l10nKey;
+					private final List<String> arguments;
+					private final List<String> localizedArgs;
+					private final String nameSpace;
+					private final boolean isArray;
+			
+					public ArrayMaxItemsValidators(String parameterName, String val, String l10nKey, List<String> arguments,
+						List<String> localizedArgs, String nameSpace, boolean isArray)
+					{
+						this.parameterName = parameterName;
+						this.val = val;
+						this.l10nKey = l10nKey;
+						this.arguments = new ArrayList<>(arguments);
+						this.localizedArgs = new ArrayList<>(localizedArgs);
+						this.nameSpace = nameSpace;
+						this.isArray = isArray;
+					}
+			
+					@Override
+					public ValidationError call(RequestInfo val)
+					{
+						String input = this.nameSpace.equalsIgnoreCase("query") ? Validations.getQueryParameterValue.apply(val, parameterName)
+										: Validations.getPathParameterValue.apply(val, parameterName);
+						if (input != null && !Validations.hasMaxItems.apply(input.split(","),
+										this.val))
+						{
+							return ValidationErrorHelper.createValidationError(l10nKey,
+											arguments,
+											localizedArgs);
+						}
+						return null;
+					}
                 }
                 """, packageName);
 
@@ -6089,40 +6247,39 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 public class ArrayMinItemsValidator implements ValidatorAction<RequestInfo>
                 {
                     private final String parameterName;
-                    private final int minItems;
-                    private final String l10nKey;
-                    private final List<String> arguments;
-                    private final List<String> localizedArgs;
-                    private final String nameSpace;
-                    private final boolean isArray;
-                
-                    public ArrayMinItemsValidator(String parameterName, int minItems, String l10nKey, List<String> arguments,
-                        List<String> localizedArguments, String nameSpace, boolean isArray)
-                    {
-                        this.parameterName = parameterName;
-                        this.minItems = minItems;
-                        this.l10nKey = l10nKey;
-                        this.arguments = new ArrayList<>(arguments);
-                        this.localizedArgs = new ArrayList<>(localizedArguments);
-                        this.nameSpace = nameSpace;
-                        this.isArray = isArray;
-                    }
-                
-                    @Override
-                    public ValidationError call(RequestInfo val)
-                    {
-                        String input = this.nameSpace.equalsIgnoreCase("query") ? Validations.getQueryParameterValue.apply(val, parameterName)
-                            : Validations.getPathParameterValue.apply(val, parameterName);
-                        if (input != null)
-                        {
-                            String[] items = input.split(",");
-                            if (items.length < minItems)
-                            {
-                                return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
-                            }
-                        }
-                        return null;
-                    }
+					private final String val;
+					private final String l10nKey;
+					private final List<String> arguments;
+					private final List<String> localizedArgs;
+					private final String nameSpace;
+					private final boolean isArray;
+			
+					public ArrayMinItemsValidator(String parameterName, String val, String l10nKey, List<String> arguments,
+						List<String> localizedArgs, String nameSpace, boolean isArray)
+					{
+						this.parameterName = parameterName;
+						this.val = val;
+						this.l10nKey = l10nKey;
+						this.arguments = new ArrayList<>(arguments);
+						this.localizedArgs = new ArrayList<>(localizedArgs);
+						this.nameSpace = nameSpace;
+						this.isArray = isArray;
+					}
+			
+					@Override
+					public ValidationError call(RequestInfo val)
+					{
+						String input = this.nameSpace.equalsIgnoreCase("query") ? Validations.getQueryParameterValue.apply(val, parameterName)
+										: Validations.getPathParameterValue.apply(val, parameterName);
+						if (input != null && !Validations.hasMinItems.apply(input.split(","),
+										this.val))
+						{
+							return ValidationErrorHelper.createValidationError(l10nKey,
+											arguments,
+											localizedArgs);
+						}
+						return null;
+					}
                 }
                 """, packageName);
 
