@@ -518,19 +518,19 @@ public class JerseyGeneratorValidationTest {
         Path maxItemsFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/ArrayMaxItemsValidators.java");
         assertTrue(Files.exists(maxItemsFile), "ArrayMaxItemsValidators should exist");
         String maxItemsContent = Files.readString(maxItemsFile);
-        assertTrue(maxItemsContent.contains("private final int maxItems"),
-            "Should have maxItems as int");
-        assertTrue(maxItemsContent.contains("items.length > maxItems"),
-            "Should check array length > maxItems");
+        assertTrue(maxItemsContent.contains("private final String val"),
+            "Should have max limit as String val");
+        assertTrue(maxItemsContent.contains("Validations.hasMaxItems"),
+            "Should use Validations.hasMaxItems for max items check");
         
         // Test ArrayMinItemsValidator
         Path minItemsFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/ArrayMinItemsValidator.java");
         assertTrue(Files.exists(minItemsFile), "ArrayMinItemsValidator should exist");
         String minItemsContent = Files.readString(minItemsFile);
-        assertTrue(minItemsContent.contains("private final int minItems"),
-            "Should have minItems as int");
-        assertTrue(minItemsContent.contains("items.length < minItems"),
-            "Should check array length < minItems");
+        assertTrue(minItemsContent.contains("private final String val"),
+            "Should have min limit as String val");
+        assertTrue(minItemsContent.contains("Validations.hasMinItems"),
+            "Should use Validations.hasMinItems for min items check");
         
         // Test ArrayUniqueItemsValidators
         Path uniqueItemsFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/ArrayUniqueItemsValidators.java");
