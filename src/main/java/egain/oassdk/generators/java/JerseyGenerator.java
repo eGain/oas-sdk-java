@@ -2596,8 +2596,13 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 content.append("        this.").append(javaFieldName).append(" = null;\n");
                 content.append("    }\n\n");
             } else {
+				// for primitive types, the field is never null, so isSetXxx() returns true. For objects, check null.
                 content.append("    public boolean isSet").append(capitalizedFieldName).append("() {\n");
-                content.append("        return (this.").append(javaFieldName).append(" != null);\n");
+                if (isJavaPrimitiveType(fieldType)) {
+					content.append("        return true;\n");
+                } else {
+                    content.append("        return (this.").append(javaFieldName).append(" != null);\n");
+                }
                 content.append("    }\n\n");
             }
         }
@@ -2955,7 +2960,11 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 content.append(indentBody).append("}\n\n");
             } else {
                 content.append(indentBody).append("public boolean isSet").append(capitalizedFieldName).append("() {\n");
-                content.append(indentBody).append("    return (").append(javaFieldName).append(" != null);\n");
+                if (isJavaPrimitiveType(fieldType)) {
+					content.append(indentBody).append("    return true;\n");
+                } else {
+                    content.append(indentBody).append("    return (").append(javaFieldName).append(" != null);\n");
+                }
                 content.append(indentBody).append("}\n\n");
             }
         }
@@ -3072,6 +3081,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("    public static class ").append(w.wrapperClassName).append(" implements Serializable, JAXBBean {\n\n");
         content.append("        private static final long serialVersionUID = 1L;\n\n");
         content.append("        @XmlElement(name = \"").append(w.innerPropertyName).append("\")\n");
+		if (isEligibleForCascadingValidation(w.innerPropertyName)) {
+			content.append("        @Valid\n");
+		}
         content.append("        private List<").append(w.itemTypeName).append("> ").append(innerJavaField).append(";\n\n");
         content.append("        public ").append(w.wrapperClassName).append("() {\n");
         content.append("        }\n\n");
@@ -3597,7 +3609,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     /** Types that do not require a model import (primitives, java/javax types, current class). */
     private static final Set<String> MODEL_IMPORT_EXCLUDES = Set.of(
         "Object", "String", "Integer", "Boolean", "Long", "Double", "Float",
-        "List", "Map", "XMLGregorianCalendar", "JAXBElement", "QName");
+        "List", "Map", "XMLGregorianCalendar", "JAXBElement", "QName", "int", "boolean", "long", "double", "float");
 
     /**
      * Add referenced model type names from a field type string to the given set.
@@ -3925,7 +3937,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     // Build regex pattern that matches any of the enum values (XJC-style: (v1)|(v2)|...).
                     // Structural parentheses are appended as literals and only enum value content is escaped,
                     // so the regex uses grouping parentheses, not literal "(" and ")".
-                    StringBuilder enumPattern = new StringBuilder("^");
+                    StringBuilder enumPattern = new StringBuilder();
                     for (int i = 0; i < enumValues.size(); i++) {
                         if (i > 0) {
                             enumPattern.append("|");
@@ -3949,7 +3961,6 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                 .replace("\"", "\\\"");
                         enumPattern.append("(").append(enumValue).append(")");
                     }
-                    enumPattern.append("$");
                     String enumPatternStr = escapePatternForJavaStringLiteral(enumPattern.toString());
                     annotations.append("@Pattern(regexp = \"").append(enumPatternStr).append("\")\n    ");
                 }
@@ -4020,24 +4031,6 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 						annotations.append("@Max(value = ").append(maximum).append(")\n    ");
 					}
                 }
-
-                // Positive/negative constraints
-                if (minimumObj != null) {
-                    long minimum = getLongValue(minimumObj);
-                    if (minimum > 0) {
-                        annotations.append("@Positive\n    ");
-                    } else if (minimum == 0) {
-                        annotations.append("@PositiveOrZero\n    ");
-                    }
-                }
-                if (maximumObj != null) {
-                    long maximum = getLongValue(maximumObj);
-                    if (maximum < 0) {
-                        annotations.append("@Negative\n    ");
-                    } else if (maximum == 0) {
-                        annotations.append("@NegativeOrZero\n    ");
-                    }
-                }
             }
 
 
@@ -4059,24 +4052,6 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     boolean exclusiveMaximum = Boolean.TRUE.equals(schema.get("exclusiveMaximum"));
                     String maxValue = String.format("%.10f", exclusiveMaximum ? maximum - Double.MIN_VALUE : maximum);
                     annotations.append("@DecimalMax(value = \"").append(maxValue).append("\")\n    ");
-                }
-
-                // Positive/negative constraints
-                if (minimumObj != null) {
-                    double minimum = getDoubleValue(minimumObj);
-                    if (minimum > 0) {
-                        annotations.append("@Positive\n    ");
-                    } else if (minimum == 0) {
-                        annotations.append("@PositiveOrZero\n    ");
-                    }
-                }
-                if (maximumObj != null) {
-                    double maximum = getDoubleValue(maximumObj);
-                    if (maximum < 0) {
-                        annotations.append("@Negative\n    ");
-                    } else if (maximum == 0) {
-                        annotations.append("@NegativeOrZero\n    ");
-                    }
                 }
             }
 
@@ -4391,6 +4366,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
         String type = (String) schema.get("type");
         String format = (String) schema.get("format");
+		boolean nullable = schema.containsKey("nullable") && Boolean.parseBoolean((String) schema.get("nullable"));
 
         switch (type) {
             case "string" -> {
@@ -4404,16 +4380,28 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             }
             case "integer" -> {
                 if ("int64".equals(format)) {
-                    return "Long";
+					if(schema.containsKey("default") || nullable)
+						return "Long";
+					 else
+                    	return "long";
                 } else {
-                    return "Integer";
+					if(schema.containsKey("default") || nullable)
+						return "Integer";
+					else
+						return "int";
                 }
             }
             case "number" -> {
                 if ("float".equals(format)) {
-                    return "Float";
+					if(schema.containsKey("default") || nullable)
+						return "Float";
+					else
+						return "float";
                 } else {
-                    return "Double";
+					if(schema.containsKey("default") || nullable)
+						return "Double";
+					else
+						return "double";
                 }
             }
             case "boolean" -> {
@@ -4577,6 +4565,14 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             case "int", "long", "boolean", "double", "float", "short", "byte", "char",
                  "Integer", "Long", "Boolean", "Double", "Float", "Short", "Byte", "Character",
                  "String" -> true;
+            default -> false;
+        };
+    }
+
+    /** True if fieldType is a Java primitive (not boxed). Used for isSetXxx(): primitives use default-value check. */
+    private static boolean isJavaPrimitiveType(String fieldType) {
+        return switch (fieldType) {
+            case "int", "long", "boolean", "double", "float", "short", "byte", "char" -> true;
             default -> false;
         };
     }
@@ -4802,10 +4798,12 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
                     // Get operation ID for method name
                     String operationId = (String) operation.get("operationId");
-                    String methodName = generateValidatorMethodName(operationId, method, path, methodNameCounters);
+                    String methodName = generateValidatorMethodName(operationId, method, path, packageName, methodNameCounters);
 
                     // Generate validator method content
                     String validatorMethod = generateValidatorMethod(methodName, params);
+					if(validatorMethod.isBlank())
+						continue; // skip if no query/path parameters to validate
 
                     validators.add(new EndpointValidator(fullPath, method.toUpperCase(Locale.ROOT), methodName, validatorMethod));
                 }
@@ -4837,7 +4835,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
     /**
      * Generate validator method name from operation ID, HTTP method, and path
      */
-    private String generateValidatorMethodName(String operationId, String method, String path, Map<String, Integer> counters) {
+    private String generateValidatorMethodName(String operationId, String method, String path, String packageName, Map<String, Integer> counters) {
         String baseName;
 
         if (operationId != null && !operationId.isEmpty()) {
@@ -4864,7 +4862,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             baseName = baseName + "_" + count;
         }
 
-        return baseName + method.toUpperCase(Locale.ROOT) + "Parameter_" + (count + 1);
+		String pkgPart = (packageName != null && !packageName.trim().isEmpty()) ? packageName.substring(packageName.lastIndexOf(".")+1) + "_" : "";
+
+        return baseName + method.toUpperCase(Locale.ROOT) + "Parameter_" + pkgPart + (count + 1);
     }
 
     /**
@@ -4879,6 +4879,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
         sb.append("    ValidationBuilder<RequestInfo> v = new ValidationBuilder<>();\n");
 
         List<String> allowedParams = new ArrayList<>();
+		int sbInitLength = sb.length();
 
         // Process parameters
         for (Map<String, Object> param : params) {
@@ -4913,6 +4914,10 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             sb.append(");\n");
             sb.append("    v.add(new AllowedParameterValidator(allowedParameters));\n");
         } else {
+			if(sb.length() == sbInitLength) {
+				// no parameters at all, return empty String
+				return "";
+			}
             sb.append("    v.add(new AllowedParameterValidator(Collections.emptyList()));\n");
         }
 
@@ -4977,6 +4982,27 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                         .append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
             }
 
+			// Format (e.g. email, uuid)
+			if (schema.containsKey("format")){
+				String format = (String) schema.get("format");
+				if (schema.containsKey("pattern")) {
+					String pattern = (String) schema.get("pattern");
+					if (pattern != null) {
+						if (pattern.startsWith("\\b")) pattern = "^" + pattern.substring(2);
+						if (pattern.endsWith("\\b")) pattern = pattern.substring(0, pattern.length() - 2) + "$";
+						format = pattern;
+					}
+				}
+				String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_FORMAT";
+				sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(
+												paramName)
+								.append("\", \"").append(format).append("\");\n");
+				sb.append("    v.add(new FormatValidator(\"").append(paramName).append("\", \"").append(format)
+								.append("\", \"").append(errorCode).append("\", arguments").append(
+												getCurrentArgCounter())
+								.append(", Collections.emptyList(), \"").append(paramType).append("\", false));\n");
+			}
+
             // Enum
             List<?> enumValues = schema.get("enum") instanceof List<?> list ? list : null;
             if (enumValues != null && !enumValues.isEmpty()) {
@@ -5037,7 +5063,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                         .append("\", \"").append(maximum).append("\");\n");
                 sb.append("    v.add(new NumericMaxValidator(\"").append(paramName).append("\", \"").append(maximum)
                         .append("\", \"").append(errorCode).append("\", arguments").append(getCurrentArgCounter())
-                        .append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
+                        .append(", Collections.emptyList(), \"").append(paramType).append("\",false,false));\n");
             }
 
             // Minimum
@@ -5048,7 +5074,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                         .append("\", \"").append(minimum).append("\");\n");
                 sb.append("    v.add(new NumericMinValidator(\"").append(paramName).append("\", \"").append(minimum)
                         .append("\", \"").append(errorCode).append("\", arguments").append(getCurrentArgCounter())
-                        .append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
+                        .append(", Collections.emptyList(), \"").append(paramType).append("\",false,false));\n");
             }
         }
 
@@ -5057,25 +5083,29 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
             // Max items
             if (schema.containsKey("maxItems")) {
                 Object maxItems = schema.get("maxItems");
-				getNextArgCounter();//call this to keep argument counter correct
-                sb.append("    v.add(new ArrayMaxItemsValidators(\"").append(paramName).append("\", \"")
-                        .append(maxItems).append("\", \"L10N_INVALID_VALUE_FOR_ARRAY_MAX_ITEMS\", Collections.emptyList(), Collections.emptyList(), \"")
-                        .append(paramType).append("\",false));\n");
+				String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_MORE_THAN_MAX_ITEMS";
+				sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(paramName)
+								.append("\", \"").append(maxItems).append("\");\n");
+				sb.append("    v.add(new ArrayMaxItemsValidators(\"").append(paramName).append("\", \"").append(maxItems)
+								.append("\", \"").append(errorCode).append("\", arguments").append(getCurrentArgCounter())
+								.append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
             }
 
             // Min items
             if (schema.containsKey("minItems")) {
                 Object minItems = schema.get("minItems");
-				getNextArgCounter();//call this to keep argument counter correct
-                sb.append("    v.add(new ArrayMinItemsValidator(\"").append(paramName).append("\", \"")
-                        .append(minItems).append("\", \"L10N_INVALID_VALUE_FOR_ARRAY_MIN_ITEMS\", Collections.emptyList(), Collections.emptyList(), \"")
-                        .append(paramType).append("\",false));\n");
+				String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_LESS_THAN_MIN_ITEMS";
+				sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(paramName)
+								.append("\", \"").append(minItems).append("\");\n");
+				sb.append("    v.add(new ArrayMinItemsValidator(\"").append(paramName).append("\", \"").append(minItems)
+								.append("\", \"").append(errorCode).append("\", arguments").append(getCurrentArgCounter())
+								.append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
             }
 
-            // Enum on items: validate each array element against allowed values
             if (schema.containsKey("items")) {
                 Map<String, Object> itemsSchema = Util.asStringObjectMap(schema.get("items"));
                 if (itemsSchema != null) {
+					// Enum on items: validate each array element against allowed values
                     List<?> enumValues = itemsSchema.get("enum") instanceof List<?> list ? list : null;
                     if (enumValues != null && !enumValues.isEmpty()) {
                         StringBuilder enumStr = new StringBuilder();
@@ -5088,6 +5118,17 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                                 .append("\", \"L10N_INVALID_VALUE_FOR_ENUM_ATTRIBUTE\", Collections.emptyList(), Collections.emptyList(), \"")
                                 .append(paramType).append("\", true));\n");
                     }
+
+					// Pattern
+					if (itemsSchema.containsKey("pattern")) {
+						String pattern = (String) itemsSchema.get("pattern");
+						String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_PATTERN";
+						sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(paramName)
+										.append("\", \"").append(escapePatternForJavaStringLiteral(pattern)).append("\");\n");
+						sb.append("    v.add(new PatternValidator(\"").append(paramName).append("\", \"").append(escapePatternForJavaStringLiteral(pattern))
+										.append("\", \"").append(errorCode).append("\", arguments").append(getCurrentArgCounter())
+										.append(", Collections.emptyList(), \"").append(paramType).append("\",true));\n");
+					}
                 }
             }
         }
@@ -5213,7 +5254,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                     .append("\", \"").append(validator.httpMethod).append("\"), QueryParamValidators::")
                     .append(validator.methodName);
             if (i < validators.size() - 1) {
-                content.append(") ,\n");
+                content.append("),\n");
             } else {
                 content.append(")\n");
             }
@@ -5589,60 +5630,65 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 public class NumericMaxValidator implements ValidatorAction<RequestInfo>
                 {
                     private final String parameterName;
-                    private final String maximum;
-                    private final String l10nKey;
-                    private final List<String> arguments;
-                    private final List<String> localizedArgs;
-                    private final String nameSpace;
-                    private final boolean isArray;
-                
-                    public NumericMaxValidator(String parameterName, String maximum, String l10nKey, List<String> arguments,
-                        List<String> localizedArguments, String nameSpace, boolean isArray)
-                    {
-                        this.parameterName = parameterName;
-                        this.maximum = maximum;
-                        this.l10nKey = l10nKey;
-                        this.arguments = new ArrayList<>(arguments);
-                        this.localizedArgs = new ArrayList<>(localizedArguments);
-                        this.nameSpace = nameSpace;
-                        this.isArray = isArray;
-                    }
-                
-                    @Override
-                    public ValidationError call(RequestInfo val)
-                    {
-                        String input = this.nameSpace.equalsIgnoreCase("query") ? Validations.getQueryParameterValue.apply(val, parameterName)
-                            : Validations.getPathParameterValue.apply(val, parameterName);
-                        if (input != null)
-                        {
-                            try {
-                                double maxVal = Double.parseDouble(maximum);
-                                if (isArray)
-                                {
-                                    String[] items = input.split(",");
-                                    for (String item : items)
-                                    {
-                                        double val = Double.parseDouble(item.trim());
-                                        if (val > maxVal)
-                                        {
-                                            return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    double val = Double.parseDouble(input);
-                                    if (val > maxVal)
-                                    {
-                                        return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
-                                    }
-                                }
-                            } catch (NumberFormatException e) {
-                                // Invalid number format, skip validation
-                            }
-                        }
-                        return null;
-                    }
+					private final String val;
+					private final String l10nKey;
+					private final List<String> arguments;
+					private final List<String> localizedArgs;
+					private final String nameSpace;
+					private final boolean isExclusive;
+					private final boolean isArray;
+			
+					public NumericMaxValidator(String parameterName, String val, String l10nKey, List<String> arguments,
+						List<String> localizedArgs, String nameSpace, boolean isExclusive, boolean isArray)
+					{
+						this.parameterName = parameterName;
+						this.val = val;
+						this.l10nKey = l10nKey;
+						this.arguments = new ArrayList<>(arguments);
+						this.localizedArgs = new ArrayList<>(localizedArgs);
+						this.nameSpace = nameSpace;
+						this.isExclusive = isExclusive;
+						this.isArray = isArray;
+					}
+			
+					@Override
+					public ValidationError call(RequestInfo val)
+					{
+						String input = this.nameSpace.equalsIgnoreCase("query") ? Validations.getQueryParameterValue.apply(val, parameterName)
+							: Validations.getPathParameterValue.apply(val, parameterName);
+						if (input == null)
+						{
+							return null;
+						}
+			
+						if (isArray)
+						{
+							String[] items = input.split(",");
+							for (String item : items)
+							{
+								if (isExclusive && Validations.isGreaterThanOrEqualTo.apply(item, this.val))
+								{
+									return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+								}
+								else if (!isExclusive && Validations.isGreaterThan.apply(item, this.val))
+								{
+									return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+								}
+							}
+						}
+						else
+						{
+							if (isExclusive && Validations.isGreaterThanOrEqualTo.apply(input, this.val))
+							{
+								return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+							}
+							else if (!isExclusive && Validations.isGreaterThan.apply(input, this.val))
+							{
+								return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+							}
+						}
+						return null;
+					}
                 }
                 """, packageName);
 
@@ -5669,60 +5715,65 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 public class NumericMinValidator implements ValidatorAction<RequestInfo>
                 {
                     private final String parameterName;
-                    private final String minimum;
-                    private final String l10nKey;
-                    private final List<String> arguments;
-                    private final List<String> localizedArgs;
-                    private final String nameSpace;
-                    private final boolean isArray;
-                
-                    public NumericMinValidator(String parameterName, String minimum, String l10nKey, List<String> arguments,
-                        List<String> localizedArguments, String nameSpace, boolean isArray)
-                    {
-                        this.parameterName = parameterName;
-                        this.minimum = minimum;
-                        this.l10nKey = l10nKey;
-                        this.arguments = new ArrayList<>(arguments);
-                        this.localizedArgs = new ArrayList<>(localizedArguments);
-                        this.nameSpace = nameSpace;
-                        this.isArray = isArray;
-                    }
-                
-                    @Override
-                    public ValidationError call(RequestInfo val)
-                    {
-                        String input = this.nameSpace.equalsIgnoreCase("query") ? Validations.getQueryParameterValue.apply(val, parameterName)
-                            : Validations.getPathParameterValue.apply(val, parameterName);
-                        if (input != null)
-                        {
-                            try {
-                                double minVal = Double.parseDouble(minimum);
-                                if (isArray)
-                                {
-                                    String[] items = input.split(",");
-                                    for (String item : items)
-                                    {
-                                        double val = Double.parseDouble(item.trim());
-                                        if (val < minVal)
-                                        {
-                                            return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    double val = Double.parseDouble(input);
-                                    if (val < minVal)
-                                    {
-                                        return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
-                                    }
-                                }
-                            } catch (NumberFormatException e) {
-                                // Invalid number format, skip validation
-                            }
-                        }
-                        return null;
-                    }
+					private final String val;
+					private final String l10nKey;
+					private final List<String> arguments;
+					private final List<String> localizedArgs;
+					private final String nameSpace;
+					private final boolean isExclusive;
+					private final boolean isArray;
+			
+					public NumericMinValidator(String parameterName, String val, String l10nKey, List<String> arguments,
+						List<String> localizedArgs, String nameSpace, boolean isExclusive, boolean isArray)
+					{
+						this.parameterName = parameterName;
+						this.val = val;
+						this.l10nKey = l10nKey;
+						this.arguments = new ArrayList<>(arguments);
+						this.localizedArgs = new ArrayList<>(localizedArgs);
+						this.nameSpace = nameSpace;
+						this.isExclusive = isExclusive;
+						this.isArray = isArray;
+					}
+			
+					@Override
+					public ValidationError call(RequestInfo val)
+					{
+						String input = this.nameSpace.equalsIgnoreCase("query") ? Validations.getQueryParameterValue.apply(val, parameterName)
+							: Validations.getPathParameterValue.apply(val, parameterName);
+						if (input == null)
+						{
+							return null;
+						}
+			
+						if (isArray)
+						{
+							String[] items = input.split(",");
+							for (String item : items)
+							{
+								if (isExclusive && Validations.isLessThanOrEqualTo.apply(item, this.val))
+								{
+									return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+								}
+								else if (!isExclusive && Validations.isLessThan.apply(item, this.val))
+								{
+									return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+								}
+							}
+						}
+						else
+						{
+							if (isExclusive && Validations.isLessThanOrEqualTo.apply(input, this.val))
+							{
+								return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+							}
+							else if (!isExclusive && Validations.isLessThan.apply(input, this.val))
+							{
+								return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+							}
+						}
+						return null;
+					}
                 }
                 """, packageName);
 
