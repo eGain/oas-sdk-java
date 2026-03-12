@@ -476,23 +476,27 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        // Test NumericMaxValidator
+        // Test NumericMaxValidator (uses Validations comparators with string val)
         Path maxValidatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/NumericMaxValidator.java");
         assertTrue(Files.exists(maxValidatorFile), "NumericMaxValidator should exist");
         String maxContent = Files.readString(maxValidatorFile);
-        assertTrue(maxContent.contains("Double.parseDouble(maximum)"),
-            "NumericMaxValidator should parse maximum as double");
-        assertTrue(maxContent.contains("val > maxVal"),
-            "NumericMaxValidator should check if value > maxVal");
+        assertTrue(maxContent.contains("Validations.isGreaterThan"),
+            "NumericMaxValidator should use Validations.isGreaterThan");
+        assertTrue(maxContent.contains("Validations.isGreaterThanOrEqualTo"),
+            "NumericMaxValidator should use Validations.isGreaterThanOrEqualTo for exclusive max");
+        assertTrue(maxContent.contains("private final String val"),
+            "NumericMaxValidator should have max limit as String val");
         
-        // Test NumericMinValidator
+        // Test NumericMinValidator (uses Validations comparators with string val)
         Path minValidatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/NumericMinValidator.java");
         assertTrue(Files.exists(minValidatorFile), "NumericMinValidator should exist");
         String minContent = Files.readString(minValidatorFile);
-        assertTrue(minContent.contains("Double.parseDouble(minimum)"),
-            "NumericMinValidator should parse minimum as double");
-        assertTrue(minContent.contains("val < minVal"),
-            "NumericMinValidator should check if value < minVal");
+        assertTrue(minContent.contains("Validations.isLessThan"),
+            "NumericMinValidator should use Validations.isLessThan");
+        assertTrue(minContent.contains("Validations.isLessThanOrEqualTo"),
+            "NumericMinValidator should use Validations.isLessThanOrEqualTo for exclusive min");
+        assertTrue(minContent.contains("private final String val"),
+            "NumericMinValidator should have min limit as String val");
         
         // Test NumericMultipleOfValidator
         Path multipleOfValidatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/NumericMultipleOfValidator.java");
