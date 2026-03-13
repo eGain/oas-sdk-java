@@ -404,6 +404,19 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${jacoco.version}</version>
+                <configuration>
+                    <!-- Exclude placeholder/contract interfaces with no executable logic -->
+                    <excludes>
+                        <exclude>egain/oassdk/connectors/APIValidator.class</exclude>
+                        <exclude>egain/oassdk/connectors/RateLimiter.class</exclude>
+                        <exclude>egain/oassdk/connectors/SLAMonitoringController.class</exclude>
+                        <exclude>egain/oassdk/connectors/StaticLimitChecker.class</exclude>
+                        <exclude>egain/oassdk/generators/CodeGenerator.class</exclude>
+                        <exclude>egain/oassdk/generators/ConfigurableGenerator.class</exclude>
+                        <exclude>egain/oassdk/testgenerators/TestGenerator.class</exclude>
+                        <exclude>egain/oassdk/testgenerators/ConfigurableTestGenerator.class</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>

@@ -351,13 +351,15 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         // Add server URLs if available
         if (spec.containsKey("servers")) {
             List<Map<String, Object>> servers = Util.asStringObjectMapList(spec.get("servers"));
-            if (!servers.isEmpty()) {
+            if (servers != null && !servers.isEmpty()) {
                 String serverUrl = (String) servers.getFirst().get("url");
-                variables.add(Map.of(
-                        "key", "base_url",
-                        "value", serverUrl,
-                        "type", "string"
-                ));
+                if (serverUrl != null) {
+                    variables.add(Map.of(
+                            "key", "base_url",
+                            "value", serverUrl,
+                            "type", "string"
+                    ));
+                }
             }
         }
 
@@ -518,17 +520,20 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
      */
     private String getAPITitle(Map<String, Object> spec) {
         Map<String, Object> info = Util.asStringObjectMap(spec.get("info"));
-        return info != null ? (String) info.get("title") : "API";
+        String title = info != null ? (String) info.get("title") : null;
+        return title != null ? title : "API";
     }
 
     private String getAPIVersion(Map<String, Object> spec) {
         Map<String, Object> info = Util.asStringObjectMap(spec.get("info"));
-        return info != null ? (String) info.get("version") : "1.0.0";
+        String version = info != null ? (String) info.get("version") : null;
+        return version != null ? version : "1.0.0";
     }
 
     private String getAPIDescription(Map<String, Object> spec) {
         Map<String, Object> info = Util.asStringObjectMap(spec.get("info"));
-        return info != null ? (String) info.get("description") : "Generated API";
+        String desc = info != null ? (String) info.get("description") : null;
+        return desc != null ? desc : "Generated API";
     }
 
     private String getOperationTag(Map<String, Object> operation) {
