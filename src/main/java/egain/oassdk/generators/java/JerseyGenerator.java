@@ -4366,7 +4366,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
         String type = (String) schema.get("type");
         String format = (String) schema.get("format");
-		boolean nullable = schema.containsKey("nullable") && Boolean.parseBoolean((String) schema.get("nullable"));
+        Object nullableVal = schema.get("nullable");
+		boolean nullable = schema.containsKey("nullable") && (nullableVal instanceof Boolean ? (Boolean) nullableVal :
+						nullableVal instanceof String && Boolean.parseBoolean((String) nullableVal));
 
         switch (type) {
             case "string" -> {
