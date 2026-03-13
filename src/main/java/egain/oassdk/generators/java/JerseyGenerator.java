@@ -4011,7 +4011,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 						++minimum;
                     }
 					if(isLongValue){
-						annotations.append("@DecimalMin(value = \"").append(minimum).append("\")\n    ");
+						annotations.append("@Min(value = ").append(minimum).append("L)\n    ");
 					}else{
 						annotations.append("@Min(value = ").append(minimum).append(")\n    ");
 					}
@@ -4026,7 +4026,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                         --maximum;
                     }
 					if(isLongValue){
-						annotations.append("@DecimalMax(value = \"").append(maximum).append("\")\n    ");
+						annotations.append("@Max(value = ").append(maximum).append("L)\n    ");
 					}else{
 						annotations.append("@Max(value = ").append(maximum).append(")\n    ");
 					}
