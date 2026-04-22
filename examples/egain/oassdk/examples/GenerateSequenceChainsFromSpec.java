@@ -1,8 +1,9 @@
 package egain.oassdk.examples;
 
+import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.exceptions.OASSDKException;
 import egain.oassdk.core.parser.OASParser;
-import egain.oassdk.test.sequence.RandomizedSequenceTester;
+import egain.oassdk.testgenerators.sequence.SequenceChainTestGenerator;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,21 +15,24 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Loads an OpenAPI YAML from disk, resolves external {@code $ref}s using a search root, and emits
- * randomized sequence test (RST) Java sources via {@link RandomizedSequenceTester}.
+ * Loads an OpenAPI YAML from disk, resolves external {@code $ref}s using a
+ * search root, and emits a pytest bundle of enumerated API-call chains via
+ * {@link SequenceChainTestGenerator}.
  * <p>
- * Run from the oas-sdk-java repo root. Prefer environment variables so shells do not split paths on spaces:
- * {@code RST_SPEC_PATH}, {@code RST_SEARCH_ROOT}, {@code RST_OUTPUT_DIR}, optional {@code RST_BASE_URL}; then run
- * {@code mvn -q exec:java} (see {@code exec-maven-plugin} {@code mainClass} in {@code pom.xml}).
+ * Run from the repo root. Prefer environment variables so shells do not split
+ * paths on spaces: {@code SEQUENCE_SPEC_PATH},
+ * {@code SEQUENCE_SEARCH_ROOT}, {@code SEQUENCE_OUTPUT_DIR}, optional
+ * {@code SEQUENCE_BASE_URL}; then run {@code mvn -q exec:java} (see the
+ * {@code exec-maven-plugin} {@code mainClass} in {@code pom.xml}).
  * <p>
- * Or program arguments: {@code specPath searchRoot outputDir [baseUrl]}. If {@code baseUrl} is omitted, defaults to
- * {@code https://localhost/knowledge/contentmgr/v4}.
+ * Or positional program arguments:
+ * {@code specPath searchRoot outputDir [baseUrl]}. If {@code baseUrl} is
+ * omitted, the generator falls back to the spec's first
+ * {@code servers[].url} or {@code http://localhost:8080}.
  */
-public final class GenerateRstFromPublishedSpec {
+public final class GenerateSequenceChainsFromSpec {
 
-    private static final String DEFAULT_BASE_URL = "https://localhost/knowledge/contentmgr/v4";
-
-    private GenerateRstFromPublishedSpec() {
+    private GenerateSequenceChainsFromSpec() {
     }
 
     public static void main(String[] args) {
@@ -40,29 +44,26 @@ public final class GenerateRstFromPublishedSpec {
             specPath = Objects.requireNonNull(args[0], "specPath").trim();
             searchRoot = Objects.requireNonNull(args[1], "searchRoot").trim();
             outputDir = Objects.requireNonNull(args[2], "outputDir").trim();
-            baseUrl = args.length >= 4 && !args[3].isBlank() ? args[3].trim() : DEFAULT_BASE_URL;
+            baseUrl = args.length >= 4 && !args[3].isBlank() ? args[3].trim() : null;
         } else if (args.length == 0) {
-            specPath = trimOrNull(System.getenv("RST_SPEC_PATH"));
-            searchRoot = trimOrNull(System.getenv("RST_SEARCH_ROOT"));
-            outputDir = trimOrNull(System.getenv("RST_OUTPUT_DIR"));
-            String envBase = trimOrNull(System.getenv("RST_BASE_URL"));
-            baseUrl = envBase != null ? envBase : DEFAULT_BASE_URL;
+            specPath = trimOrNull(System.getenv("SEQUENCE_SPEC_PATH"));
+            searchRoot = trimOrNull(System.getenv("SEQUENCE_SEARCH_ROOT"));
+            outputDir = trimOrNull(System.getenv("SEQUENCE_OUTPUT_DIR"));
+            baseUrl = trimOrNull(System.getenv("SEQUENCE_BASE_URL"));
             if (specPath == null || searchRoot == null || outputDir == null) {
-                System.err.println("Usage: GenerateRstFromPublishedSpec <specPath> <searchRoot> <outputDir> [baseUrl]");
-                System.err.println("Or set env RST_SPEC_PATH, RST_SEARCH_ROOT, RST_OUTPUT_DIR, optional RST_BASE_URL and run with no args.");
+                printUsage();
                 System.exit(1);
                 return;
             }
         } else {
-            System.err.println("Usage: GenerateRstFromPublishedSpec <specPath> <searchRoot> <outputDir> [baseUrl]");
-            System.err.println("Or set env RST_SPEC_PATH, RST_SEARCH_ROOT, RST_OUTPUT_DIR, optional RST_BASE_URL and run with no args.");
+            printUsage();
             System.exit(1);
             return;
         }
 
         try {
             run(specPath, searchRoot, outputDir, baseUrl);
-            System.out.println("RST generation finished: " + outputDir);
+            System.out.println("Sequence chain generation finished: " + outputDir);
         } catch (OASSDKException e) {
             System.err.println(e.getMessage());
             if (e.getCause() != null) {
@@ -91,7 +92,17 @@ public final class GenerateRstFromPublishedSpec {
         map = parser.resolveReferences(map, specKey);
 
         Files.createDirectories(Paths.get(outputDir));
-        new RandomizedSequenceTester().generateSequenceTests(map, outputDir, baseUrl);
+        TestConfig.Builder tc = TestConfig.builder().language("python").framework("pytest");
+        if (baseUrl != null) {
+            tc.additionalProperties(Map.of("sequence.baseUrl", baseUrl));
+        }
+        new SequenceChainTestGenerator().generate(map, outputDir, tc.build());
+    }
+
+    private static void printUsage() {
+        System.err.println("Usage: GenerateSequenceChainsFromSpec <specPath> <searchRoot> <outputDir> [baseUrl]");
+        System.err.println("Or set env SEQUENCE_SPEC_PATH, SEQUENCE_SEARCH_ROOT, SEQUENCE_OUTPUT_DIR,");
+        System.err.println("optional SEQUENCE_BASE_URL and run with no args.");
     }
 
     private static String trimOrNull(String s) {

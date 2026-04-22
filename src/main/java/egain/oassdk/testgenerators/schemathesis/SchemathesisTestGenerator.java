@@ -44,6 +44,9 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
             [phases.coverage]
             unexpected-methods = ["GET", "PUT", "POST", "DELETE", "OPTIONS", "PATCH"]
 
+            [phases.stateful]
+            max-steps = 10
+
             [checks.missing_required_header]
             expected-statuses = [400]
             """;
@@ -132,7 +135,7 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
         m.put("RATE_LIMIT", propString(config, "schemathesis.rateLimit", "10000/m"));
         m.put("CHECKS", propString(config, "schemathesis.checks", "all"));
         m.put("MODE", propString(config, "schemathesis.mode", "all"));
-        m.put("PHASES", propString(config, "schemathesis.phases", "coverage"));
+        m.put("PHASES", propString(config, "schemathesis.phases", "coverage,stateful"));
         m.put("HEADER_ACCEPT", propString(config, "schemathesis.headerAccept", "Accept: application/json"));
         m.put("HEADER_ACCEPT_LANG", propString(config, "schemathesis.headerAcceptLanguage", "Accept-language: en-US"));
         m.put("HEADER_AUTH", propString(config, "schemathesis.headerAuthorization", "Authorization: %TOKEN%"));
@@ -211,7 +214,7 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
                 RATE_LIMIT="$(get_prop RATE_LIMIT '10000/m')"
                 CHECKS="$(get_prop CHECKS 'all')"
                 MODE="$(get_prop MODE 'all')"
-                PHASES="$(get_prop PHASES 'coverage')"
+                PHASES="$(get_prop PHASES 'coverage,stateful')"
                 HEADER_ACCEPT="$(get_prop HEADER_ACCEPT 'Accept: application/json')"
                 HEADER_ACCEPT_LANG="$(get_prop HEADER_ACCEPT_LANG 'Accept-language: en-US')"
                 HEADER_AUTH="$(get_prop HEADER_AUTH 'Authorization: %TOKEN%')"
@@ -262,7 +265,7 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
                 
                 - `openapi.yaml` — OpenAPI document used by Schemathesis (from the SDK parse/filter pipeline).
                 - `schemathesis.properties` — paths and options; CI placeholders such as `%BASEURL%`, `%TOKEN%`, `%HUB%`, `%DOT%`, `%BUILD_NUMBER%` are left literal for your build server to replace.
-                - `schemathesis.toml` — Schemathesis project config (coverage phase unexpected HTTP methods; `missing_required_header` check expects HTTP 400).
+                - `schemathesis.toml` — Schemathesis project config: coverage-phase unexpected HTTP methods, stateful phase (max-steps 10) for random producer-consumer workflows, and the `missing_required_header` check.
                 - `run-schemathesis.sh` — runs `st run` with JUnit and VCR outputs; honors `TLS_VERIFY` (default in bundle: verify off for dev via `--tls-verify=false`; set `TLS_VERIFY=true` for production).
                 - Optional `schemathesis.local.properties` — shell-sourced before the run; use for local secrets (do not commit).
                 

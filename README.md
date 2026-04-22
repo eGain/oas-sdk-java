@@ -2157,18 +2157,17 @@ For support and questions:
   - [x] Additional format support: password, byte, binary, hostname, ipv4, ipv6
   - [x] Recursion depth limit for circular schemas
   - [x] Public `generateRequestBodyJson()` API for integration with test generators
-- [x] OAS-driven randomized sequential testing
+- [x] OAS-driven sequence chain testing (test type `sequence`, Python/pytest)
   - [x] Endpoints extracted from spec paths (not hardcoded)
-  - [x] Request bodies generated from OAS schemas
-  - [x] Dependency graph inferred from path parameters
-  - [x] Jackson-based JSON parsing (replaces string manipulation)
-  - [x] PATCH/HEAD/OPTIONS support
-  - [x] Automatic cleanup/teardown sequences
-  - [x] Seed-based reproducibility
-  - [x] Path templates (`{folderID}`, and so on), query maps, per-call expected HTTP status, optional unauthenticated client
-  - [x] `Location` header and JSON body ID extraction into state for chained calls
-  - [x] Integrated-style scenario tests and `generateScenarioBiasedSequence` in generated `RandomSequenceGenerator`
-  - [x] `egain.oassdk.examples.GenerateRstFromPublishedSpec`: parse + resolve `$ref` with a search root, emit RST sources (use env `RST_SPEC_PATH`, `RST_SEARCH_ROOT`, `RST_OUTPUT_DIR`, optional `RST_BASE_URL`, then `mvn exec:java`; avoids shell quoting issues)
+  - [x] Enumerates every valid workflow chain per resource (creator + consumer permutations)
+  - [x] Chains are valid by construction — every emitted test expects `2xx` at every step; no permissive gate
+  - [x] Delete-terminal and no-repeats rules enforced at generation time
+  - [x] Path templates resolved to a `resource_id` extracted from the creator response
+  - [x] Request bodies generated from OAS schemas (single-level; delegate to Schemathesis for nested/`oneOf`/formats)
+  - [x] Env-var runtime config: `API_BASE_URL`, `API_TOKEN`
+  - [x] Companion Schemathesis bundle with stateful phase enabled by default for random/property-based coverage
+  - [x] `egain.oassdk.examples.GenerateSequenceChainsFromSpec`: parse + resolve `$ref` with a search root, emit the pytest bundle (use env `SEQUENCE_SPEC_PATH`, `SEQUENCE_SEARCH_ROOT`, `SEQUENCE_OUTPUT_DIR`, optional `SEQUENCE_BASE_URL`, then `mvn exec:java`; avoids shell quoting issues)
+  - [x] Design rationale and worked examples: [`docs/sequence-chain-tests.md`](docs/sequence-chain-tests.md)
 - [x] Enhanced test generation
   - [x] Schema-derived request bodies in integration tests
   - [x] Response schema validation (required fields, type checks)

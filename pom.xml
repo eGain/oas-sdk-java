@@ -262,14 +262,15 @@
                 </executions>
             </plugin>
 
-            <!-- RST: set RST_SPEC_PATH, RST_SEARCH_ROOT, RST_OUTPUT_DIR, optional RST_BASE_URL, then mvn -q exec:java.
+            <!-- Sequence chain generation: set SEQUENCE_SPEC_PATH, SEQUENCE_SEARCH_ROOT, SEQUENCE_OUTPUT_DIR,
+                 optional SEQUENCE_BASE_URL, then mvn -q exec:java.
                  Override main: mvn -q exec:java -Dexec.mainClass=fully.qualified.Main -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.0</version>
                 <configuration>
-                    <mainClass>egain.oassdk.examples.GenerateRstFromPublishedSpec</mainClass>
+                    <mainClass>egain.oassdk.examples.GenerateSequenceChainsFromSpec</mainClass>
                     <jvmArgs>-Xmx4g</jvmArgs>
                 </configuration>
             </plugin>

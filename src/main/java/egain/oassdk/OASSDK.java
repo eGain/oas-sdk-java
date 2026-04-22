@@ -391,7 +391,7 @@ public class OASSDK implements AutoCloseable {
     /**
      * Generate test suite
      *
-     * @param testTypes List of test types (unit, integration, nfr, performance, security, postman, schemathesis, mock_data, etc.)
+     * @param testTypes List of test types (unit, integration, nfr, performance, security, postman, schemathesis, sequence, mock_data, etc.)
      * @param outputDir Output directory for generated tests
      * @return This SDK instance for method chaining
      * @throws OASSDKException if generation fails
@@ -653,7 +653,7 @@ public class OASSDK implements AutoCloseable {
             // Generate tests
             if (testConfig != null) {
                 generateTests(
-                        List.of("unit", "integration", "nfr", "performance", "security", "postman", "schemathesis"),
+                        List.of("unit", "integration", "nfr", "performance", "security", "postman", "schemathesis", "sequence"),
                         outputDir + "/tests"
                 );
 
