@@ -21,6 +21,7 @@ import java.util.Objects;
 /**
  * Generates a Schemathesis bundle: resolved OpenAPI YAML, {@code schemathesis.properties}
  * (paths and CI placeholders such as {@code %HUB%}, {@code %BASEURL%}, {@code %TOKEN%}),
+ * {@code schemathesis.toml} (Schemathesis CLI coverage and check defaults),
  * and {@code run-schemathesis.sh} wrapping {@code st run}.
  * <p>Optional {@link TestConfig#getAdditionalProperties()} keys:
  * <ul>
@@ -39,10 +40,18 @@ import java.util.Objects;
  */
 public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTestGenerator {
 
+    private static final String DEFAULT_SCHEMATHESIS_TOML = """
+            [phases.coverage]
+            unexpected-methods = ["GET", "PUT", "POST", "DELETE", "OPTIONS", "PATCH"]
+
+            [checks.missing_required_header]
+            expected-statuses = [400]
+            """;
+
     private TestConfig config;
 
     /**
-     * Directory that holds {@code openapi.yaml}, properties, and scripts for this generator.
+     * Directory that holds {@code openapi.yaml}, properties, {@code schemathesis.toml}, and scripts for this generator.
      */
     public static Path resolveBundleDirectory(String outputDir, TestConfig config) {
         Objects.requireNonNull(outputDir, "outputDir");
@@ -68,6 +77,8 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
         try {
             Path bundleDir = resolveBundleDirectory(outputDir, config);
             Files.createDirectories(bundleDir);
+
+            Files.writeString(bundleDir.resolve("schemathesis.toml"), DEFAULT_SCHEMATHESIS_TOML, StandardCharsets.UTF_8);
 
             String specFileName = propString(config, "schemathesis.specFileName", "openapi.yaml");
             new OpenApiMapYamlWriter().write(spec, bundleDir.resolve(specFileName));
@@ -251,6 +262,7 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
                 
                 - `openapi.yaml` — OpenAPI document used by Schemathesis (from the SDK parse/filter pipeline).
                 - `schemathesis.properties` — paths and options; CI placeholders such as `%BASEURL%`, `%TOKEN%`, `%HUB%`, `%DOT%`, `%BUILD_NUMBER%` are left literal for your build server to replace.
+                - `schemathesis.toml` — Schemathesis project config (coverage phase unexpected HTTP methods; `missing_required_header` check expects HTTP 400).
                 - `run-schemathesis.sh` — runs `st run` with JUnit and VCR outputs; honors `TLS_VERIFY` (default in bundle: verify off for dev via `--tls-verify=false`; set `TLS_VERIFY=true` for production).
                 - Optional `schemathesis.local.properties` — shell-sourced before the run; use for local secrets (do not commit).
                 
@@ -262,6 +274,7 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
                 ```
                 
                 Override defaults by editing `schemathesis.properties` or providing `schemathesis.local.properties`.
+                Edit `schemathesis.toml` for Schemathesis-native settings (phases, checks, and similar).
                 Set `TLS_VERIFY=true` when targeting environments with proper TLS trust stores.
                 """;
     }
