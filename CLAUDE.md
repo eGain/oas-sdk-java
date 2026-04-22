@@ -28,11 +28,17 @@ mvn verify
 # Code coverage report (outputs to target/site/jacoco/)
 mvn verify -Pjacoco
 
-# Static analysis with SpotBugs
+# Release profile — stricter coverage gates (60% line + 50% branch)
+mvn verify -Prelease
+
+# Static analysis with SpotBugs (config in spotbugs-exclude.xml)
 mvn spotbugs:check
 
 # Build fat JAR (shaded, main class: egain.oassdk.cli.OASSDKCLI)
 mvn package
+
+# Run the CLI from the shaded JAR
+java -jar target/oas-sdk-java-*-shaded.jar generate --spec path/to/openapi.yaml --output ./out
 ```
 
 ## Architecture
@@ -51,6 +57,9 @@ mvn package
 - **`testgenerators`** — Test generation via `TestGeneratorFactory`. Subtypes: `unit`, `integration`, `nfr`, `performance`, `security`, `postman`, `schemathesis`, `mock`.
 - **`docs`** — Documentation generation (Swagger UI, Markdown, FreeMarker templates).
 - **`sla`** — SLA enforcement: rate limiting, API gateway policies, Prometheus/Grafana monitoring.
+- **`connectors`** — Runtime helpers pulled into generated apps: `APIValidator`, `RateLimiter`, `StaticLimitChecker`, `SLAMonitoringController`, `BusinessLogicConnector`.
+- **`dev`** — `DevSDK` façade plus `beans`, `docs`, `limits`, `sla`, `validators` helpers used by the generated developer experience.
+- **`test`** — Runtime scaffolding shipped into generated test bundles: `test.schemathesis` (toml/bundle wiring) and `test.sequence` (sequence-test support).
 
 **Main SDK entry point**: `OASSDK.java` (implements `AutoCloseable` for ZIP FileSystem cleanup). Orchestrates parsing → validation → generation pipeline.
 
@@ -64,9 +73,9 @@ mvn package
 - **String operations** use `Locale.ROOT` for locale safety.
 - **Defensive copying** for mutable collections in public APIs.
 
-## Test Resources
+## Test Resources & Examples
 
-OpenAPI test specs live in `src/test/resources/` (openapi1-5.yaml, sla.yaml, etc.). Generated sample projects are in `generated-code/`.
+OpenAPI test specs live in `src/test/resources/` (openapi1-5.yaml, sla.yaml, etc.). Generated sample projects land in `generated-code/`. Runnable library-usage samples (`HelloWorldExample`, `CompleteExample`, `GenerateBundleSDK`) live in `examples/` and consume specs from that same directory.
 
 ## Dependencies
 
@@ -74,6 +83,7 @@ Key libraries: Jackson 2.15.2 (YAML/JSON), Swagger Parser 2.1.16 (OpenAPI parsin
 
 ## Code Quality
 
-- **SpotBugs**: Max effort, Low threshold
-- **JaCoCo**: 50% line coverage minimum (60% line + 50% branch for release profile)
-- **Commit messages**: Start with a verb (Add, Fix, Update, Remove), reference issue numbers
+- **SpotBugs**: Max effort, Low threshold; suppressions in `spotbugs-exclude.xml`.
+- **JaCoCo**: 50% line coverage minimum by default; `release` profile tightens to 60% line + 50% branch.
+- **Tests**: Surefire runs methods in parallel (4 threads); Failsafe runs `*IT.java` / `*IntegrationTest.java` during `verify`.
+- **Commit messages**: Start with a verb (Add, Fix, Update, Remove), reference issue numbers.
