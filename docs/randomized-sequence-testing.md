@@ -11,6 +11,61 @@ Tests: `src/test/java/egain/oassdk/test/sequence/RandomizedSequenceTesterTest.ja
 
 ---
 
+## 0. Read this first — the idea in 60 seconds
+
+**What problem this solves.** You have an OpenAPI spec describing, say, a
+Folder API. Writing end-to-end integration tests by hand is tedious:
+*"create a folder, then read it back, then delete it, then try to read the
+deleted one."* RST does it for you by reading the spec.
+
+**What you give it.** One thing: your OpenAPI spec and a base URL.
+
+```java
+new RandomizedSequenceTester()
+    .generateSequenceTests(spec, "generated/sequence",
+                           "https://api.example.com/v1");
+```
+
+**What it gives back.** A folder of five Java files — a compile-and-run JUnit
+project. You don't write a line of test code.
+
+**How "sequence" works — the one idea to remember.** A *sequence* is just a
+list of API calls run in order. The framework carries a shared `state` map
+across the steps. Whenever a response contains an `id` (or a `Location`
+header), it's stashed in `state`. When a later step has a path like
+`/folders/{folderID}`, the framework fills in `{folderID}` from `state`
+before sending the request.
+
+That one trick — **save the id, reuse it** — is what makes a random pile of
+calls behave like a realistic workflow. Without it, a GET on
+`/folders/{folderID}` could never work because the ID doesn't exist yet.
+
+**How it decides what to call.** Two modes, both driven by the same list of
+endpoints extracted from the spec:
+
+1. **Random** — pick a random endpoint, N times. Rough, fuzz-style.
+2. **Scenario-biased** — 45% of the time splice in a *known-good* little
+   recipe like `[POST /folders, GET /folders/{id}]` instead of one random
+   call. Those recipes are generated from the spec by matching `operationId`s
+   like `createFolder` + `getFolder`.
+
+**A concrete trace — `create then get`.**
+
+| Step | Call sent | What happens in `state` | Why it works |
+| --- | --- | --- | --- |
+| 1 | `POST /folders` body `{"name":"mock_name"}` | Server returns `{"id":"f-123"}`. Framework stores `state = {id: f-123, folderID: f-123}`. | Body mock is auto-generated from the `FolderCreate` schema. The `folderID` key is populated because the spec has a path `/folders/{folderID}` somewhere. |
+| 2 | `GET /folders/f-123?kbLanguage=en-US&$level=0` | Server returns 200. | The path template `/folders/{folderID}` was resolved from `state` *before* the call was sent. `kbLanguage` comes from the enum's first value; `$level` from the schema's `minimum`. |
+| 3 | *(teardown)* `DELETE /folders/f-123` | cleared | Any POST that returned an id is auto-registered for deletion after the test. |
+
+**Where to go next.**
+- **Want to see the actual generated Java for this example?** → §8 (worked example, with real snippets).
+- **Want to know what sources of data the generator reads from the spec?** → §2.
+- **Want to know what the generated framework does at runtime?** → §4.
+- **Curious about the five sequence-building strategies (random / weighted / dependent / stateful / scenario-biased)?** → §3.
+- **"How does it know which random sequences are valid?"** → §9 (short answer: it doesn't, and that's the point).
+
+---
+
 ## 1. Two-stage design
 
 RST operates in two clearly separated stages.
@@ -271,14 +326,14 @@ alongside `unit`/`integration`/`schemathesis`/etc. is a natural extension.
 
 ---
 
-## 8. Worked example
+## 8. Method-by-method walkthrough
 
-The snippets below trace one small spec all the way from parse to runtime.
-Line and file references cite the *generator* (`RandomizedSequenceTester.java`);
-the JAX-RS code in them is what actually lands in the emitted output
-directory.
+This section takes **one YAML**, feeds it into
+`RandomizedSequenceTester`, and walks through **every method on the class in
+the order it runs**, showing for each one: what goes in, what comes out, and
+why. If you only read one section, read this one.
 
-### 8.1 Input spec
+### 8.1 The input YAML we'll trace
 
 A minimal folder API — a single creation endpoint and a single by-ID
 read. This is the shape exercised by `RandomizedSequenceTesterTest.minimalFolderSpec`.
@@ -313,7 +368,7 @@ components:
         name: { type: string }
 ```
 
-### 8.2 Caller
+### 8.2 The caller
 
 ```java
 Map<String, Object> spec = new OASParser().parse(Path.of("folders.yaml"));
@@ -322,94 +377,436 @@ new RandomizedSequenceTester()
                            "https://api.example.com/v1");
 ```
 
-This writes the five `.java` files listed in §1 into `generated/sequence/`.
+One call in. Five `.java` files on disk as output. Everything below happens
+inside that one call.
 
-### 8.3 What `extractAPICallsFromSpec` produces
+---
 
-Two `APICallInfo` records, with the fields the rest of the generator reads:
+### 8.3 `generateSequenceTests(spec, outputDir, baseUrl)` — the entry point
 
-| Field | Call 1 | Call 2 |
-| --- | --- | --- |
-| `method`             | `POST`              | `GET` |
-| `path`               | `/folders`          | `/folders/{folderID}` |
-| `operationId`        | `createFolder`      | `getFolder` |
-| `resourceName`       | `folders`           | `folders` *(last non-templated segment)* |
-| `hasPathParams`      | `false`             | `true` |
-| `hasRequestBody`     | `true`              | `false` |
-| `pathParamNames`     | `[]`                | `[folderID]` |
-| `defaultQueryParams` | `{}`                | `{kbLanguage=en-US, $level=0}` |
+Signature: `public void generateSequenceTests(Map<String,Object>, String, String)` (`:34`).
 
-How the defaults for call 2 are chosen, per `pickExampleForQueryParam`
-(`RandomizedSequenceTester.java:185`):
+**Input:**
+- `spec` — the parsed OpenAPI map.
+- `outputDir = "generated/sequence"`.
+- `baseUrl = "https://api.example.com/v1"`.
 
-- `kbLanguage` — no example/default, has `enum` → first entry `"en-US"`.
-- `$level` — no example/default/enum; type is `integer` with `minimum=0` → `"0"`.
-
-### 8.4 What the generator bakes into `SequenceTestCases.java`
-
-**`initializeAPICalls()`** — the result of `appendAPICallConstructor` for each
-extracted call (`RandomizedSequenceTester.java:263`):
+**What it does:** orchestrates six steps, in this exact order:
 
 ```java
-private List<APICall> initializeAPICalls() {
-    List<APICall> calls = new ArrayList<>();
+Files.createDirectories(outputDir);                          // 1. mkdir
+List<APICallInfo> apiCalls = extractAPICallsFromSpec(spec);  // 2. read spec
+generateSequenceTestFramework(spec, outputDir, baseUrl, apiCalls);   // 3. file 1
+generateRandomSequenceGenerator(spec, outputDir, baseUrl);           // 4. file 2
+generateSequenceTestCases(spec, outputDir, baseUrl, apiCalls);       // 5. file 3
+generateSequenceTestRunner(spec, outputDir, baseUrl);                // 6. file 4
+generateSequenceTestConfig(spec, outputDir, baseUrl, apiCalls);      // 7. file 5
+```
 
-    calls.add(new APICall("POST", "/folders",
-        "{\"name\": \"mock_name\"}",
-        null, Collections.emptyMap(), -1, false));
-    calls.add(new APICall("GET", "/folders/{folderID}",
-        null, null,
-        Map.of("kbLanguage", "en-US", "$level", "0"), -1, false));
+**Output:** five files written. No return value.
 
-    return calls;
+We now walk step by step.
+
+---
+
+### 8.4 `extractAPICallsFromSpec(spec)` — turn the spec into a flat list
+
+Signature: `private List<APICallInfo> extractAPICallsFromSpec(Map<String,Object>)` (`:64`).
+
+**Input:** the spec map (shown above in 8.1).
+
+**What it does:** walks `spec.paths`, pairs each path with each of its HTTP
+verbs, and builds one `APICallInfo` per pair. To fill the fields it calls
+three helpers: `extractResourceName`, `extractPathParamNames`,
+`buildDefaultQueryParams`.
+
+**Output:** `List<APICallInfo>` of length 2 for our spec.
+
+```
+apiCalls[0] = APICallInfo {
+  method             = "POST"
+  path               = "/folders"
+  operationId        = "createFolder"
+  hasPathParams      = false                  (path has no '{')
+  hasRequestBody     = true                   (operation has "requestBody")
+  resourceName       = "folders"              ← from extractResourceName
+  pathParamNames     = []                     ← from extractPathParamNames
+  defaultQueryParams = {}                     ← from buildDefaultQueryParams
+  operation          = <raw POST map>
+}
+
+apiCalls[1] = APICallInfo {
+  method             = "GET"
+  path               = "/folders/{folderID}"
+  operationId        = "getFolder"
+  hasPathParams      = true
+  hasRequestBody     = false
+  resourceName       = "folders"
+  pathParamNames     = ["folderID"]
+  defaultQueryParams = {"kbLanguage": "en-US", "$level": "0"}
+  operation          = <raw GET map>
 }
 ```
 
-Note:
-- The POST body is the output of `buildMockJsonFromSchema` on the resolved
-  `FolderCreate` schema — one property, one string, so `{"name": "mock_name"}`.
-- `expectedStatus = -1` means "any non-5xx" (see §4).
-- The GET's query-param map preserves spec order via `toJavaMapExpression`
-  (`RandomizedSequenceTester.java:235`).
+The three helpers below are all called from here.
 
-**Inferred `dependencies`** emitted into `testDependentSequence`:
+---
+
+### 8.5 `extractResourceName(path)`
+
+Signature: `private String extractResourceName(String)` (`:102`).
+
+**Input:** one path string.
+
+**What it does:** walks path segments right-to-left, returns the first
+non-empty, non-`{...}` segment. Fallback: `"resource"`.
+
+**Outputs:**
+- `"/folders"`             → `"folders"`
+- `"/folders/{folderID}"`  → `"folders"` (skips `{folderID}`, finds `folders`)
+
+---
+
+### 8.6 `extractPathParamNames(path)`
+
+Signature: `private List<String> extractPathParamNames(String)` (`:113`).
+
+**Input:** one path string.
+
+**What it does:** matches the regex `\{([^}]+)}` and collects group 1.
+
+**Outputs:**
+- `"/folders"`             → `[]`
+- `"/folders/{folderID}"`  → `["folderID"]`
+
+---
+
+### 8.7 `buildDefaultQueryParams(operation, spec)`
+
+Signature: `private Map<String,String> buildDefaultQueryParams(Map,Map)` (`:122`).
+
+**Input:** one operation map + the spec (needed for `$ref` resolution in
+`listOperationParameters`).
+
+**What it does:**
+1. Gets the operation's parameters via `listOperationParameters` (resolves
+   `$ref`s).
+2. Keeps only `in: query` params.
+3. For each, calls `pickExampleForQueryParam` on its schema to get a default
+   value.
+4. If the param is `required` and no default could be found, uses `"1"` so
+   the request still has *something*.
+
+**Outputs for our spec:**
+- `POST /folders`           → `{}` (no parameters)
+- `GET /folders/{folderID}` → `{"kbLanguage": "en-US", "$level": "0"}`
+
+The two helpers that back this one are next.
+
+---
+
+### 8.8 `listOperationParameters(operation, spec)`
+
+Signature: `private List<Map<String,Object>> listOperationParameters(Map,Map)` (`:146`).
+
+**Input:** operation map + spec.
+
+**What it does:** returns `operation.parameters` as a list of maps. If an
+entry is a `$ref`, substitutes the resolved parameter in its place (via
+`resolveParameterRef`).
+
+**Output for our GET:** two maps — one for `kbLanguage`, one for `$level`.
+Neither uses `$ref`, so no resolution happens here.
+
+---
+
+### 8.9 `resolveParameterRef(ref, spec)`
+
+Signature: `private Map<String,Object> resolveParameterRef(String,Map)` (`:169`).
+
+**Input:** a string like `"#/components/parameters/Foo"`.
+
+**What it does:** only handles refs into `components.parameters`. Looks up
+the referenced parameter map; returns `null` if anything is missing.
+
+**Output for our spec:** not called (no parameter `$ref`s).
+
+---
+
+### 8.10 `pickExampleForQueryParam(schema)`
+
+Signature: `private String pickExampleForQueryParam(Map<String,Object>)` (`:185`).
+
+**Input:** one parameter's `schema` map.
+
+**Decision order (stops at first hit):**
+1. `schema.example`     (string/number/boolean)
+2. `schema.default`     (string/number/boolean)
+3. First entry of `schema.enum`
+4. Typed fallback: integer/number → `"<minimum>"` if set else `"0"`;
+   boolean → `"true"`; string → `"test"`; else `null`.
+
+**Outputs for our spec:**
+- `{type:"string", enum:["en-US","fr-FR"]}` → `"en-US"` (rule 3)
+- `{type:"integer", minimum:0}`              → `"0"` (rule 4, `minimum`)
+
+---
+
+At this point `apiCalls` is fully populated. The remaining steps each write
+one file, using `apiCalls` and helper methods below.
+
+---
+
+### 8.11 `generateSequenceTestFramework(spec, outputDir, baseUrl, apiCalls)`
+
+Signature: `private void generateSequenceTestFramework(Map,String,String,List<APICallInfo>)` (`:440`).
+
+**Input:** the four shown.
+
+**What it does:**
+1. Unions `pathParamNames` across every `APICallInfo` → `{"folderID"}` in
+   our case.
+2. Builds two strings, one line per path-param name:
+   - `bodyIdBootstrap`  = `state.putIfAbsent("folderID", extractedId);\n`
+   - `locationBootstrap`= `state.putIfAbsent("folderID", lastSegment);\n`
+3. Interpolates four values into a **fixed text-block template**:
+   `baseUrl`, `locationBootstrap`, `bodyIdBootstrap`, and
+   `Constants.DEFAULT_MAX_RESPONSE_TIME_MS` (5000).
+
+**Output:** writes `generated/sequence/SequenceTestFramework.java` —
+a generic JAX-RS harness. Nothing else about your spec influences this file.
+The two bootstrap lines are the *only* spec-derived customization.
+
+The framework's bodies of interest (what those bootstrap lines land inside):
+
+```java
+// inside captureLocationState(...)
+state.putIfAbsent("locationResourceId", lastSegment);
+state.putIfAbsent("id", lastSegment);
+state.putIfAbsent("folderID", lastSegment);        // ← locationBootstrap
+
+// inside updateState(...) when extractedId != null
+state.putIfAbsent("id", extractedId);
+state.putIfAbsent("folderID", extractedId);        // ← bodyIdBootstrap
+```
+
+That is how the framework knows which `state` keys future path templates
+will ask for: the generator seeds every one of them at response time.
+
+---
+
+### 8.12 `generateRandomSequenceGenerator(spec, outputDir, baseUrl)`
+
+Signature: `private void generateRandomSequenceGenerator(Map,String,String)` (`:849`).
+
+**Input:** three args, but only `outputDir` is used.
+
+**What it does:** writes a **verbatim** Java source file — no interpolation
+at all.
+
+**Output:** `generated/sequence/RandomSequenceGenerator.java`. Identical
+bytes for every spec. Contains the five sequence-building strategies:
+`generateRandomSequence`, `generateWeightedSequence`,
+`generateDependentSequence`, `generateStatefulSequence`,
+`generateScenarioBiasedSequence`.
+
+---
+
+### 8.13 `generateSequenceTestCases(spec, outputDir, baseUrl, apiCalls)`
+
+Signature: `private void generateSequenceTestCases(Map,String,String,List<APICallInfo>)` (`:1035`).
+
+This is the **most spec-specific file**. It builds five chunks of source
+code, then stitches them into a text-block template.
+
+**Chunk A — `initBody`** (calls `appendAPICallConstructor` once per call):
+
+```java
+calls.add(new APICall("POST", "/folders",
+    "{\"name\": \"mock_name\"}",
+    null, Collections.emptyMap(), -1, false));
+calls.add(new APICall("GET", "/folders/{folderID}",
+    null, null,
+    Map.of("kbLanguage", "en-US", "$level", "0"), -1, false));
+```
+
+**Chunk B — `integrated`** (from `buildIntegratedScenarioCodegen`, §8.18).
+This becomes the scenario helper methods + `@Test` methods, plus a list
+expression injected into `setUp()`.
+
+**Chunk C — `depsBody`** (from `inferDependencies`, §8.22):
 
 ```java
 dependencies.put("/folders:POST",             Arrays.asList());
 dependencies.put("/folders/{folderID}:GET",   Arrays.asList("/folders:POST"));
 ```
 
-(`inferDependencies`, `RandomizedSequenceTester.java:404` — the GET has a path
-param, so it depends on the POST creation endpoint for the same
-`resourceName`.)
+**Chunk D — `stateBody`** (built inline):
 
-**Emitted weights** for `testWeightedSequence`:
+```java
+stateTransitions.put("/folders:POST",            "folders_post");
+stateTransitions.put("/folders/{folderID}:GET",  "folders_get");
+```
+
+**Chunk E — `weightsBody`** (GET weighted higher than write methods):
 
 ```java
 weights.put("/folders:POST",           0.15);
 weights.put("/folders/{folderID}:GET", 0.3);
 ```
 
-**Integrated scenarios** — only scenarios whose operations are all present are
-emitted live; the rest are `@Disabled` stubs with reasons. For this spec:
+**Output:** writes `generated/sequence/SequenceTestCases.java` — the JUnit
+test class extending `SequenceTestFramework`, containing `testRandomSequence`,
+`testWeightedSequence`, `testDependentSequence`, `testStatefulSequence`,
+`testConcurrentSequences`, `testSequencePerformance`,
+`testScenarioBiasedSequence`, and the scenario-specific `testScenario_*`
+methods.
 
-| Scenario | Status |
+The helper methods called from here are up next.
+
+---
+
+### 8.14 `appendAPICallConstructor(sb, indent, type, call, spec, queryOverride, expectedStatus, noAuth)`
+
+Signature: `private void appendAPICallConstructor(...)` (`:263`).
+
+**Input:** a `StringBuilder` + all the metadata needed to emit one
+`new APICall(...)` expression. `queryOverride` (nullable) is merged on top of
+`call.defaultQueryParams`.
+
+**What it does:** appends to `sb` the literal Java text
+`new <type>("<method>", "<path>", <body>, null, <queryMap>, <expectedStatus>, <noAuth>)`.
+Body is either `null` (no requestBody) or the result of
+`buildRequestBodyForOperation` wrapped in `"..."`.
+
+**Output for call[0]:**
+
+```
+new APICall("POST", "/folders", "{\"name\": \"mock_name\"}", null, Collections.emptyMap(), -1, false)
+```
+
+`expectedStatus = -1` means "any non-5xx is acceptable".
+
+---
+
+### 8.15 `buildRequestBodyForOperation(operation, spec)`
+
+Signature: `private String buildRequestBodyForOperation(Map,Map)` (`:314`).
+
+**Input:** one operation map + spec.
+
+**What it does:**
+1. Finds `operation.requestBody.content["application/json"].schema` (or falls
+   back to the first content type).
+2. If the schema is `{$ref: "#/components/schemas/..."}`, resolves it against
+   `spec.components.schemas`.
+3. Delegates to `buildMockJsonFromSchema`.
+
+**Output for our POST:** `"{\"name\": \"mock_name\"}"` (the `\"` escapes are
+already in place because this string is about to be dropped inside a Java
+string literal in the emitted file).
+
+**Output for our GET:** not called — no `requestBody` on the operation.
+
+---
+
+### 8.16 `buildMockJsonFromSchema(schema, spec, depth)`
+
+Signature: `private String buildMockJsonFromSchema(Map,Map,int)` (`:357`).
+
+**Input:** an object schema + spec + current depth.
+
+**What it does:** iterates over `schema.properties` and emits one JSON entry
+per property, chosen by `type`:
+
+| `type` | emitted value |
 | --- | --- |
-| `testScenario_createAndGet`           | **emitted**  (createFolder + getFolder present) |
-| `testScenario_queryLangPositive`      | **emitted**  (`kbLanguage` contains `"lang"` → override `{kbLanguage: en-US}`) |
-| `testScenario_queryLevelPositive`     | **emitted**  (`$level` contains `"level"` → override `{$level: 0}`) |
-| `testScenario_querySortOrderPositive` | emitted with fallback `{$sort: name, $order: asc}` (no matching params in spec) |
-| `testScenario_queryPaginationPositive`| emitted with fallback `{$pagenum: 1, $pagesize: 10}` |
-| `testScenario_expect401`              | **emitted**  (`noAuth=true, expectedStatus=401` on the GET) |
-| `testScenario_editAndGet`             | `@Disabled` — no `editFolder` in spec |
-| `testScenario_deleteAndGet`           | `@Disabled` — no `deleteFolder` in spec |
-| `testScenario_copyFolderAndGet`       | `@Disabled` — no operationId contains `"copy"` |
-| `testScenario_moveFolderAndGet`       | `@Disabled` — no operationId contains `"move"` |
-| `testScenario_editPermissionsAndGet`  | `@Disabled` — no operationId contains `"ermission"` |
-| `testScenario_expect403` / two user-context scenarios | `@Disabled` — require multiple credentials |
+| `string` (and default) | `"mock_<fieldname>"` |
+| `integer`, `number`    | `1` |
+| `boolean`              | `true` |
+| anything else          | `"mock_value"` |
 
-The `createAndGet` helper, as written by `emitScenarioIfPresent`
-(`RandomizedSequenceTester.java:1466`):
+Depth cap at 5 → returns `"{}"`. **Nested objects, arrays, `allOf`/`oneOf`,
+formats, and `required` are ignored** (see §10 limitations).
+
+**Output for `FolderCreate`** (one string property `name`):
+
+```
+{\"name\": \"mock_name\"}
+```
+
+---
+
+### 8.17 `findByOperationId` / `findByOperationIdContains`
+
+Signatures: `:290` and `:302`.
+
+**Inputs:** `apiCalls` + a string.
+
+**What they do:** linear scan. `findByOperationId` does an **exact match**;
+`findByOperationIdContains` does a **case-insensitive substring match**.
+
+**Outputs for our spec:**
+- `findByOperationId("createFolder")`       → call[0]
+- `findByOperationId("getFolder")`          → call[1]
+- `findByOperationId("editFolder")`         → `null`
+- `findByOperationId("deleteFolder")`       → `null`
+- `findByOperationIdContains("copy")`       → `null`
+- `findByOperationIdContains("move")`       → `null`
+- `findByOperationIdContains("ermission")`  → `null`
+
+---
+
+### 8.18 `buildIntegratedScenarioCodegen(spec, apiCalls)`
+
+Signature: `private IntegratedScenarioCodegen buildIntegratedScenarioCodegen(Map,List<APICallInfo>)` (`:1325`).
+
+This is where the *scenario-biased* magic lives.
+
+**Input:** spec + apiCalls.
+
+**What it does:** looks up specific, folder-centric operations by name (see
+§8.17). For each hard-coded scenario in its catalog, it asks: *"are all the
+operations this scenario needs present in the spec?"*
+
+- All present → **emit** via `emitScenarioIfPresent`: a
+  `scenarioFoo()` helper returning the call list, plus `@Test testScenario_foo`.
+- Missing → **disable** via `emitDisabledScenario`: a `@Disabled` stub with
+  a human-readable reason.
+
+**For our spec, the catalog resolves as:**
+
+| Scenario (method suffix)     | Ops required                          | Verdict for our spec |
+| ---                          | ---                                   | ---                  |
+| `createAndGet`               | createFolder, getFolder               | **emit**             |
+| `editAndGet`                 | createFolder, editFolder, getFolder   | `@Disabled` (no edit)|
+| `deleteAndGet`               | create, delete, getFolder             | `@Disabled` (no del) |
+| `editPermissionsAndGet`      | create, op containing "ermission", get| `@Disabled`          |
+| `copyFolderAndGet`           | create, op containing "copy", get     | `@Disabled`          |
+| `moveFolderAndGet`           | create, op containing "move", get     | `@Disabled`          |
+| `queryLangPositive`          | createFolder, getFolder               | **emit** (override from `pickQueryParamsMatching(get, "lang")`) |
+| `queryLevelPositive`         | createFolder, getFolder               | **emit**             |
+| `querySortOrderPositive`     | createFolder, getFolder               | emit w/ fallback `{$sort:name, $order:asc}` |
+| `queryPaginationPositive`    | createFolder, getFolder               | emit w/ fallback `{$pagenum:1, $pagesize:10}` |
+| `expect401`                  | createFolder, getFolder               | **emit** (`noAuth=true`, `expectedStatus=401` on GET) |
+| `expect403`                  | —                                     | always `@Disabled`   |
+| `getUsingDifferentUser`      | —                                     | always `@Disabled`   |
+| `editUsingDifferentUserThanCreateAndGet` | —                         | always `@Disabled`   |
+
+**Output:** an `IntegratedScenarioCodegen` record with three fields:
+
+```
+helperMethods          = <concatenated scenario*() helpers as Java source>
+testMethods            = <concatenated @Test testScenario_*() methods>
+scenarioTemplateListExpr = "Arrays.asList(scenarioCreateAndGet(), scenarioQueryLangPositive(), ...)"
+```
+
+`scenarioTemplateListExpr` is dropped into `SequenceTestCases.setUp()` as
+the second argument to `new RandomSequenceGenerator(...)`, which is what
+lets `generateScenarioBiasedSequence` splice whole recipes into a random
+walk.
+
+The emitted `scenarioCreateAndGet()` helper looks like:
 
 ```java
 /** Integrated: create and get */
@@ -425,87 +822,348 @@ private List<APICall> scenarioCreateAndGet() {
 }
 ```
 
-### 8.5 Bootstrap lines baked into the framework
+---
 
-Because the union of path-param names across the spec is `{folderID}`,
-`generateSequenceTestFramework` (`RandomizedSequenceTester.java:440`) injects
-exactly one `putIfAbsent` into each of the two state-capture paths:
+### 8.19 `emitScenarioIfPresent(helpers, tests, templateRefs, spec, suffix, comment, calls, queryOverrides, expectedStatuses, noAuthFlags)`
 
-In `updateState`, after an ID is extracted from the JSON response body:
+Signature at `:1466`.
+
+**Input:** two `StringBuilder`s, a list for registering scenario names, the
+spec, and — for the scenario being emitted — its name, a human comment, the
+ordered `APICallInfo` list, and per-step override lists.
+
+**What it does:**
+1. If any required op is `null`, falls through to `emitDisabledScenario` and
+   returns.
+2. Pads the override lists to match `calls.size()`.
+3. Appends a `/** comment */ private List<APICall> scenarioFoo() { return
+   Arrays.asList(...); }` helper.
+4. Appends a one-line `@Test void testScenario_foo() { assertTrue(...); }`.
+5. Registers the name in `templateRefs`.
+
+**Output:** no return; `helpers`, `tests`, `templateRefs` are all mutated.
+
+---
+
+### 8.20 `emitDisabledScenario(tests, suffix, reason)`
+
+Signature at `:1458`.
+
+**Input:** a `StringBuilder`, a suffix, a reason string.
+
+**What it does:** appends
 
 ```java
-state.putIfAbsent("id", extractedId);
-state.putIfAbsent("folderID", extractedId);   // bodyIdBootstrap
+@org.junit.jupiter.api.Disabled("<reason>")
+@Test
+void testScenario_<suffix>() {
+}
 ```
 
-In `captureLocationState`, after a successful response's `Location` header
-tail is extracted:
+**Output:** the stub compiles and reports as "skipped" in JUnit output. This
+is why the generated test class is always complete — every scenario in the
+catalog produces *some* method, even on specs that don't match the
+folder-API shape.
 
-```java
-state.putIfAbsent("locationResourceId", lastSegment);
-state.putIfAbsent("id", lastSegment);
-state.putIfAbsent("folderID", lastSegment);   // locationBootstrap
+---
+
+### 8.21 `pickQueryParamsMatching(getOp, needle)`
+
+Signature at `:1444`.
+
+**Input:** one `APICallInfo` + a substring.
+
+**What it does:** returns the entries of `getOp.defaultQueryParams` whose key
+contains `needle` (case-insensitive).
+
+**Output examples:**
+- `pickQueryParamsMatching(getFolder, "lang")`  → `{"kbLanguage": "en-US"}`
+  (because `"kblanguage".contains("lang")`).
+- `pickQueryParamsMatching(getFolder, "level")` → `{"$level": "0"}`.
+- `pickQueryParamsMatching(getFolder, "sort")`  → `{}` (nothing matches).
+
+The empty case triggers the fallback hard-coded in §8.18
+(`{$sort:name, $order:asc}`).
+
+---
+
+### 8.22 `inferDependencies(apiCalls)`
+
+Signature at `:404`.
+
+**Input:** the flat `apiCalls` list.
+
+**What it does:**
+1. Passes 1 — for every POST **without** path params, record it as the
+   "creation endpoint" for its `resourceName`. Give it no deps.
+2. Pass 2 — for every call **with** path params, make it depend on that
+   resource's creation endpoint (if one exists); otherwise no deps.
+3. Everything else — no deps.
+
+Keys are `"<path>:<METHOD>"`.
+
+**Output for our spec:**
+
+```
+"/folders:POST"            → []
+"/folders/{folderID}:GET"  → ["/folders:POST"]
 ```
 
-This is the piece that makes templated GETs resolvable without writing any
-per-endpoint glue: the generator knows *which* state keys paths will ask for
-and wires every ID source to populate all of them.
+This feeds `testDependentSequence` (§8.13 Chunk C).
 
-### 8.6 A runtime trace: `testScenario_createAndGet`
+---
 
-Assume the server returns `201 Created` with body `{"id":"f-123"}` (no
-`Location` header).
+### 8.23 `generateSequenceTestRunner(spec, outputDir, baseUrl)`
+
+Signature at `:1232`.
+
+**Input:** three args; only `outputDir` is used.
+
+**What it does:** writes a verbatim `main()` class — no interpolation.
+
+**Output:** `generated/sequence/SequenceTestRunner.java`. Runs JUnit Platform
+against `SequenceTestCases.class` and prints a summary. Identical for every
+spec.
+
+---
+
+### 8.24 `generateSequenceTestConfig(spec, outputDir, baseUrl, apiCalls)`
+
+Signature at `:1266`.
+
+**Input:** same as §8.13.
+
+**What it does:** builds the same `initBody` chunk as §8.13 Chunk A and
+drops it into a tiny factory-class template.
+
+**Output:** `generated/sequence/SequenceTestConfig.java`. Exposes
+`createRandomSequenceGenerator()` for anyone who wants to reuse the extracted
+`availableCalls` list outside the generated JUnit test.
+
+---
+
+### 8.25 Two string-emission helpers
+
+These two are called all over the place.
+
+**`escapeJavaStringLiteral(s)`** (`:225`): replaces `\` with `\\` and `"` with
+`\"`. Used whenever a spec-derived string is going into a generated Java
+string literal. Example: a path containing `"` would otherwise break the
+generated source.
+
+**`toJavaMapExpression(map)`** (`:235`):
+- `null` or empty map → `"Collections.emptyMap()"`
+- size ≤ 5 → `"Map.of(\"k1\", \"v1\", \"k2\", \"v2\")"`
+- size > 5 → `new LinkedHashMap<>() {{ put(\"k1\", \"v1\"); ... }}`
+  (preserves insertion order — matches parameter order from the spec).
+
+---
+
+### 8.26 What ends up on disk
+
+```
+generated/sequence/
+├── SequenceTestFramework.java    (§8.11 — bootstrap-customized JAX-RS harness)
+├── RandomSequenceGenerator.java  (§8.12 — verbatim, spec-agnostic)
+├── SequenceTestCases.java        (§8.13 — the spec-driven JUnit class)
+├── SequenceTestRunner.java       (§8.23 — verbatim main())
+└── SequenceTestConfig.java       (§8.24 — factory for availableCalls)
+```
+
+Compile those five files in a JUnit-5 + Jersey project, point them at a live
+server, and you have a working test suite — **no per-endpoint test code was
+written by hand**.
+
+---
+
+### 8.27 What those generated files actually do at runtime
+
+So far everything has been about generation. For completeness, here is what
+happens when you run the emitted tests against a live server.
+
+#### Trace A — `testScenario_createAndGet`
+
+Assume the server answers `POST /folders` with `201 Created` + body
+`{"id":"f-123"}` (no `Location` header).
 
 1. **Step 1 — `POST /folders`**
-   - `resolveTemplateParams("/folders")` — no `{…}`, returns `/folders`.
-   - Framework sends `POST /folders {"name":"mock_name"}`.
+   - `resolveTemplateParams("/folders")` — no `{…}` → `/folders`.
+   - Sends `POST /folders {"name":"mock_name"}`.
    - Response: 201, body `{"id":"f-123"}`.
    - `updateState` (`:690`):
      - `extractIdFromResponse` finds `"id"` → `"f-123"`.
      - `state` becomes `{id=f-123, folderID=f-123, last_response=..., last_status=201}`.
-     - POST + extracted ID → appends `DELETE /folders/f-123` to
-       `createdResources`.
+       (The `folderID=` line is the one the generator baked in — see §8.11.)
+     - POST + extracted id → appends `DELETE /folders/f-123` to
+       `createdResources` for teardown.
 2. **Step 2 — `GET /folders/{folderID}?kbLanguage=en-US&$level=0`**
    - `resolveTemplateParams("/folders/{folderID}")` calls
      `resolveStateForPathParam("folderID")` (`:560`), finds
-     `state["folderID"] = "f-123"` on the first lookup → path resolves to
-     `/folders/f-123`.
-   - Framework sends `GET /folders/f-123?kbLanguage=en-US&$level=0`.
-   - Response: 200 → passes validation (non-5xx, under 5000 ms,
-     `expectedStatus=-1` so any non-5xx is accepted).
-3. **Cleanup — `@AfterEach tearDown` (`:502`)**
-   - Reverses `createdResources` and fires `DELETE /folders/f-123`
-     (best-effort; errors swallowed).
+     `state["folderID"] = "f-123"` → path resolves to `/folders/f-123`.
+   - Sends `GET /folders/f-123?kbLanguage=en-US&$level=0`.
+   - Response 200 → passes validation (non-5xx, under 5 s, `expectedStatus=-1`).
+3. **Teardown — `@AfterEach`** (`:502`)
+   - Reverses `createdResources`, fires `DELETE /folders/f-123` (best effort).
    - Closes both JAX-RS clients.
 
-Had the POST omitted `"id"` but returned a `Location: /folders/f-123` header,
+Had the POST omitted `"id"` but returned `Location: /folders/f-123` instead,
 `captureLocationState` would have set `state["folderID"] = "f-123"` from the
-URL tail instead, and step 2 would still resolve.
+URL tail, and Step 2 would still resolve.
 
-### 8.7 A second trace: `testRandomSequence`
+#### Trace B — `testRandomSequence`
 
-Same spec, seeded `RandomSequenceGenerator`. Suppose the random draw yields:
+Same spec, but let's say the random draw yields
 
 ```
 [GET /folders/{folderID}, POST /folders, GET /folders/{folderID}]
 ```
 
-- **Step 1** — `state` is empty; `resolveTemplateParams` finds no match for
+- **Step 1** — `state` is empty. `resolveTemplateParams` finds no match for
   `folderID` and leaves the literal `{folderID}` in place. The GET hits
-  `/folders/%7BfolderID%7D` (URL-encoded by JAX-RS), server returns 404.
-  Validation *still passes* — 404 is non-5xx and `expectedStatus=-1`.
-- **Step 2** — POST succeeds, state now has `folderID=f-123`.
-- **Step 3** — same GET, this time resolves to `/folders/f-123` and returns
-  200.
+  `/folders/%7BfolderID%7D`, server returns 404. Validation *still passes* —
+  404 is non-5xx and `expectedStatus = -1`.
+- **Step 2** — POST succeeds, `state["folderID"] = "f-123"`.
+- **Step 3** — same GET, resolves to `/folders/f-123`, returns 200.
 
-This is the intended shape of the random mode: it fuzzes the ordering and
-relies on the state machine to recover when a later step happens to supply
-what an earlier one needed. The *dependent* and *scenario-biased* modes exist
-specifically to avoid the step-1 pothole.
+This is the intended shape of random mode: fuzz the ordering and rely on the
+state machine to recover when a later step happens to supply what an earlier
+one needed. The **dependent** and **scenario-biased** modes exist
+specifically to avoid the Step-1 pothole.
 
 ---
 
-## 9. Known limitations
+## 9. How it decides what's "valid"
+
+A reasonable question to ask about a *random* sequence generator is: *the
+spec defines combinations that make sense (POST then GET by id) and
+combinations that don't (GET by id with nothing created yet). How does RST
+tell them apart?*
+
+**Short answer: it doesn't, and that's by design.** The random/weighted
+modes generate freely; the gate is permissive; three separate mechanisms
+steer toward coherent workflows without ever labeling anything "invalid".
+This section is the whole story.
+
+### 9.1 What *"validity"* could mean
+
+"Valid" is overloaded. Distinguish three senses:
+
+1. **At generation time** — will the generator refuse to emit this step?
+2. **At runtime, at the gate** — will `validateSequenceResults` mark this
+   result as a failure?
+3. **At runtime, in the request** — will the *server* accept the call?
+
+RST leans almost entirely on sense 3. Senses 1 and 2 are deliberately loose.
+
+### 9.2 Sense 1: does the generator skip it?
+
+Of the five strategies in `RandomSequenceGenerator`, only one actually
+prefilters for prerequisites:
+
+| Strategy                         | Skips steps whose preconditions aren't met? |
+| ---                              | --- |
+| `generateRandomSequence`         | No — uniform draw |
+| `generateWeightedSequence`       | No — weighted draw |
+| `generateStatefulSequence`       | No — the "eligibility" filter admits any call named in the transitions map, regardless of `currentState`; it's cosmetic (see §3) |
+| `generateDependentSequence`      | **Yes** |
+| `generateScenarioBiasedSequence` | **Partial** — splices in hand-written recipes (§5) |
+
+The dependency-gated logic, from the emitted `RandomSequenceGenerator.java`:
+
+```java
+eligible = availableCalls.filter(call ->
+    deps == null || deps.stream().allMatch(executedCalls::contains));
+```
+
+That `executedCalls` set is local to *this* sequence; it's not a global
+"has this ever been called" — so dependencies must be satisfied *earlier in
+the same sequence*.
+
+Where does the deps map come from? `inferDependencies` (§8.22) — and it
+encodes exactly one rule:
+
+> **"Any call with a `{…}` in its path depends on the `POST` (no path
+> params) for the same `resourceName`."**
+
+Everything else has no deps. `GET /folders/{id}/contents/{cid}` still gets
+only one dep (the POST for `folders`), not a chain. So even the "dependent"
+mode can emit calls whose *deep* prerequisites aren't met — it only enforces
+the first hop.
+
+### 9.3 Sense 2: does the gate fail the sequence?
+
+The gate is `SequenceTestFramework.validateSequenceResults` (`:757`):
+
+```java
+if (!result.isSuccess())                              return false;  // transport crash
+if (result.getResponseTime() > 5000)                  return false;  // timeout
+if (status >= 500)                                    return false;  // server error
+if (call.getExpectedStatus() >= 0
+        && status != call.getExpectedStatus())        return false;  // mismatch, only if set
+// everything else passes
+```
+
+Translated: the only *failure* outcomes are
+
+- a transport exception (connection refused, SSL error, …),
+- a response that took longer than 5 seconds,
+- a 5xx status,
+- a declared expected status that didn't match.
+
+**4xx is a passing response.** A 404 from a GET-before-POST, a 400 from a
+missing field in the auto-generated body, a 409 from a duplicate create —
+all count as the sequence behaving *correctly*.
+
+And `expectedStatus` is `-1` ("any non-5xx") for every emitted call *except*
+the handful of scenario templates that set it deliberately — today only
+`expect401` does (§8.18). So in practice nearly all steps accept anything
+that isn't a crash.
+
+### 9.4 Sense 3: the state-propagation trick
+
+When a random draw *happens to* produce `[POST /folders, GET /folders/{folderID}, …]`,
+the framework rescues it (§4, §8.11):
+
+1. Watches the POST's response body and `Location` header.
+2. Seeds `state` with `id=f-123` **and** `folderID=f-123` (the generator
+   baked in one `putIfAbsent` line per path-param name it saw anywhere in the
+   spec).
+3. Before sending the GET, `resolveTemplateParams` substitutes `{folderID}`
+   with `f-123`.
+
+The call that *looked* invalid on paper becomes a valid workflow the
+moment the right predecessor fires. When it doesn't — GET draws before any
+POST — the template stays unresolved, JAX-RS URL-encodes the braces into
+`%7BfolderID%7D`, and the server responds 404, which still passes the gate.
+
+### 9.5 The three lines of defense, summarized
+
+| Mechanism | When it runs | What it buys you |
+| --- | --- | --- |
+| `inferDependencies` + `generateDependentSequence` | Generation, dependent mode only | No path-templated call emits until its resource's POST has already emitted *in this sequence* |
+| Scenario recipes (`scenarioCreateAndGet`, …)      | Generation, scenario-biased mode | Known-good orderings spliced in whole |
+| `state` map + `resolveTemplateParams`             | Runtime, every mode              | If a POST happened to run first, later templated calls resolve correctly |
+
+The pure random and weighted modes have **none** of the first two. They
+deliberately rely on #3, and on the server tolerating nonsense with 4xx.
+
+### 9.6 What this means in practice
+
+- **Strength.** RST catches crashes, hangs, and explicit-expectation
+  mismatches against unpredictable orderings. That's the fuzz-test value.
+- **Weakness.** A random sequence in which every single call returns 404
+  still passes. The tests can't tell the difference between *"the server
+  coherently refused a nonsense request"* and *"the server silently
+  accepted my garbage and did nothing"*. If you need stronger invariants,
+  use scenario templates with `expectedStatus` set — that is the lever.
+- **Rule of thumb.** Treat `testRandomSequence` and `testWeightedSequence`
+  as *robustness* tests, `testDependentSequence` as a prerequisite-graph
+  test, and the `testScenario_*` methods as the actual business-workflow
+  assertions. They are doing different jobs under one umbrella.
+
+---
+
+## 10. Known limitations
 
 These are worth calling out before you extend the code:
 
