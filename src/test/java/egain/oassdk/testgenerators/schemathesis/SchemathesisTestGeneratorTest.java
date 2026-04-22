@@ -28,6 +28,13 @@ class SchemathesisTestGeneratorTest {
         assertTrue(Files.isRegularFile(bundle.resolve("schemathesis.properties")));
         assertTrue(Files.isRegularFile(bundle.resolve("run-schemathesis.sh")));
         assertTrue(Files.isRegularFile(bundle.resolve("README-schemathesis.md")));
+        assertTrue(Files.isRegularFile(bundle.resolve("schemathesis.toml")));
+
+        String toml = Files.readString(bundle.resolve("schemathesis.toml"));
+        assertTrue(toml.contains("[phases.coverage]"));
+        assertTrue(toml.contains("unexpected-methods"));
+        assertTrue(toml.contains("[checks.missing_required_header]"));
+        assertTrue(toml.contains("expected-statuses = [400]"));
 
         String props = Files.readString(bundle.resolve("schemathesis.properties"));
         assertTrue(props.contains("%HUB%"));

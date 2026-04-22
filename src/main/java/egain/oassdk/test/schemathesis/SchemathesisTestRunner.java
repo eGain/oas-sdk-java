@@ -13,7 +13,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Prepares Schemathesis bundles (OpenAPI + properties + {@code st run} script) and optional Docker/CI templates.
+ * Prepares Schemathesis bundles (OpenAPI + properties + {@code schemathesis.toml} + {@code st run} script)
+ * and optional Docker/CI templates.
  * Core artifacts are produced by {@link SchemathesisTestGenerator}.
  */
 public class SchemathesisTestRunner {
@@ -67,6 +68,7 @@ public class SchemathesisTestRunner {
                 
                 COPY openapi.yaml .
                 COPY schemathesis.properties .
+                COPY schemathesis.toml .
                 COPY run-schemathesis.sh .
                 RUN chmod +x run-schemathesis.sh
                 
@@ -86,6 +88,7 @@ public class SchemathesisTestRunner {
                     volumes:
                       - ./openapi.yaml:/app/openapi.yaml:ro
                       - ./schemathesis.properties:/app/schemathesis.properties:ro
+                      - ./schemathesis.toml:/app/schemathesis.toml:ro
                       - ./results:/app/results
                     environment:
                       - BASE_URL=%s

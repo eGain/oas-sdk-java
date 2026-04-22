@@ -52,6 +52,9 @@ public class SchemathesisTestRunnerTest {
         String content = Files.readString(propsPath);
         assertTrue(content.contains("BASEURL=" + baseUrl));
         assertTrue(Files.exists(tempDir.resolve("openapi.yaml")));
+        Path tomlPath = tempDir.resolve("schemathesis.toml");
+        assertTrue(Files.exists(tomlPath));
+        assertTrue(Files.readString(tomlPath).contains("[phases.coverage]"));
     }
 
     @Test
@@ -79,11 +82,13 @@ public class SchemathesisTestRunnerTest {
         assertTrue(Files.exists(dockerfilePath));
         String dockerfileContent = new String(Files.readAllBytes(dockerfilePath));
         assertTrue(dockerfileContent.contains("ENV BASE_URL=" + baseUrl));
+        assertTrue(dockerfileContent.contains("COPY schemathesis.toml ."));
 
         Path dockerComposePath = tempDir.resolve("docker-compose.yml");
         assertTrue(Files.exists(dockerComposePath));
         String composeContent = new String(Files.readAllBytes(dockerComposePath));
         assertTrue(composeContent.contains("BASE_URL=" + baseUrl));
+        assertTrue(composeContent.contains("./schemathesis.toml:/app/schemathesis.toml:ro"));
     }
 
     @Test
