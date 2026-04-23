@@ -28,9 +28,14 @@ public record ApiCallInfo(
         defaultQueryParams = defaultQueryParams == null ? Map.of() : Map.copyOf(defaultQueryParams);
     }
 
-    /** POST with no path parameters — a resource creator. */
+    /** Top-level POST (no path parameters) — creates a brand-new resource from scratch. */
     public boolean isCreator() {
         return "POST".equalsIgnoreCase(method) && !hasPathParams;
+    }
+
+    /** POST on a path-templated path — creates a nested resource under an existing parent. */
+    public boolean isSubResourceCreator() {
+        return "POST".equalsIgnoreCase(method) && hasPathParams;
     }
 
     /** A path-templated op (GET/PUT/PATCH/DELETE by id, or POST on a sub-resource path). */

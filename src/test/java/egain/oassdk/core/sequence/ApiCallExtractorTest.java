@@ -60,6 +60,98 @@ class ApiCallExtractorTest {
     }
 
     @Test
+    void idVariableName_snakeCasesCamelAndUpper() {
+        assertThat(ApiCallExtractor.idVariableName("folderID")).isEqualTo("folder_id");
+        assertThat(ApiCallExtractor.idVariableName("orderId")).isEqualTo("order_id");
+        assertThat(ApiCallExtractor.idVariableName("UserID")).isEqualTo("user_id");
+        assertThat(ApiCallExtractor.idVariableName("user_id")).isEqualTo("user_id");
+        assertThat(ApiCallExtractor.idVariableName("ABCId")).isEqualTo("abc_id");
+        assertThat(ApiCallExtractor.idVariableName("id")).isEqualTo("id");
+        assertThat(ApiCallExtractor.idVariableName("")).isEqualTo("resource_id");
+        assertThat(ApiCallExtractor.idVariableName(null)).isEqualTo("resource_id");
+    }
+
+    @Test
+    void findProducerForParam_exactPrefixMatch() {
+        List<ApiCallInfo> calls = extractor.extract(SequenceTestFixtures.orderWithItemsSpec());
+        ApiCallInfo items = calls.stream()
+                .filter(c -> c.path().equals("/orders/{orderId}/items") && c.method().equals("POST"))
+                .findFirst().orElseThrow();
+
+        ApiCallInfo producer = ApiCallExtractor.findProducerForParam(items, "orderId", calls);
+
+        assertThat(producer).isNotNull();
+        assertThat(producer.path()).isEqualTo("/orders");
+        assertThat(producer.method()).isEqualTo("POST");
+    }
+
+    @Test
+    void findProducerForParam_recursivelyResolvesNestedSubResource() {
+        List<ApiCallInfo> calls = extractor.extract(SequenceTestFixtures.orderWithItemsSpec());
+        ApiCallInfo itemGet = calls.stream()
+                .filter(c -> c.path().equals("/orders/{orderId}/items/{itemId}") && c.method().equals("GET"))
+                .findFirst().orElseThrow();
+
+        ApiCallInfo orderIdProducer = ApiCallExtractor.findProducerForParam(itemGet, "orderId", calls);
+        ApiCallInfo itemIdProducer = ApiCallExtractor.findProducerForParam(itemGet, "itemId", calls);
+
+        assertThat(orderIdProducer.path()).isEqualTo("/orders");
+        assertThat(itemIdProducer.path()).isEqualTo("/orders/{orderId}/items");
+        assertThat(itemIdProducer.method()).isEqualTo("POST");
+    }
+
+    @Test
+    void findProducerForParam_nameStemFallback() {
+        // POST at /teams is the only creator; consumer path doesn't share a literal prefix
+        // with /teams, so only the name-stem fallback can resolve `teamId`.
+        Map<String, Object> spec = Map.of("paths", Map.of(
+                "/teams", Map.of("post", Map.of("operationId", "createTeam")),
+                "/reports/{teamId}", Map.of("get", Map.of("operationId", "getReport"))));
+        List<ApiCallInfo> calls = extractor.extract(spec);
+        ApiCallInfo report = calls.stream()
+                .filter(c -> c.path().equals("/reports/{teamId}"))
+                .findFirst().orElseThrow();
+
+        ApiCallInfo producer = ApiCallExtractor.findProducerForParam(report, "teamId", calls);
+
+        assertThat(producer).isNotNull();
+        assertThat(producer.path()).isEqualTo("/teams");
+    }
+
+    @Test
+    void findProducerForParam_returnsNullWhenUnresolvable() {
+        List<ApiCallInfo> calls = extractor.extract(SequenceTestFixtures.unresolvedParamSpec());
+        ApiCallInfo orphan = calls.stream()
+                .filter(c -> c.path().equals("/orphans/{parentId}/children"))
+                .findFirst().orElseThrow();
+
+        ApiCallInfo producer = ApiCallExtractor.findProducerForParam(orphan, "parentId", calls);
+
+        assertThat(producer).isNull();
+    }
+
+    @Test
+    void apiCallInfo_isSubResourceCreator() {
+        List<ApiCallInfo> calls = extractor.extract(SequenceTestFixtures.orderWithItemsSpec());
+        ApiCallInfo topLevel = calls.stream()
+                .filter(c -> c.path().equals("/orders") && c.method().equals("POST"))
+                .findFirst().orElseThrow();
+        ApiCallInfo subResource = calls.stream()
+                .filter(c -> c.path().equals("/orders/{orderId}/items") && c.method().equals("POST"))
+                .findFirst().orElseThrow();
+        ApiCallInfo nonPost = calls.stream()
+                .filter(c -> c.method().equals("GET"))
+                .findFirst().orElseThrow();
+
+        assertThat(topLevel.isCreator()).isTrue();
+        assertThat(topLevel.isSubResourceCreator()).isFalse();
+        assertThat(subResource.isCreator()).isFalse();
+        assertThat(subResource.isSubResourceCreator()).isTrue();
+        assertThat(nonPost.isCreator()).isFalse();
+        assertThat(nonPost.isSubResourceCreator()).isFalse();
+    }
+
+    @Test
     void buildRequestBodyForOperation_resolvesRef() {
         Map<String, Object> spec = SequenceTestFixtures.minimalFolderSpec();
         List<ApiCallInfo> calls = extractor.extract(spec);

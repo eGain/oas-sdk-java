@@ -6,6 +6,7 @@ import egain.oassdk.core.Constants;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -75,6 +76,113 @@ public class ApiCallExtractor {
             }
         }
         return "resource";
+    }
+
+    /**
+     * Snake-cased Python variable name for a path parameter.
+     * {@code folderID} → {@code folder_id}; {@code orderId} → {@code order_id};
+     * {@code ABCId} → {@code abc_id}; empty/null → {@code "resource_id"}.
+     */
+    public static String idVariableName(String pathParamName) {
+        if (pathParamName == null || pathParamName.isEmpty()) {
+            return "resource_id";
+        }
+        String snake = pathParamName
+                .replaceAll("([a-z0-9])([A-Z])", "$1_$2")
+                .replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2")
+                .replaceAll("[^a-zA-Z0-9]+", "_")
+                .toLowerCase(Locale.ROOT);
+        if (snake.startsWith("_")) {
+            snake = snake.substring(1);
+        }
+        if (snake.endsWith("_")) {
+            snake = snake.substring(0, snake.length() - 1);
+        }
+        return snake.isEmpty() ? "resource_id" : snake;
+    }
+
+    /**
+     * Find the POST operation that produces the value for {@code paramName}
+     * when {@code consumer} is called. The answer is the producer that the
+     * sequence-chain generator will prepend to a chain whose seed is
+     * {@code consumer}.
+     *
+     * <p>Resolution rules, in order:
+     * <ol>
+     *   <li><b>Exact prefix match.</b> The substring of {@code consumer.path()}
+     *       up to (but not including) {@code {paramName}} equals some POST
+     *       operation's path. That POST is the producer.</li>
+     *   <li><b>Name-stem fallback.</b> Strip a trailing {@code Id}/{@code ID}/{@code _id}
+     *       from {@code paramName}, lowercase it, and match against the
+     *       {@link ApiCallInfo#resourceName() resourceName} (and simple
+     *       pluralizations) of any POST in the spec. First match wins.</li>
+     * </ol>
+     *
+     * @return the producer POST, or {@code null} if none found.
+     */
+    public static ApiCallInfo findProducerForParam(ApiCallInfo consumer, String paramName,
+                                                   List<ApiCallInfo> allCalls) {
+        if (consumer == null || paramName == null || allCalls == null) {
+            return null;
+        }
+        String consumerPath = consumer.path();
+        String token = "{" + paramName + "}";
+        int idx = consumerPath.indexOf(token);
+        if (idx < 0) {
+            return null;
+        }
+        String prefix = consumerPath.substring(0, idx);
+        if (prefix.endsWith("/")) {
+            prefix = prefix.substring(0, prefix.length() - 1);
+        }
+
+        for (ApiCallInfo c : allCalls) {
+            if (c == consumer) {
+                continue;
+            }
+            if (!"POST".equalsIgnoreCase(c.method())) {
+                continue;
+            }
+            if (c.path().equals(prefix)) {
+                return c;
+            }
+        }
+
+        String stem = stripIdSuffix(paramName).toLowerCase(Locale.ROOT);
+        if (stem.isEmpty()) {
+            return null;
+        }
+        for (ApiCallInfo c : allCalls) {
+            if (c == consumer) {
+                continue;
+            }
+            if (!"POST".equalsIgnoreCase(c.method())) {
+                continue;
+            }
+            String rn = c.resourceName() == null ? "" : c.resourceName().toLowerCase(Locale.ROOT);
+            if (rn.isEmpty()) {
+                continue;
+            }
+            if (rn.equals(stem) || rn.equals(stem + "s") || rn.equals(stem + "es")
+                    || stem.equals(rn) || stem.equals(rn + "s")) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    private static String stripIdSuffix(String param) {
+        if (param == null) {
+            return "";
+        }
+        String s = param;
+        if (s.length() > 3 && (s.endsWith("_id") || s.endsWith("_ID") || s.endsWith("_Id"))) {
+            return s.substring(0, s.length() - 3);
+        }
+        if (s.length() > 2 && (s.endsWith("ID") || s.endsWith("Id"))) {
+            return s.substring(0, s.length() - 2);
+        }
+        return s;
     }
 
     static List<String> extractPathParamNames(String path) {

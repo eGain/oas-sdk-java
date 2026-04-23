@@ -91,6 +91,109 @@ public final class SequenceTestFixtures {
         return spec;
     }
 
+    /**
+     * Spec with a sub-resource POST — exercises the producer-index / prefix-chain paths.
+     * <ul>
+     *   <li>{@code POST /orders} — {@code createOrder}</li>
+     *   <li>{@code GET /orders/{orderId}} — {@code getOrder}</li>
+     *   <li>{@code POST /orders/{orderId}/items} — {@code addItem} (sub-resource creator)</li>
+     *   <li>{@code GET /orders/{orderId}/items/{itemId}} — {@code getItem}</li>
+     *   <li>{@code DELETE /orders/{orderId}/items/{itemId}} — {@code deleteItem}</li>
+     * </ul>
+     */
+    public static Map<String, Object> orderWithItemsSpec() {
+        Map<String, Object> paths = new LinkedHashMap<>();
+        Map<String, Object> ordersPath = new LinkedHashMap<>();
+        ordersPath.put("post", operation("createOrder"));
+        paths.put("/orders", ordersPath);
+
+        Map<String, Object> orderByIdPath = new LinkedHashMap<>();
+        orderByIdPath.put("get", operation("getOrder"));
+        paths.put("/orders/{orderId}", orderByIdPath);
+
+        Map<String, Object> itemsPath = new LinkedHashMap<>();
+        itemsPath.put("post", operation("addItem"));
+        paths.put("/orders/{orderId}/items", itemsPath);
+
+        Map<String, Object> itemByIdPath = new LinkedHashMap<>();
+        itemByIdPath.put("get", operation("getItem"));
+        itemByIdPath.put("delete", operation("deleteItem"));
+        paths.put("/orders/{orderId}/items/{itemId}", itemByIdPath);
+
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("paths", paths);
+        return spec;
+    }
+
+    /**
+     * Spec with two top-level creators on the same resource group — exercises
+     * the seed-each-POST rule for alternative creators.
+     * <ul>
+     *   <li>{@code POST /users} — {@code createUser}</li>
+     *   <li>{@code POST /users/bulk} — {@code bulkCreateUsers} (rightmost segment
+     *       {@code "bulk"}, so different resourceName but both creators)</li>
+     * </ul>
+     */
+    public static Map<String, Object> alternativeCreatorsSpec() {
+        Map<String, Object> paths = new LinkedHashMap<>();
+        Map<String, Object> usersPath = new LinkedHashMap<>();
+        usersPath.put("post", operation("createUser"));
+        paths.put("/users", usersPath);
+
+        Map<String, Object> bulkPath = new LinkedHashMap<>();
+        bulkPath.put("post", operation("bulkCreateUsers"));
+        paths.put("/users/bulk", bulkPath);
+
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("paths", paths);
+        return spec;
+    }
+
+    /**
+     * Two-level nested resources — exercises recursive prefix chaining.
+     * <ul>
+     *   <li>{@code POST /a}</li>
+     *   <li>{@code POST /a/{aId}/b}</li>
+     *   <li>{@code POST /a/{aId}/b/{bId}/c}</li>
+     * </ul>
+     */
+    public static Map<String, Object> twoLevelNestedSpec() {
+        Map<String, Object> paths = new LinkedHashMap<>();
+        Map<String, Object> aPath = new LinkedHashMap<>();
+        aPath.put("post", operation("createA"));
+        paths.put("/a", aPath);
+
+        Map<String, Object> bPath = new LinkedHashMap<>();
+        bPath.put("post", operation("createB"));
+        paths.put("/a/{aId}/b", bPath);
+
+        Map<String, Object> cPath = new LinkedHashMap<>();
+        cPath.put("post", operation("createC"));
+        paths.put("/a/{aId}/b/{bId}/c", cPath);
+
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("paths", paths);
+        return spec;
+    }
+
+    /**
+     * Sub-resource POST with no top-level creator that can resolve its path param —
+     * exercises the UnresolvedParamPolicy branch.
+     * <ul>
+     *   <li>{@code POST /orphans/{parentId}/children}</li>
+     * </ul>
+     */
+    public static Map<String, Object> unresolvedParamSpec() {
+        Map<String, Object> paths = new LinkedHashMap<>();
+        Map<String, Object> orphansChildrenPath = new LinkedHashMap<>();
+        orphansChildrenPath.put("post", operation("createChild"));
+        paths.put("/orphans/{parentId}/children", orphansChildrenPath);
+
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("paths", paths);
+        return spec;
+    }
+
     private static Map<String, Object> operation(String operationId) {
         Map<String, Object> op = new LinkedHashMap<>();
         op.put("operationId", operationId);
