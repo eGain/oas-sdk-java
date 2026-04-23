@@ -1,29 +1,41 @@
 package egain.oassdk.core.sequence;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 /**
- * Enumerates every valid workflow chain from a flat list of
- * {@link ApiCallInfo}. Chains are <i>valid by construction</i>: the
- * enumerator never emits one that would be semantically broken, so the
- * pytest tests it feeds can assert {@code 2xx} at every step without
- * ambiguity.
+ * Enumerates workflow chains out of a flat list of {@link ApiCallInfo}.
  *
- * <p>The five decision rules are applied at enumeration time:
+ * <p>One chain family per POST in the spec — top-level and sub-resource
+ * alike. Every POST is guaranteed to appear in at least one emitted chain,
+ * so no path is skipped.
+ *
+ * <p>A chain is always {@code [prefix..., seed POST, tail...]}:
+ * <ul>
+ *   <li><b>Seed POST.</b> The POST this family is built around.</li>
+ *   <li><b>Prefix.</b> Predecessor POSTs whose outputs resolve the seed's
+ *       path parameters. Computed recursively via
+ *       {@link ApiCallExtractor#findProducerForParam}. If any path
+ *       parameter cannot be resolved the family is either dropped or
+ *       emitted with a marker per
+ *       {@link ChainConfig.UnresolvedParamPolicy}.</li>
+ *   <li><b>Tail.</b> Path-templated non-POST consumers (GET/PUT/PATCH/
+ *       DELETE) whose path is the seed's path or a descendant of it and
+ *       whose path parameters are all bound by (prefix + seed).
+ *       Permutations of length up to {@code maxChainLength - prefix.size - 1}.</li>
+ * </ul>
+ *
+ * <p>Filters applied after enumeration:
  * <ol>
- *   <li>{@code op_0} must be a creator (POST without path params) — else reject.</li>
- *   <li>Any {@code op_i} where {@code i &gt; 0} must be a consumer (path-templated) — else reject (no second creator in the same chain).</li>
- *   <li>If DELETE is in the chain and {@code deleteLastOnly = true}, it must be the final step — else reject.</li>
- *   <li>If {@code allowRepeats = false}, no consumer appears twice — else reject.</li>
- *   <li>Chains are deduped on method+path signature.</li>
+ *   <li>{@code maxChainLength} caps the total step count, not just the tail.</li>
+ *   <li>{@code deleteLastOnly} rejects tails where DELETE is not the final step.</li>
+ *   <li>{@code allowRepeats} controls whether tail permutations may reuse
+ *       the same consumer twice.</li>
+ *   <li>Chains with an identical method+path signature across all steps
+ *       are deduped globally.</li>
  * </ol>
- *
- * <p>Cross-resource chaining is currently disabled; each chain is scoped
- * to a single {@link ApiCallInfo#resourceName() resource}. Resources
- * without a creator are skipped entirely (no id to seed consumers).
  */
 public class ChainEnumerator {
 
@@ -37,51 +49,160 @@ public class ChainEnumerator {
         this.config = config;
     }
 
-    public List<List<ApiCallInfo>> enumerate(List<ApiCallInfo> allCalls) {
-        List<List<ApiCallInfo>> out = new ArrayList<>();
-        for (Map.Entry<String, List<ApiCallInfo>> entry : groupByResource(allCalls).entrySet()) {
-            out.addAll(enumerateResource(entry.getValue()));
+    public List<EnumeratedChain> enumerate(List<ApiCallInfo> allCalls) {
+        List<EnumeratedChain> out = new ArrayList<>();
+        Set<String> seenSignatures = new HashSet<>();
+
+        for (ApiCallInfo post : allCalls) {
+            if (!"POST".equalsIgnoreCase(post.method())) {
+                continue;
+            }
+            PrefixResult prefix = buildPrefix(post, allCalls, new HashSet<>());
+            boolean unresolved = prefix.hasUnresolved();
+            if (unresolved && config.unresolvedParamPolicy() == ChainConfig.UnresolvedParamPolicy.SKIP) {
+                continue;
+            }
+
+            int prefixSize = prefix.steps().size();
+            int seedLen = prefixSize + 1;
+            if (seedLen > config.maxChainLength()) {
+                // Prefix alone already exceeds the budget.
+                continue;
+            }
+
+            addIfUnique(composeSteps(prefix.steps(), post, List.of()), post, unresolved,
+                    out, seenSignatures);
+
+            List<ApiCallInfo> tailPool = buildTailPool(post, allCalls);
+            int tailBudget = config.maxChainLength() - seedLen;
+            int maxTail;
+            if (config.allowRepeats()) {
+                maxTail = tailBudget;
+            } else {
+                maxTail = Math.min(tailBudget, tailPool.size());
+            }
+            for (int tailLen = 1; tailLen <= maxTail; tailLen++) {
+                for (List<ApiCallInfo> tail : permutations(tailPool, tailLen, config.allowRepeats())) {
+                    if (config.deleteLastOnly() && hasDeleteBeforeEnd(tail)) {
+                        continue;
+                    }
+                    addIfUnique(composeSteps(prefix.steps(), post, tail), post, unresolved,
+                            out, seenSignatures);
+                }
+            }
         }
         return out;
     }
 
-    /** Group by {@link ApiCallInfo#resourceName()} preserving insertion order. */
-    private Map<String, List<ApiCallInfo>> groupByResource(List<ApiCallInfo> calls) {
-        Map<String, List<ApiCallInfo>> byResource = new LinkedHashMap<>();
-        for (ApiCallInfo c : calls) {
-            byResource.computeIfAbsent(c.resourceName(), k -> new ArrayList<>()).add(c);
+    /**
+     * Build the prefix chain for a POST by recursively resolving each of
+     * its path parameters to a producer POST. Deduplicates so a producer
+     * that resolves multiple params appears once, and breaks cycles
+     * defensively.
+     */
+    private PrefixResult buildPrefix(ApiCallInfo post, List<ApiCallInfo> allCalls,
+                                     Set<ApiCallInfo> visiting) {
+        if (post.pathParamNames().isEmpty()) {
+            return new PrefixResult(List.of(), false);
         }
-        return byResource;
-    }
-
-    private List<List<ApiCallInfo>> enumerateResource(List<ApiCallInfo> calls) {
-        ApiCallInfo creator = calls.stream().filter(ApiCallInfo::isCreator).findFirst().orElse(null);
-        if (creator == null) {
-            return List.of();
+        if (visiting.contains(post)) {
+            return new PrefixResult(List.of(), true);
         }
-        List<ApiCallInfo> consumers = calls.stream()
-                .filter(ApiCallInfo::isConsumer)
-                .toList();
+        Set<ApiCallInfo> nextVisiting = new HashSet<>(visiting);
+        nextVisiting.add(post);
 
-        List<List<ApiCallInfo>> chains = new ArrayList<>();
-        chains.add(List.of(creator));
+        List<ApiCallInfo> steps = new ArrayList<>();
+        Set<ApiCallInfo> included = new HashSet<>();
+        boolean anyUnresolved = false;
 
-        int maxTail = Math.min(config.maxChainLength() - 1, consumers.size());
-        if (config.allowRepeats()) {
-            maxTail = config.maxChainLength() - 1;
-        }
-        for (int tailLen = 1; tailLen <= maxTail; tailLen++) {
-            for (List<ApiCallInfo> tail : permutations(consumers, tailLen, config.allowRepeats())) {
-                if (config.deleteLastOnly() && hasDeleteBeforeEnd(tail)) {
-                    continue;
+        for (String param : post.pathParamNames()) {
+            ApiCallInfo producer = ApiCallExtractor.findProducerForParam(post, param, allCalls);
+            if (producer == null) {
+                anyUnresolved = true;
+                continue;
+            }
+            if (included.contains(producer)) {
+                continue;
+            }
+            PrefixResult sub = buildPrefix(producer, allCalls, nextVisiting);
+            if (sub.hasUnresolved()) {
+                anyUnresolved = true;
+            }
+            for (ApiCallInfo step : sub.steps()) {
+                if (included.add(step)) {
+                    steps.add(step);
                 }
-                List<ApiCallInfo> chain = new ArrayList<>(tailLen + 1);
-                chain.add(creator);
-                chain.addAll(tail);
-                chains.add(List.copyOf(chain));
+            }
+            if (included.add(producer)) {
+                steps.add(producer);
             }
         }
-        return chains;
+        return new PrefixResult(List.copyOf(steps), anyUnresolved);
+    }
+
+    /**
+     * Tail pool for a seed POST: non-POST path-templated consumers whose
+     * path is the seed's own or a descendant under the seed's tree, and
+     * whose path parameters are all bound by (prefix + seed).
+     *
+     * <p>Ancestor consumers belong to a different seed's family. POSTs are
+     * always seeds themselves, never tail members.
+     */
+    private static List<ApiCallInfo> buildTailPool(ApiCallInfo seed, List<ApiCallInfo> allCalls) {
+        Set<String> boundParams = new HashSet<>(seed.pathParamNames());
+        String seedPath = seed.path();
+        String descendantScan = seedPath + "/{";
+        for (ApiCallInfo c : allCalls) {
+            if (c.path().startsWith(descendantScan)) {
+                int start = descendantScan.length();
+                int end = c.path().indexOf('}', start);
+                if (end > start) {
+                    boundParams.add(c.path().substring(start, end));
+                    break;
+                }
+            }
+        }
+
+        List<ApiCallInfo> pool = new ArrayList<>();
+        for (ApiCallInfo c : allCalls) {
+            if (c == seed) {
+                continue;
+            }
+            if (!c.isConsumer()) {
+                continue;
+            }
+            if ("POST".equalsIgnoreCase(c.method())) {
+                continue;
+            }
+            if (!(c.path().equals(seedPath) || c.path().startsWith(seedPath + "/"))) {
+                continue;
+            }
+            if (!boundParams.containsAll(c.pathParamNames())) {
+                continue;
+            }
+            pool.add(c);
+        }
+        return pool;
+    }
+
+    private static List<ApiCallInfo> composeSteps(List<ApiCallInfo> prefix, ApiCallInfo seed,
+                                                  List<ApiCallInfo> tail) {
+        List<ApiCallInfo> steps = new ArrayList<>(prefix.size() + 1 + tail.size());
+        steps.addAll(prefix);
+        steps.add(seed);
+        steps.addAll(tail);
+        return steps;
+    }
+
+    private static void addIfUnique(List<ApiCallInfo> steps, ApiCallInfo seed, boolean unresolved,
+                                    List<EnumeratedChain> out, Set<String> seenSignatures) {
+        StringBuilder sig = new StringBuilder();
+        for (ApiCallInfo c : steps) {
+            sig.append(c.method()).append(' ').append(c.path()).append('|');
+        }
+        if (seenSignatures.add(sig.toString())) {
+            out.add(new EnumeratedChain(seed, steps, unresolved));
+        }
     }
 
     /**
@@ -129,5 +250,11 @@ public class ChainEnumerator {
             }
         }
         return false;
+    }
+
+    private record PrefixResult(List<ApiCallInfo> steps, boolean hasUnresolved) {
+        PrefixResult {
+            steps = List.copyOf(steps);
+        }
     }
 }

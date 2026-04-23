@@ -7,6 +7,7 @@ import egain.oassdk.core.sequence.ApiCallExtractor;
 import egain.oassdk.core.sequence.ApiCallInfo;
 import egain.oassdk.core.sequence.ChainConfig;
 import egain.oassdk.core.sequence.ChainEnumerator;
+import egain.oassdk.core.sequence.EnumeratedChain;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.TestGenerator;
 
@@ -66,7 +67,7 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
             ApiCallExtractor extractor = new ApiCallExtractor();
             List<ApiCallInfo> calls = extractor.extract(spec);
             ChainEnumerator enumerator = new ChainEnumerator(readChainConfig(config));
-            List<List<ApiCallInfo>> chains = enumerator.enumerate(calls);
+            List<EnumeratedChain> chains = enumerator.enumerate(calls);
 
             String baseUrl = resolveBaseUrl(spec, config);
             writeConftest(dir, baseUrl);
@@ -221,10 +222,10 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
         Files.writeString(dir.resolve("README-sequence.md"), content, StandardCharsets.UTF_8);
     }
 
-    private void writeChainTestFiles(Path dir, List<List<ApiCallInfo>> chains,
+    private void writeChainTestFiles(Path dir, List<EnumeratedChain> chains,
                                      Map<String, Object> spec, ApiCallExtractor extractor) throws IOException {
-        Map<String, List<List<ApiCallInfo>>> byResource = groupChainsByResource(chains);
-        for (Map.Entry<String, List<List<ApiCallInfo>>> e : byResource.entrySet()) {
+        Map<String, List<EnumeratedChain>> byResource = groupChainsByResource(chains);
+        for (Map.Entry<String, List<EnumeratedChain>> e : byResource.entrySet()) {
             String resource = e.getKey();
             String fileName = "test_chain_" + sanitizeModuleName(resource) + ".py";
             String content = renderChainTestFile(resource, e.getValue(), spec, extractor);
@@ -232,18 +233,18 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
         }
     }
 
-    private Map<String, List<List<ApiCallInfo>>> groupChainsByResource(List<List<ApiCallInfo>> chains) {
-        Map<String, List<List<ApiCallInfo>>> byResource = new TreeMap<>();
-        for (List<ApiCallInfo> chain : chains) {
-            if (chain.isEmpty()) {
+    private Map<String, List<EnumeratedChain>> groupChainsByResource(List<EnumeratedChain> chains) {
+        Map<String, List<EnumeratedChain>> byResource = new TreeMap<>();
+        for (EnumeratedChain chain : chains) {
+            if (chain.steps().isEmpty()) {
                 continue;
             }
-            byResource.computeIfAbsent(chain.get(0).resourceName(), k -> new java.util.ArrayList<>()).add(chain);
+            byResource.computeIfAbsent(chain.seedPost().resourceName(), k -> new java.util.ArrayList<>()).add(chain);
         }
         return byResource;
     }
 
-    private String renderChainTestFile(String resource, List<List<ApiCallInfo>> chains,
+    private String renderChainTestFile(String resource, List<EnumeratedChain> chains,
                                        Map<String, Object> spec, ApiCallExtractor extractor) {
         StringBuilder sb = new StringBuilder();
         sb.append("\"\"\"Enumerated workflow chains for resource: ").append(resource).append(".\n\n");
@@ -251,8 +252,8 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
         sb.append("construction; every step asserts 2xx.\n");
         sb.append("\"\"\"\n");
         sb.append("from conftest import extract_id\n\n");
-        for (List<ApiCallInfo> chain : chains) {
-            sb.append(renderOneTest(chain, spec, extractor));
+        for (EnumeratedChain chain : chains) {
+            sb.append(renderOneTest(chain.steps(), spec, extractor));
             sb.append('\n');
         }
         return sb.toString();
