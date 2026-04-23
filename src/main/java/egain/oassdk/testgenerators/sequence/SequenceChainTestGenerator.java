@@ -16,9 +16,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -46,6 +48,9 @@ import java.util.TreeMap;
  *   <li>{@code sequence.maxChainLength} (int, default 4)</li>
  *   <li>{@code sequence.allowRepeats} (bool, default false)</li>
  *   <li>{@code sequence.deleteLastOnly} (bool, default true)</li>
+ *   <li>{@code sequence.unresolvedParamPolicy} — {@code SKIP} (default)
+ *       or {@code EMIT_WITH_MARKER}; controls handling of sub-resource
+ *       POSTs whose path parameters have no producer POST in the spec</li>
  *   <li>{@code sequence.baseUrl} — baked into conftest as the default
  *       {@code API_BASE_URL} when the env var is unset</li>
  * </ul>
@@ -95,6 +100,15 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
         if (deleteLast != null) {
             b.deleteLastOnly(deleteLast);
         }
+        String policy = propString(tc, "sequence.unresolvedParamPolicy", null);
+        if (policy != null) {
+            try {
+                b.unresolvedParamPolicy(ChainConfig.UnresolvedParamPolicy.valueOf(
+                        policy.trim().toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException ignored) {
+                // Leave the builder's default (SKIP) in place for unknown values.
+            }
+        }
         return b.build();
     }
 
@@ -117,6 +131,7 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
         String content = """
                 \"\"\"Shared fixtures for enumerated API-chain tests.\"\"\"
                 import os
+                import re
                 import pytest
                 import requests
 
@@ -143,14 +158,28 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
                     return {"Authorization": f"Bearer {token}"}
 
 
-                def extract_id(response):
-                    \"\"\"Pull an id out of a JSON response body; None if missing or not JSON.\"\"\"
+                def extract_id(response, hint=None):
+                    \"\"\"Pull an id out of a JSON response body; None if missing or not JSON.
+
+                    If ``hint`` is given (the OpenAPI path-parameter name the caller expects to
+                    consume, e.g. ``orderId``) it takes precedence: the hint itself and a
+                    snake_case variant are tried first. The generic id heuristic then runs as a
+                    fallback so callers that omit ``hint`` get pre-hint behavior.
+                    \"\"\"
                     try:
                         body = response.json()
                     except ValueError:
                         return None
                     if not isinstance(body, dict):
                         return None
+                    if hint:
+                        snake = re.sub(r"([a-z0-9])([A-Z])", r"\\1_\\2", hint).lower()
+                        candidates = [hint]
+                        if snake != hint:
+                            candidates.append(snake)
+                        for key in candidates:
+                            if key in body and body[key] is not None:
+                                return str(body[key])
                     for key in ("id", "ID", "_id", "uuid", "resourceId"):
                         if key in body and body[key] is not None:
                             return str(body[key])
@@ -186,9 +215,11 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
         String content = """
                 # Enumerated API-chain tests
 
-                One file per resource. One test per valid workflow chain.
-                Every chain starts with the resource's POST creator and ends in
-                a terminal step (optionally DELETE); each step asserts `2xx`.
+                One file per seed POST's resource. One test per valid
+                workflow chain. Every POST in the spec seeds at least one
+                chain, so no path is skipped; sub-resource POSTs are
+                preceded by producer POSTs whose output ids resolve the
+                path parameters. Each step asserts `2xx`.
 
                 ## Run
 
@@ -210,10 +241,14 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
 
                 ## Validity rules (enforced at generation time)
 
-                1. First step is the resource's POST creator (no path params).
-                2. Subsequent steps are path-templated consumers.
+                1. Each chain is anchored on a seed POST. Any prefix steps
+                   are producer POSTs whose responses resolve the seed's
+                   path parameters (recursively).
+                2. Tail steps are path-templated consumers
+                   (GET/PUT/PATCH/DELETE) scoped to the seed's resource tree.
                 3. DELETE, if present, is the terminal step.
-                4. No operation repeats within a chain.
+                4. No operation repeats within a chain (unless
+                   `sequence.allowRepeats` is enabled).
 
                 Because these rules are enforced when the tests are generated,
                 every emitted test's expected outcome is `2xx` at every step.
@@ -251,20 +286,25 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
         sb.append("Generated by SequenceChainTestGenerator. Every chain is valid by\n");
         sb.append("construction; every step asserts 2xx.\n");
         sb.append("\"\"\"\n");
+        sb.append("import pytest\n");
         sb.append("from conftest import extract_id\n\n");
         for (EnumeratedChain chain : chains) {
-            sb.append(renderOneTest(chain.steps(), spec, extractor));
+            sb.append(renderOneTest(chain, spec, extractor));
             sb.append('\n');
         }
         return sb.toString();
     }
 
-    private String renderOneTest(List<ApiCallInfo> chain, Map<String, Object> spec, ApiCallExtractor extractor) {
+    private String renderOneTest(EnumeratedChain chain, Map<String, Object> spec, ApiCallExtractor extractor) {
         StringBuilder sb = new StringBuilder();
-        String testName = chainTestName(chain);
+        List<ApiCallInfo> steps = chain.steps();
+        String testName = chainTestName(chain.seedPost(), steps);
         sb.append("def ").append(testName).append("(api_client, auth_headers, base_url):\n");
-        for (int i = 0; i < chain.size(); i++) {
-            ApiCallInfo call = chain.get(i);
+        if (chain.unresolved()) {
+            sb.append("    pytest.skip(\"Sequence chain has an unresolved path parameter; no producer POST found in the spec\")\n");
+        }
+        for (int i = 0; i < steps.size(); i++) {
+            ApiCallInfo call = steps.get(i);
             int stepNum = i + 1;
             String pathExpr = pythonPathExpression(call.path());
             String verb = call.method().toLowerCase(Locale.ROOT);
@@ -291,32 +331,59 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
                         .append(' ').append(pathInFString)
                         .append(": {r.status_code} {r.text}\"\n");
             }
-            if (call.isCreator() && anyLaterConsumerNeedsId(chain, i)) {
-                sb.append("    resource_id = extract_id(r)\n");
-                sb.append("    assert resource_id is not None, ")
-                        .append("\"Creator response had no extractable id — subsequent steps cannot proceed\"\n");
+            if ("POST".equalsIgnoreCase(call.method())) {
+                for (String paramName : newlyBoundByPost(steps, i)) {
+                    String var = ApiCallExtractor.idVariableName(paramName);
+                    sb.append("    ").append(var).append(" = extract_id(r, hint=\"")
+                            .append(escapePy(paramName)).append("\")\n");
+                    sb.append("    assert ").append(var).append(" is not None, ")
+                            .append("f\"Step ").append(stepNum).append(" POST response had no extractable '")
+                            .append(escapePy(paramName)).append("'\"\n");
+                }
             }
         }
         return sb.toString();
     }
 
-    private static boolean anyLaterConsumerNeedsId(List<ApiCallInfo> chain, int creatorIdx) {
-        for (int j = creatorIdx + 1; j < chain.size(); j++) {
-            if (!chain.get(j).pathParamNames().isEmpty()) {
-                return true;
+    /**
+     * Path-parameter names that a POST at {@code postIdx} binds for later
+     * steps — specifically, the first path-param segment that appears
+     * directly under this POST's path in any subsequent consumer path, and
+     * isn't already bound by an earlier step. Usually 0 or 1 names per POST;
+     * multiple only occur when the spec uses inconsistent param names at
+     * the same position (e.g. {@code /orders/{id}} and {@code /orders/{orderId}}).
+     */
+    static List<String> newlyBoundByPost(List<ApiCallInfo> steps, int postIdx) {
+        ApiCallInfo post = steps.get(postIdx);
+        String scanPrefix = post.path() + "/{";
+        Set<String> alreadyBound = new LinkedHashSet<>();
+        for (int k = 0; k <= postIdx; k++) {
+            alreadyBound.addAll(steps.get(k).pathParamNames());
+        }
+        LinkedHashSet<String> produced = new LinkedHashSet<>();
+        for (int j = postIdx + 1; j < steps.size(); j++) {
+            String laterPath = steps.get(j).path();
+            if (!laterPath.startsWith(scanPrefix)) {
+                continue;
+            }
+            int start = scanPrefix.length();
+            int end = laterPath.indexOf('}', start);
+            if (end <= start) {
+                continue;
+            }
+            String param = laterPath.substring(start, end);
+            if (!alreadyBound.contains(param)) {
+                produced.add(param);
             }
         }
-        return false;
+        return List.copyOf(produced);
     }
 
     /**
-     * Convert an OpenAPI path like {@code /folders/{folderID}/contents/{cid}}
-     * to a Python f-string expression:
-     * {@code f"{base_url}/folders/{resource_id}/contents/{resource_id}"}.
-     *
-     * <p>All path params bind to the same {@code resource_id} extracted
-     * from the creator — sufficient for the single-resource, creator-first
-     * chains the enumerator emits.
+     * Convert an OpenAPI path like {@code /orders/{orderId}/items/{itemId}}
+     * to a Python f-string expression where each path parameter is bound
+     * to a distinct snake_cased id variable produced by an earlier POST:
+     * {@code f"{base_url}/orders/{order_id}/items/{item_id}"}.
      */
     static String pythonPathExpression(String path) {
         StringBuilder sb = new StringBuilder("f\"{base_url}");
@@ -333,7 +400,8 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
                 sb.append(escapePy(path.substring(open)));
                 break;
             }
-            sb.append("{resource_id}");
+            String paramName = path.substring(open + 1, close);
+            sb.append('{').append(ApiCallExtractor.idVariableName(paramName)).append('}');
             i = close + 1;
         }
         sb.append("\"");
@@ -379,15 +447,16 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
         return sb.toString();
     }
 
-    /** Build a deterministic, filesystem-safe test function name from a chain. */
-    static String chainTestName(List<ApiCallInfo> chain) {
+    /** Build a deterministic, filesystem-safe test function name from a chain, rooted on the seed resource. */
+    static String chainTestName(ApiCallInfo seed, List<ApiCallInfo> steps) {
         StringBuilder sb = new StringBuilder("test_");
-        sb.append(sanitizeModuleName(chain.get(0).resourceName()));
-        for (ApiCallInfo call : chain) {
+        String seedResource = seed.resourceName();
+        sb.append(sanitizeModuleName(seedResource));
+        for (ApiCallInfo call : steps) {
             sb.append('_').append(call.method().toLowerCase(Locale.ROOT));
             if (!call.pathParamNames().isEmpty() && !call.isCreator()) {
                 String tail = tailNonParamSegment(call.path());
-                if (tail != null && !tail.equals(chain.get(0).resourceName())) {
+                if (tail != null && !tail.equals(seedResource)) {
                     sb.append('_').append(sanitizeModuleName(tail));
                 }
             }

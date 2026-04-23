@@ -1,6 +1,7 @@
 package egain.oassdk.testgenerators.sequence;
 
 import egain.oassdk.config.TestConfig;
+import egain.oassdk.core.sequence.ApiCallInfo;
 import egain.oassdk.core.sequence.SequenceTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,7 +33,7 @@ class SequenceChainTestGeneratorTest {
     }
 
     @Test
-    void emittedChainsResolvePathTemplatesToResourceId(@TempDir Path outputDir) throws Exception {
+    void emittedChainsBindPathParamsToPerParamIdVariables(@TempDir Path outputDir) throws Exception {
         new SequenceChainTestGenerator().generate(
                 SequenceTestFixtures.folderSpecWithCrud(),
                 outputDir.toString(),
@@ -40,8 +42,9 @@ class SequenceChainTestGeneratorTest {
         String pytest = Files.readString(
                 outputDir.resolve("sequence/test_chain_folders.py"), StandardCharsets.UTF_8);
 
-        // Path template substituted into an f-string, not left as {folderID}.
-        assertThat(pytest).contains("f\"{base_url}/folders/{resource_id}\"");
+        // Path template uses the per-param snake_case variable, not the generic resource_id.
+        assertThat(pytest).contains("f\"{base_url}/folders/{folder_id}\"");
+        assertThat(pytest).doesNotContain("{resource_id}");
         assertThat(pytest).doesNotContain("\"{base_url}/folders/{folderID}\"");
         // Error messages still reference the original template (braces escaped).
         assertThat(pytest).contains("/folders/{{folderID}}");
@@ -52,7 +55,7 @@ class SequenceChainTestGeneratorTest {
     }
 
     @Test
-    void creatorExtractsResourceIdOnlyWhenLaterStepsNeedIt(@TempDir Path outputDir) throws Exception {
+    void creatorExtractsIdWithHintOnlyWhenLaterStepsNeedIt(@TempDir Path outputDir) throws Exception {
         new SequenceChainTestGenerator().generate(
                 SequenceTestFixtures.minimalFolderSpec(),
                 outputDir.toString(),
@@ -61,11 +64,9 @@ class SequenceChainTestGeneratorTest {
         String pytest = Files.readString(
                 outputDir.resolve("sequence/test_chain_folders.py"), StandardCharsets.UTF_8);
 
-        // Two chains emitted: [POST] and [POST, GET]. Only the second needs resource_id.
         assertThat(pytest).contains("def test_folders_post(");
         assertThat(pytest).contains("def test_folders_post_get(");
-        // resource_id extraction appears exactly once (inside the longer chain).
-        int occurrences = pytest.split("resource_id = extract_id\\(r\\)", -1).length - 1;
+        int occurrences = pytest.split("folder_id = extract_id\\(r, hint=\"folderID\"\\)", -1).length - 1;
         assertThat(occurrences).isEqualTo(1);
     }
 
@@ -89,14 +90,13 @@ class SequenceChainTestGeneratorTest {
     }
 
     @Test
-    void pythonPathExpression_escapesBraces() {
-        // direct helper check: no path params → plain f-string, params → resource_id.
+    void pythonPathExpression_usesPerParamIdVariable() {
         assertThat(SequenceChainTestGenerator.pythonPathExpression("/folders"))
                 .isEqualTo("f\"{base_url}/folders\"");
         assertThat(SequenceChainTestGenerator.pythonPathExpression("/folders/{folderID}"))
-                .isEqualTo("f\"{base_url}/folders/{resource_id}\"");
-        assertThat(SequenceChainTestGenerator.pythonPathExpression("/a/{x}/b/{y}"))
-                .isEqualTo("f\"{base_url}/a/{resource_id}/b/{resource_id}\"");
+                .isEqualTo("f\"{base_url}/folders/{folder_id}\"");
+        assertThat(SequenceChainTestGenerator.pythonPathExpression("/orders/{orderId}/items/{itemId}"))
+                .isEqualTo("f\"{base_url}/orders/{order_id}/items/{item_id}\"");
     }
 
     @Test
@@ -112,5 +112,94 @@ class SequenceChainTestGeneratorTest {
         assertThat(SequenceChainTestGenerator.sanitizeModuleName("UserProfiles")).isEqualTo("user_profiles");
         assertThat(SequenceChainTestGenerator.sanitizeModuleName("my-widget")).isEqualTo("my_widget");
         assertThat(SequenceChainTestGenerator.sanitizeModuleName(null)).isEqualTo("resource");
+    }
+
+    @Test
+    void newlyBoundByPost_identifiesOnlyProducedParams() {
+        ApiCallInfo ordersPost = new ApiCallInfo("POST", "/orders", "createOrder",
+                "orders", false, true, List.of(), Map.of(), Map.of());
+        ApiCallInfo itemsPost = new ApiCallInfo("POST", "/orders/{orderId}/items", "addItem",
+                "items", true, true, List.of("orderId"), Map.of(), Map.of());
+        ApiCallInfo itemGet = new ApiCallInfo("GET", "/orders/{orderId}/items/{itemId}", "getItem",
+                "items", true, false, List.of("orderId", "itemId"), Map.of(), Map.of());
+        List<ApiCallInfo> chain = List.of(ordersPost, itemsPost, itemGet);
+
+        assertThat(SequenceChainTestGenerator.newlyBoundByPost(chain, 0))
+                .containsExactly("orderId");
+        assertThat(SequenceChainTestGenerator.newlyBoundByPost(chain, 1))
+                .containsExactly("itemId");
+    }
+
+    @Test
+    void emitsOneFilePerSeedResource_withSubResources(@TempDir Path outputDir) throws Exception {
+        new SequenceChainTestGenerator().generate(
+                SequenceTestFixtures.orderWithItemsSpec(),
+                outputDir.toString(),
+                TestConfig.builder().language("python").framework("pytest").build());
+
+        Path bundle = outputDir.resolve("sequence");
+        assertThat(bundle.resolve("test_chain_orders.py")).isRegularFile();
+        assertThat(bundle.resolve("test_chain_items.py")).isRegularFile();
+
+        String items = Files.readString(bundle.resolve("test_chain_items.py"), StandardCharsets.UTF_8);
+
+        // The items family is anchored on /orders/{orderId}/items POST, so the chain
+        // is [POST /orders, POST /orders/{orderId}/items, ...] — the prefix /orders POST
+        // extracts order_id, the items POST extracts item_id, and subsequent steps use both.
+        assertThat(items).contains("order_id = extract_id(r, hint=\"orderId\")");
+        assertThat(items).contains("item_id = extract_id(r, hint=\"itemId\")");
+        assertThat(items).contains("f\"{base_url}/orders/{order_id}/items/{item_id}\"");
+    }
+
+    @Test
+    void alternativeCreators_emitEachInItsOwnFile(@TempDir Path outputDir) throws Exception {
+        new SequenceChainTestGenerator().generate(
+                SequenceTestFixtures.alternativeCreatorsSpec(),
+                outputDir.toString(),
+                TestConfig.builder().language("python").framework("pytest").build());
+
+        Path bundle = outputDir.resolve("sequence");
+        // Both POSTs land in their own file keyed on their seed's resourceName.
+        assertThat(bundle.resolve("test_chain_users.py")).isRegularFile();
+        assertThat(bundle.resolve("test_chain_bulk.py")).isRegularFile();
+
+        String users = Files.readString(bundle.resolve("test_chain_users.py"), StandardCharsets.UTF_8);
+        String bulk = Files.readString(bundle.resolve("test_chain_bulk.py"), StandardCharsets.UTF_8);
+
+        assertThat(users).contains("def test_users_post(");
+        assertThat(bulk).contains("def test_bulk_post(");
+    }
+
+    @Test
+    void unresolvedParam_defaultPolicy_omitsFamily(@TempDir Path outputDir) throws Exception {
+        new SequenceChainTestGenerator().generate(
+                SequenceTestFixtures.unresolvedParamSpec(),
+                outputDir.toString(),
+                TestConfig.builder().language("python").framework("pytest").build());
+
+        Path bundle = outputDir.resolve("sequence");
+        // Default policy is SKIP — no test_chain_*.py emitted for an orphan op.
+        try (var stream = Files.list(bundle)) {
+            boolean anyChainFile = stream.anyMatch(p -> p.getFileName().toString().startsWith("test_chain_"));
+            assertThat(anyChainFile).isFalse();
+        }
+    }
+
+    @Test
+    void unresolvedParam_emitWithMarkerPolicy_rendersPytestSkip(@TempDir Path outputDir) throws Exception {
+        TestConfig tc = TestConfig.builder()
+                .language("python")
+                .framework("pytest")
+                .additionalProperties(Map.of("sequence.unresolvedParamPolicy", "EMIT_WITH_MARKER"))
+                .build();
+        new SequenceChainTestGenerator().generate(
+                SequenceTestFixtures.unresolvedParamSpec(),
+                outputDir.toString(),
+                tc);
+
+        Path bundle = outputDir.resolve("sequence");
+        assertThat(bundle.resolve("test_chain_children.py")).isRegularFile();
+        String content = Files.readString(bundle.resolve("test_chain_children.py"), StandardCharsets.UTF_8);
+        assertThat(content).contains("pytest.skip(");
     }
 }
