@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -134,6 +135,39 @@ class JerseyTypeUtilsTest {
         Map<String, Object> items = Map.of("$ref", "#/components/schemas/User");
         Map<String, Object> schema = Map.of("type", "array", "items", items);
         assertEquals("List<User>", createTypeUtils().getJavaType(schema));
+    }
+
+    @Test
+    @DisplayName("getJavaType uses x-resolved-ref named schema for inlined oneOf union (IdentityPayload)")
+    void getJavaType_oneOfWithXResolvedRef_returnsComponentModelType() {
+        Map<String, Object> userBranch = new LinkedHashMap<>();
+        userBranch.put("type", "object");
+        userBranch.put("properties", Map.of("user", Map.of("$ref", "#/components/schemas/Identity")));
+        Map<String, Object> groupBranch = new LinkedHashMap<>();
+        groupBranch.put("type", "object");
+        groupBranch.put("properties", Map.of("group", Map.of("$ref", "#/components/schemas/GroupIdentity")));
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("description", "The subject receiving the permissions.");
+        schema.put("oneOf", List.of(userBranch, groupBranch));
+        schema.put("x-resolved-ref", "#/components/schemas/IdentityPayload");
+        assertEquals("IdentityPayload", createTypeUtils().getJavaType(schema));
+    }
+
+    @Test
+    @DisplayName("getFieldTypeForModelProperty returns IdentityPayload for inlined oneOf + x-resolved-ref")
+    void getFieldTypeForModelProperty_oneOfWithXResolvedRef() {
+        Map<String, Object> userBranch = new LinkedHashMap<>();
+        userBranch.put("type", "object");
+        userBranch.put("properties", Map.of("user", Map.of("$ref", "#/components/schemas/Identity")));
+        Map<String, Object> groupBranch = new LinkedHashMap<>();
+        groupBranch.put("type", "object");
+        groupBranch.put("properties", Map.of("group", Map.of("$ref", "#/components/schemas/GroupIdentity")));
+        Map<String, Object> fieldSchema = new LinkedHashMap<>();
+        fieldSchema.put("oneOf", List.of(userBranch, groupBranch));
+        fieldSchema.put("x-resolved-ref", "#/components/schemas/IdentityPayload");
+        JerseyTypeUtils typeUtils = createTypeUtils(Map.of());
+        assertEquals("IdentityPayload",
+                typeUtils.getFieldTypeForModelProperty("EditFolderPermissionsEntry", "identity", fieldSchema, false, Map.of()));
     }
 
     // -----------------------------------------------------------------------

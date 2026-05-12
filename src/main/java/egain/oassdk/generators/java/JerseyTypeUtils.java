@@ -99,6 +99,15 @@ public final class JerseyTypeUtils {
             }
         }
 
+        // Parser-inlined internal $ref: body is oneOf/anyOf but x-resolved-ref (or $ref) names the component.
+        // Use that model type instead of collapsing to the first branch (which would become Object).
+        if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+            String namedUnionSchema = JerseySchemaUtils.getSchemaNameFromRef(schema);
+            if (namedUnionSchema != null) {
+                return JerseyNamingUtils.toJavaClassName(namedUnionSchema);
+            }
+        }
+
         // Resolve property-level allOf/oneOf/anyOf to effective schema for type resolution
         if (schema.containsKey("allOf") || schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
             Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(schema, ctx.spec);
