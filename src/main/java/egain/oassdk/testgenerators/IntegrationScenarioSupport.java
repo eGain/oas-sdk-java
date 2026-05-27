@@ -5,9 +5,11 @@ import egain.oassdk.config.TestConfig;
 import egain.oassdk.testgenerators.postman.PostmanNegativeRequestFactory;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Shared OpenAPI-driven scenarios for integration test generators (Java, Python, Node).
@@ -201,82 +203,123 @@ public final class IntegrationScenarioSupport {
     /**
      * Valid JSON text (not escaped for Java source).
      */
-    @SuppressWarnings("unchecked")
     public static String generateJsonFromSchemaRaw(Map<String, Object> schema, Map<String, Object> spec) {
+        return generateJsonFromSchemaRaw(schema, spec, new HashSet<>());
+    }
+
+    // Self-referential schemas (e.g. a node type whose `children` array items
+    // $ref back to itself) would otherwise recurse forever. `visitedRefs`
+    // tracks refs currently on the call stack; we add before descending and
+    // remove on the way out so sibling subtrees can still expand the same ref.
+    @SuppressWarnings("unchecked")
+    private static String generateJsonFromSchemaRaw(Map<String, Object> schema,
+                                                    Map<String, Object> spec,
+                                                    Set<String> visitedRefs) {
         if (schema == null || schema.isEmpty()) {
             return "{}";
         }
+        String enteredRef = null;
         if (schema.containsKey("$ref")) {
-            Map<String, Object> resolved = resolveRef((String) schema.get("$ref"), spec);
-            if (resolved != null) {
-                schema = resolved;
-            } else {
+            String ref = (String) schema.get("$ref");
+            if (visitedRefs.contains(ref)) {
                 return "{}";
             }
-        }
-
-        String type = (String) schema.get("type");
-        if ("array".equals(type)) {
-            Map<String, Object> items = Util.asStringObjectMap(schema.get("items"));
-            if (items != null) {
-                return "[" + generateJsonFromSchemaRaw(items, spec) + "]";
+            Map<String, Object> resolved = resolveRef(ref, spec);
+            if (resolved == null) {
+                return "{}";
             }
-            return "[]";
+            schema = resolved;
+            visitedRefs.add(ref);
+            enteredRef = ref;
         }
-
-        if (!"object".equals(type) && type != null && !"null".equals(type)) {
-            return generateMockValue(null, type, (String) schema.get("format"));
-        }
-
-        Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
-        if (properties == null || properties.isEmpty()) {
-            return "{}";
-        }
-
-        StringBuilder json = new StringBuilder("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : properties.entrySet()) {
-            if (!first) {
-                json.append(", ");
-            }
-            first = false;
-
-            String fieldName = entry.getKey();
-            Map<String, Object> propSchema = Util.asStringObjectMap(entry.getValue());
-            if (propSchema == null) {
-                continue;
-            }
-            if (propSchema.containsKey("$ref")) {
-                Map<String, Object> resolved = resolveRef((String) propSchema.get("$ref"), spec);
-                if (resolved != null) {
-                    propSchema = resolved;
-                }
-            }
-
-            String propType = (String) propSchema.get("type");
-            String propFormat = (String) propSchema.get("format");
-
-            json.append('"').append(escapeJsonString(fieldName)).append("\": ");
-
-            if ("object".equals(propType) || propSchema.containsKey("properties")) {
-                json.append(generateJsonFromSchemaRaw(propSchema, spec));
-            } else if ("array".equals(propType)) {
-                Map<String, Object> items = Util.asStringObjectMap(propSchema.get("items"));
+        try {
+            String type = (String) schema.get("type");
+            if ("array".equals(type)) {
+                Map<String, Object> items = Util.asStringObjectMap(schema.get("items"));
                 if (items != null) {
-                    json.append("[").append(generateJsonFromSchemaRaw(items, spec)).append("]");
-                } else {
-                    json.append("[]");
+                    return "[" + generateJsonFromSchemaRaw(items, spec, visitedRefs) + "]";
                 }
-            } else if ("integer".equals(propType) || "number".equals(propType)) {
-                json.append(generateMockValue(fieldName, propType, propFormat));
-            } else if ("boolean".equals(propType)) {
-                json.append(generateMockValue(fieldName, propType, propFormat));
-            } else {
-                json.append('"').append(escapeJsonString(generateMockValue(fieldName, propType, propFormat))).append('"');
+                return "[]";
+            }
+
+            if (!"object".equals(type) && type != null && !"null".equals(type)) {
+                return generateMockValue(null, type, (String) schema.get("format"));
+            }
+
+            Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+            if (properties == null || properties.isEmpty()) {
+                return "{}";
+            }
+
+            StringBuilder json = new StringBuilder("{");
+            boolean first = true;
+            for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                if (!first) {
+                    json.append(", ");
+                }
+                first = false;
+
+                String fieldName = entry.getKey();
+                Map<String, Object> propSchema = Util.asStringObjectMap(entry.getValue());
+                if (propSchema == null) {
+                    continue;
+                }
+                json.append('"').append(escapeJsonString(fieldName)).append("\": ");
+
+                // Resolve a property-level $ref, but also track it for the duration of the
+                // recursive expansion so a cycle (e.g. A.self -> $ref: A) terminates instead
+                // of looping. Without this the recursion enters the resolved schema directly,
+                // bypassing the top-of-method ref check.
+                String propRef = null;
+                if (propSchema.containsKey("$ref")) {
+                    propRef = (String) propSchema.get("$ref");
+                    if (visitedRefs.contains(propRef)) {
+                        json.append("{}");
+                        continue;
+                    }
+                    Map<String, Object> resolved = resolveRef(propRef, spec);
+                    if (resolved != null) {
+                        propSchema = resolved;
+                    } else {
+                        propRef = null;
+                    }
+                }
+                if (propRef != null) {
+                    visitedRefs.add(propRef);
+                }
+                try {
+                    String propType = (String) propSchema.get("type");
+                    String propFormat = (String) propSchema.get("format");
+
+                    if ("object".equals(propType) || propSchema.containsKey("properties")) {
+                        json.append(generateJsonFromSchemaRaw(propSchema, spec, visitedRefs));
+                    } else if ("array".equals(propType)) {
+                        Map<String, Object> items = Util.asStringObjectMap(propSchema.get("items"));
+                        if (items != null) {
+                            json.append("[").append(generateJsonFromSchemaRaw(items, spec, visitedRefs)).append("]");
+                        } else {
+                            json.append("[]");
+                        }
+                    } else if ("integer".equals(propType) || "number".equals(propType)) {
+                        json.append(generateMockValue(fieldName, propType, propFormat));
+                    } else if ("boolean".equals(propType)) {
+                        json.append(generateMockValue(fieldName, propType, propFormat));
+                    } else {
+                        json.append('"').append(escapeJsonString(generateMockValue(fieldName, propType, propFormat))).append('"');
+                    }
+                } finally {
+                    if (propRef != null) {
+                        visitedRefs.remove(propRef);
+                    }
+                }
+            }
+            json.append("}");
+            return json.toString();
+        } finally {
+            if (enteredRef != null) {
+                visitedRefs.remove(enteredRef);
             }
         }
-        json.append("}");
-        return json.toString();
     }
 
     public static String escapeJsonString(String s) {
