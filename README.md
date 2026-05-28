@@ -241,6 +241,10 @@ java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar generate openapi.yaml -l java -f 
 # Generate with Jakarta EE namespace (jakarta.*) instead of Java EE (javax.*)
 java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar generate openapi.yaml -l java -f jersey -p com.example.api -o ./generated --jakarta
 
+# Generate without proprietary eGain platform dependencies (open-source mode)
+# Models implement only Serializable; no JAXBBean, ValidationBuilder, etc.
+java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar generate openapi.yaml -l java -f jersey -p com.example.api -o ./generated --standalone
+
 # Generate test suites
 java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar tests openapi.yaml -t unit,integration -o ./generated/tests
 
@@ -252,6 +256,9 @@ java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar all openapi.yaml -l java -f jerse
 
 # Generate everything with Jakarta EE namespace
 java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar all openapi.yaml -l java -f jersey -o ./generated --jakarta
+
+# Generate everything in standalone (open-source) mode
+java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar all openapi.yaml -l java -f jersey -o ./generated --standalone
 
 # Validate a specification
 java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar validate openapi.yaml
@@ -636,6 +643,51 @@ try (OASSDK sdk = new OASSDK(config, null, null)) {
 | JAXB API | `javax.xml.bind-api 2.3.1` | `jakarta.xml.bind-api 4.0.0` |
 | Hibernate Validator | `6.2.5.Final` | `8.0.1.Final` |
 | web.xml schema | Java EE (`web-app_4_0.xsd`) | Jakarta EE (`web-app_6_0.xsd`) |
+
+### 8. Standalone Mode (Open Source)
+
+By default, generated Java models reference proprietary eGain platform classes such as `com.egain.platform.common.JAXBBean` and `com.egain.platform.framework.validation.*`. These ship inside eGain's runtime and are not available to open-source consumers of this SDK.
+
+Use the `--standalone` CLI flag (or set `standaloneMode=true` in `additionalProperties`) to generate code that has no dependency on the eGain platform. Generated models implement only `java.io.Serializable`.
+
+**CLI:**
+```bash
+# Generate a fully standalone (open-source) Jersey project
+java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar generate openapi.yaml --standalone -p com.example.api -o ./generated
+
+# Combine with --jakarta for modern Jakarta EE servers
+java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar generate openapi.yaml --standalone --jakarta -p com.example.api -o ./generated
+```
+
+**Programmatic:**
+```java
+Map<String, Object> extra = new HashMap<>();
+extra.put("standaloneMode", "true");
+
+GeneratorConfig config = GeneratorConfig.builder()
+    .language("java")
+    .framework("jersey")
+    .packageName("com.example.api")
+    .additionalProperties(extra)
+    .build();
+
+try (OASSDK sdk = new OASSDK(config, null, null)) {
+    sdk.loadSpec("openapi.yaml");
+    sdk.generateApplication("java", "jersey", "com.example.api", "./generated");
+}
+```
+
+**What changes with `--standalone`:**
+
+| Area | Default (platform mode) | `--standalone` |
+|------|-------------------------|----------------|
+| Model `implements` clause | `Serializable, JAXBBean` | `Serializable` |
+| `JAXBBean` import | `import com.egain.platform.common.JAXBBean;` | omitted |
+| Dynamic-attribute `_attributes` field | emitted (`@XmlTransient Map<String,Object>`) | omitted |
+| `getAttribute` / `isSetAttribute` / `getAttributeNames` / `setAttribute` methods | emitted | omitted |
+| Inner/wrapper classes | `implements Serializable, JAXBBean` | `implements Serializable` |
+
+The flag applies only to the Jersey Java generator; Python and Node.js generators are unaffected.
 
 ### 8. Built-in Observability
 

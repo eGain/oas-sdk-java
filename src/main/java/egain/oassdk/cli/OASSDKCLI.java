@@ -71,6 +71,11 @@ public class OASSDKCLI implements Callable<Integer> {
         @Option(names = {"--jakarta"}, description = "Use Jakarta EE namespace (jakarta.*) instead of Java EE namespace (javax.*) in generated code")
         private boolean useJakartaNamespace;
 
+        @Option(names = {"--standalone"},
+                description = "Generate open-source-friendly Java code without proprietary eGain platform dependencies "
+                        + "(JAXBBean, ValidationBuilder, ValidationError, etc.). Models implement only Serializable.")
+        private boolean standaloneMode;
+
         @Override
         public Integer call() {
             try {
@@ -85,6 +90,11 @@ public class OASSDKCLI implements Callable<Integer> {
                         .useJakartaNamespace(useJakartaNamespace);
                 if (specZipPath != null && !specZipPath.isEmpty()) {
                     configBuilder.specZipPath(specZipPath);
+                }
+                if (standaloneMode) {
+                    Map<String, Object> extra = new HashMap<>();
+                    extra.put("standaloneMode", "true");
+                    configBuilder.additionalProperties(extra);
                 }
                 GeneratorConfig generatorConfig = configBuilder.build();
 
@@ -286,17 +296,27 @@ public class OASSDKCLI implements Callable<Integer> {
         @Option(names = {"--jakarta"}, description = "Use Jakarta EE namespace (jakarta.*) instead of Java EE namespace (javax.*) in generated code")
         private boolean useJakartaNamespace;
 
+        @Option(names = {"--standalone"},
+                description = "Generate open-source-friendly Java code without proprietary eGain platform dependencies "
+                        + "(JAXBBean, ValidationBuilder, ValidationError, etc.). Models implement only Serializable.")
+        private boolean standaloneMode;
+
         @Override
         public Integer call() {
             try {
-                GeneratorConfig generatorConfig = GeneratorConfig.builder()
+                GeneratorConfig.Builder configBuilder = GeneratorConfig.builder()
                         .language(language)
                         .framework(framework)
                         .packageName(packageName)
                         .outputDir(output)
                         .searchPaths(searchPaths != null && !searchPaths.isEmpty() ? searchPaths : null)
-                        .useJakartaNamespace(useJakartaNamespace)
-                        .build();
+                        .useJakartaNamespace(useJakartaNamespace);
+                if (standaloneMode) {
+                    Map<String, Object> extra = new HashMap<>();
+                    extra.put("standaloneMode", "true");
+                    configBuilder.additionalProperties(extra);
+                }
+                GeneratorConfig generatorConfig = configBuilder.build();
                 TestConfig testConfig = TestConfig.builder().build();
                 SLAConfig slaConfig = null;
 
