@@ -927,9 +927,9 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                         <maven.compiler.source>21</maven.compiler.source>
                         <maven.compiler.target>21</maven.compiler.target>
                         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-                        <junit.version>5.10.0</junit.version>
-                        <restassured.version>5.3.2</restassured.version>
-                        <jacoco.version>0.8.11</jacoco.version>
+                        <junit.version>5.12.2</junit.version>
+                        <restassured.version>5.5.2</restassured.version>
+                        <jacoco.version>0.8.13</jacoco.version>
                     </properties>
 
                     <dependencies>
@@ -948,7 +948,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                         <dependency>
                             <groupId>org.hamcrest</groupId>
                             <artifactId>hamcrest</artifactId>
-                            <version>2.2</version>
+                            <version>3.0</version>
                             <scope>test</scope>
                         </dependency>
                     </dependencies>
@@ -958,7 +958,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                             <plugin>
                                 <groupId>org.apache.maven.plugins</groupId>
                                 <artifactId>maven-surefire-plugin</artifactId>
-                                <version>3.2.2</version>
+                                <version>3.5.5</version>
                             </plugin>
                             <plugin>
                                 <groupId>org.jacoco</groupId>

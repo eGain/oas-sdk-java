@@ -228,15 +228,15 @@ class JerseyBuildGenerator {
                                 <dependency>
                                     <groupId>jakarta.xml.bind</groupId>
                                     <artifactId>jakarta.xml.bind-api</artifactId>
-                                    <version>4.0.0</version>
+                                    <version>4.0.2</version>
                                 </dependency>
                                 <dependency>
                                     <groupId>org.glassfish.jaxb</groupId>
                                     <artifactId>jaxb-runtime</artifactId>
-                                    <version>4.0.3</version>
+                                    <version>4.0.6</version>
                                 </dependency>
 
-                                <!-- Jakarta APIs -->
+                                <!-- Jakarta APIs (kept on Jakarta EE 10 line for Jersey 3.1.x compatibility) -->
                                 <dependency>
                                     <groupId>jakarta.ws.rs</groupId>
                                     <artifactId>jakarta.ws.rs-api</artifactId>
@@ -256,7 +256,7 @@ class JerseyBuildGenerator {
                                 <dependency>
                                     <groupId>org.hibernate.validator</groupId>
                                     <artifactId>hibernate-validator</artifactId>
-                                    <version>8.0.1.Final</version>
+                                    <version>8.0.2.Final</version>
                                 </dependency>""";
         } else {
             namespaceDeps = """
@@ -310,12 +310,12 @@ class JerseyBuildGenerator {
                             <packaging>war</packaging>
 
                             <name>%s</name>
-                            <description>%s</description>
+                            <description><![CDATA[%s]]></description>
 
                             <properties>
                                 <java.version>21</java.version>
-                                <jersey.version>3.1.3</jersey.version>
-                                <jackson.version>2.15.2</jackson.version>
+                                <jersey.version>3.1.10</jersey.version>
+                                <jackson.version>2.19.0</jackson.version>
                                 <maven.compiler.source>21</maven.compiler.source>
                                 <maven.compiler.target>21</maven.compiler.target>
                                 <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -366,8 +366,8 @@ class JerseyBuildGenerator {
                                     <version>${jackson.version}</version>
                                 </dependency>
 
-                %s
-                %s
+                            %s
+                            %s
                             </dependencies>
 
                             <build>
@@ -375,7 +375,7 @@ class JerseyBuildGenerator {
                                     <plugin>
                                         <groupId>org.apache.maven.plugins</groupId>
                                         <artifactId>maven-compiler-plugin</artifactId>
-                                        <version>3.11.0</version>
+                                        <version>3.15.0</version>
                                         <configuration>
                                             <source>21</source>
                                             <target>21</target>
@@ -384,7 +384,7 @@ class JerseyBuildGenerator {
                                     <plugin>
                                         <groupId>org.apache.maven.plugins</groupId>
                                         <artifactId>maven-war-plugin</artifactId>
-                                        <version>3.3.2</version>
+                                        <version>3.5.1</version>
                                     </plugin>
                                 </plugins>
                             </build>
@@ -411,24 +411,24 @@ class JerseyBuildGenerator {
                         <dependency>
                             <groupId>io.micrometer</groupId>
                             <artifactId>micrometer-registry-prometheus</artifactId>
-                            <version>1.12.2</version>
+                            <version>1.15.0</version>
                         </dependency>
 
                         <!-- Observability: OpenTelemetry -->
                         <dependency>
                             <groupId>io.opentelemetry</groupId>
                             <artifactId>opentelemetry-api</artifactId>
-                            <version>1.34.1</version>
+                            <version>1.51.0</version>
                         </dependency>
                         <dependency>
                             <groupId>io.opentelemetry</groupId>
                             <artifactId>opentelemetry-sdk</artifactId>
-                            <version>1.34.1</version>
+                            <version>1.51.0</version>
                         </dependency>
                         <dependency>
                             <groupId>io.opentelemetry</groupId>
                             <artifactId>opentelemetry-exporter-otlp</artifactId>
-                            <version>1.34.1</version>
+                            <version>1.51.0</version>
                         </dependency>""";
     }
 

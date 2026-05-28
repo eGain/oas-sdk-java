@@ -792,8 +792,8 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                         <maven.compiler.source>21</maven.compiler.source>
                         <maven.compiler.target>21</maven.compiler.target>
                         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-                        <junit.version>5.10.0</junit.version>
-                        <jacoco.version>0.8.11</jacoco.version>
+                        <junit.version>5.12.2</junit.version>
+                        <jacoco.version>0.8.13</jacoco.version>
                     </properties>
 
                     <dependencies>
@@ -810,7 +810,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                             <plugin>
                                 <groupId>org.apache.maven.plugins</groupId>
                                 <artifactId>maven-surefire-plugin</artifactId>
-                                <version>3.2.2</version>
+                                <version>3.5.5</version>
                             </plugin>
                             <plugin>
                                 <groupId>org.jacoco</groupId>
