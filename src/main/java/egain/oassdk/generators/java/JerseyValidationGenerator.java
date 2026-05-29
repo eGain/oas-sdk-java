@@ -29,10 +29,15 @@ class JerseyValidationGenerator {
         }
         String validationPackage = packageName != null ? packageName : "egain.ws.oas.validation";
         String packagePath = validationPackage.replace(".", "/");
-        String validationDir = outputDir + (ctx.modelsOnly ? "/" : "/src/main/java/") + packagePath;
+        String sourceRoot = outputDir + (ctx.modelsOnly ? "/" : "/src/main/java/");
+        String validationDir = sourceRoot + packagePath;
 
         // Ensure target directory exists
         Files.createDirectories(Paths.get(validationDir));
+
+        // Generate the runtime support classes the validators depend on. These live in the
+        // fixed egain.ws.oas package (the validators import egain.ws.oas.RequestInfo / Validations).
+        generateSupportClasses(sourceRoot);
 
         // Generate all validator classes
         generateIsRequiredValidator(validationDir, validationPackage);
@@ -1284,6 +1289,250 @@ class JerseyValidationGenerator {
                 """, packageName);
 
         writeFile(outputDir + "/IsAllowReservedValidator.java", content);
+    }
+
+    /**
+     * Generate the runtime support classes (RequestInfo, Validations) into the fixed
+     * {@code egain.ws.oas} package that every generated validator imports from.
+     *
+     * @param sourceRoot output root up to and including {@code src/main/java/} (or the bare
+     *                   output dir when {@code modelsOnly}); the {@code egain/ws/oas} sub-path is appended here.
+     */
+    private void generateSupportClasses(String sourceRoot) throws IOException {
+        String supportDir = sourceRoot + "egain/ws/oas";
+        Files.createDirectories(Paths.get(supportDir));
+        generateRequestInfo(supportDir);
+        generateValidations(supportDir);
+    }
+
+    /**
+     * Generate the RequestInfo record — a lightweight holder for request URL, method, and
+     * query/path parameters that all validators receive.
+     */
+    private void generateRequestInfo(String supportDir) throws IOException {
+        String content = String.format("""
+                package egain.ws.oas;
+
+                import com.google.common.collect.Multimap;
+                import com.google.common.collect.MultimapBuilder;
+
+                import %s.core.MultivaluedMap;
+
+                public record RequestInfo(String url, String httpMethod, Multimap<String, String> queryParameters,
+                                          Multimap<String, String> pathParameters) {
+
+                \tpublic RequestInfo(String url, String httpMethod, MultivaluedMap<String, String> queryParameters,
+                                       MultivaluedMap<String, String> pathParameters)
+                \t{
+                \t\tthis(url, httpMethod, convertMultivaluedMapToMultimap(queryParameters),
+                \t\t\tconvertMultivaluedMapToMultimap(pathParameters));
+                \t}
+
+                \tprivate static Multimap<String, String> convertMultivaluedMapToMultimap(MultivaluedMap<String, String> multivaluedMap)
+                \t{
+                \t\tMultimap<String, String> map = MultimapBuilder.linkedHashKeys().arrayListValues().build();
+                \t\tmultivaluedMap.forEach(map::putAll);
+                \t\treturn map;
+                \t}
+
+                \t@Override
+                \tpublic String toString()
+                \t{
+                \t\treturn "uriInfoHolder[" +
+                \t\t\t"url=" + url + ", " +
+                \t\t\t"httpMethod=" + httpMethod + ", " +
+                \t\t\t"queryParameters=" + queryParameters + ", " +
+                \t\t\t"pathParameters=" + pathParameters + ']';
+                \t}
+
+                }
+                """, ctx.getWsNs());
+
+        writeFile(supportDir + "/RequestInfo.java", content);
+    }
+
+    /**
+     * Generate the Validations class — the shared library of constraint-checking lambdas
+     * (numeric, string, array, enum, boolean) and parameter accessors used by every validator.
+     */
+    private void generateValidations(String supportDir) throws IOException {
+        String content = """
+                package egain.ws.oas;
+
+                import com.google.common.base.Objects;
+
+                import java.util.Arrays;
+                import java.util.Set;
+                import java.util.function.BiFunction;
+                import java.util.regex.Pattern;
+
+                public class Validations
+                {
+                \tpublic static final Pattern RESERVED_CHARACTERS = Pattern.compile("[:/?#\\\\[\\\\]@!$&'()*+,;=]");
+                \t// For numerical attributes
+                \tpublic static final BiFunction<String, String, Boolean> isGreaterThanOrEqualTo = (value, min) -> {
+                \t\ttry
+                \t\t{
+                \t\t\tDouble numericValue = Double.parseDouble(value);
+                \t\t\tDouble minValue = Double.parseDouble(min);
+                \t\t\treturn numericValue >= minValue;
+                \t\t}
+                \t\tcatch (NumberFormatException e)
+                \t\t{
+                \t\t\treturn false;
+                \t\t}
+                \t};
+                \tpublic static final BiFunction<String, String, Boolean> isGreaterThan = (value, min) -> {
+                \t\ttry
+                \t\t{
+                \t\t\tDouble numericValue = Double.parseDouble(value);
+                \t\t\tDouble minValue = Double.parseDouble(min);
+                \t\t\treturn numericValue > minValue;
+                \t\t}
+                \t\tcatch (NumberFormatException e)
+                \t\t{
+                \t\t\treturn false;
+                \t\t}
+                \t};
+                \tpublic static final BiFunction<String, String, Boolean> isLessThanOrEqualTo = (value, max) -> {
+                \t\ttry
+                \t\t{
+                \t\t\tDouble numericValue = Double.parseDouble(value);
+                \t\t\tDouble maxValue = Double.parseDouble(max);
+                \t\t\treturn numericValue <= maxValue;
+                \t\t}
+                \t\tcatch (NumberFormatException e)
+                \t\t{
+                \t\t\treturn false;
+                \t\t}
+                \t};
+                \tpublic static final BiFunction<String, String, Boolean> isLessThan = (value, max) -> {
+                \t\ttry
+                \t\t{
+                \t\t\tDouble numericValue = Double.parseDouble(value);
+                \t\t\tDouble maxValue = Double.parseDouble(max);
+                \t\t\treturn numericValue < maxValue;
+                \t\t}
+                \t\tcatch (NumberFormatException e)
+                \t\t{
+                \t\t\treturn false;
+                \t\t}
+                \t};
+                \tpublic static final BiFunction<String, String, Boolean> isMultipleOf = (value, divisor) -> {
+                \t\ttry
+                \t\t{
+                \t\t\tDouble numericValue = Double.parseDouble(value);
+                \t\t\tDouble divisorValue = Double.parseDouble(divisor);
+                \t\t\treturn divisorValue != 0 && numericValue % divisorValue == 0;
+                \t\t}
+                \t\tcatch (NumberFormatException e)
+                \t\t{
+                \t\t\treturn false;
+                \t\t}
+                \t};
+                \t// For string attributes
+                \tpublic static final BiFunction<String, String, Boolean> hasMinLength = (string, minLength) -> {
+                \t\ttry
+                \t\t{
+                \t\t\tint min = Integer.parseInt(minLength);
+                \t\t\treturn string != null && string.length() < min;
+                \t\t}
+                \t\tcatch (NumberFormatException e)
+                \t\t{
+                \t\t\treturn false;
+                \t\t}
+                \t};
+                \tpublic static final BiFunction<String, String, Boolean> hasMaxLength = (string, maxLength) -> {
+                \t\ttry
+                \t\t{
+                \t\t\tint max = Integer.parseInt(maxLength);
+                \t\t\treturn string != null && string.length() > max;
+                \t\t}
+                \t\tcatch (NumberFormatException e)
+                \t\t{
+                \t\t\treturn false;
+                \t\t}
+                \t};
+                \tpublic static final BiFunction<String, String, Boolean> matchesPattern = (string, regex) -> {
+                \t\tif (string == null || regex == null)
+                \t\t\treturn false;
+                \t\tPattern pattern = Pattern.compile(regex);
+                \t\treturn pattern.matcher(string).matches();
+                \t};
+                \t// For array attributes (size-based checks)
+                \tpublic static final BiFunction<String[], String, Boolean> hasMinItems = (array, minItems) -> {
+                \t\ttry
+                \t\t{
+                \t\t\tint min = Integer.parseInt(minItems);
+                \t\t\treturn array != null && array.length >= min;
+                \t\t}
+                \t\tcatch (NumberFormatException e)
+                \t\t{
+                \t\t\treturn false;
+                \t\t}
+                \t};
+                \tpublic static final BiFunction<String[], String, Boolean> hasMaxItems = (array, maxItems) -> {
+                \t\ttry
+                \t\t{
+                \t\t\tint max = Integer.parseInt(maxItems);
+                \t\t\treturn array.length <= max;
+                \t\t}
+                \t\tcatch (NumberFormatException e)
+                \t\t{
+                \t\t\treturn false;
+                \t\t}
+                \t};
+                \tpublic static final BiFunction<String[], String, Boolean> hasUniqueItems = (array, uniqueRequired) -> {
+                \t\tif (array == null || !Boolean.parseBoolean(uniqueRequired))
+                \t\t\treturn true;
+                \t\treturn array.length == Arrays.stream(array).distinct().count();
+                \t};
+                \t// For enums
+                \tpublic static final BiFunction<String, String, Boolean> isValueInEnum = (value, input) -> {
+                \t\tif (value == null || input == null)
+                \t\t\treturn false;
+                \t\tSet<String> enumSet = Arrays.stream(input.split(",\\\\s*")).collect(
+                \t\t\tjava.util.stream.Collectors.toSet());
+                \t\treturn enumSet.contains(value);
+                \t};
+
+                \t// For boolean attributes
+                \tpublic static final BiFunction<String, String, Boolean> isBoolean = (value, ignored) -> {
+                \t\tif (value == null)
+                \t\t\treturn false;
+                \t\treturn !("true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value));
+                \t};
+                \tpublic static final BiFunction<RequestInfo, String, String> getQueryParameterValue = (holder,
+                \t\tparamName) -> holder.queryParameters().get(paramName).stream().findFirst().orElse(null);
+                \tpublic static final BiFunction<RequestInfo, String, String> getPathParameterValue = (holder,
+                \t\tparamName) -> holder.pathParameters().get(paramName).stream().findFirst().orElse(null);
+                \t
+                \tpublic record ParameterValidatorMapKey(String url, String httpMethod) {
+                \t\t@Override
+                \t\tpublic boolean equals(Object o)
+                \t\t{
+                \t\t\tif (this == o)
+                \t\t\t\treturn true;
+                \t\t\tif (o == null || getClass() != o.getClass())
+                \t\t\t\treturn false;
+                \t\t\tParameterValidatorMapKey that = (ParameterValidatorMapKey) o;
+                \t\t\treturn Objects.equal(url, that.url) && Objects.equal(httpMethod, that.httpMethod);
+                \t\t}
+
+                \t\t@Override
+                \t\tpublic int hashCode()
+                \t\t{
+                \t\t\treturn Objects.hashCode(url, httpMethod);
+                \t\t}
+                \t}
+
+                \tpublic record Parameter(String name, String nameSpace, boolean isRequired, boolean isAllowEmptyValue,
+                \t\t\t\t\tboolean isAllowReserved) {
+                \t}
+                }
+                """;
+
+        writeFile(supportDir + "/Validations.java", content);
     }
 
     private void writeFile(String filePath, String content) throws IOException {
