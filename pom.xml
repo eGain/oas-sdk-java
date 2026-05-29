@@ -55,6 +55,7 @@
         <swagger-ui.version>4.15.5</swagger-ui.version>
         <openapi-generator-maven.version>7.0.0</openapi-generator-maven.version>
         <faker.version>1.0.2</faker.version>
+        <guava.version>33.4.0-jre</guava.version>
     </properties>
 
     <dependencies>
@@ -187,6 +188,13 @@
                     <artifactId>snakeyaml</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+
+        <!-- Guava (Multimap, MultimapBuilder, base.Objects) -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guava.version}</version>
         </dependency>
 
         <!-- Testing -->
