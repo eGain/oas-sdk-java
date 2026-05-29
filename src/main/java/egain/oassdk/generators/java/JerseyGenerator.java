@@ -73,12 +73,17 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
 
             new JerseyQueryParamValidatorGenerator(ctx).generate();
 
+            JerseyValidationGenerator validationGenerator = new JerseyValidationGenerator(ctx);
+            // Runtime support classes (RequestInfo, Validations) are always emitted, regardless of
+            // models-only mode, so the egain.ws.oas package is present in every generated output.
+            validationGenerator.generateSupportClasses();
+
             if (!isModelsOnly) {
                 JerseyBuildGenerator buildGenerator = new JerseyBuildGenerator(ctx);
                 buildGenerator.generateMainApplicationClass(spec, outputDir, packageName);
 
                 new JerseyResourceGenerator(ctx, this::getJavaType).generate();
-                new JerseyValidationGenerator(ctx).generate();
+                validationGenerator.generate();
 
                 buildGenerator.generateServices(outputDir, packageName);
                 buildGenerator.generateConfiguration(outputDir, packageName);

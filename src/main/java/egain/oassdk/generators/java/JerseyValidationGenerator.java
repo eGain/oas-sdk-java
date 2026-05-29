@@ -35,10 +35,6 @@ class JerseyValidationGenerator {
         // Ensure target directory exists
         Files.createDirectories(Paths.get(validationDir));
 
-        // Generate the runtime support classes the validators depend on. These live in the
-        // fixed egain.ws.oas package (the validators import egain.ws.oas.RequestInfo / Validations).
-        generateSupportClasses(sourceRoot);
-
         // Generate all validator classes
         generateIsRequiredValidator(validationDir, validationPackage);
         generatePatternValidator(validationDir, validationPackage);
@@ -1295,10 +1291,15 @@ class JerseyValidationGenerator {
      * Generate the runtime support classes (RequestInfo, Validations) into the fixed
      * {@code egain.ws.oas} package that every generated validator imports from.
      *
-     * @param sourceRoot output root up to and including {@code src/main/java/} (or the bare
-     *                   output dir when {@code modelsOnly}); the {@code egain/ws/oas} sub-path is appended here.
+     * <p>These are emitted regardless of the {@code modelsOnly} flag — the orchestrator calls this
+     * unconditionally so the support classes are always present, while the validators themselves
+     * are only generated in full (non-models-only) mode.
      */
-    private void generateSupportClasses(String sourceRoot) throws IOException {
+    public void generateSupportClasses() throws IOException {
+        if (ctx.outputDir == null) {
+            throw new IllegalArgumentException("Output directory cannot be null");
+        }
+        String sourceRoot = ctx.outputDir + (ctx.modelsOnly ? "/" : "/src/main/java/");
         String supportDir = sourceRoot + "egain/ws/oas";
         Files.createDirectories(Paths.get(supportDir));
         generateRequestInfo(supportDir);
