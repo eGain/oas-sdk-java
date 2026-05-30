@@ -48,8 +48,8 @@ class JerseyObservabilityGenerator {
         String metricsFilter = String.format("""
                 package %s;
 
-                import io.micrometer.prometheus.PrometheusMeterRegistry;
-                import io.micrometer.prometheus.PrometheusConfig;
+                import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+                import io.micrometer.prometheusmetrics.PrometheusConfig;
                 import io.micrometer.core.instrument.Timer;
                 import %s.Singleton;
                 import %s.container.ContainerRequestContext;

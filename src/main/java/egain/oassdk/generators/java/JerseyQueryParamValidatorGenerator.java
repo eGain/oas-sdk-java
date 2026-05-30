@@ -505,7 +505,7 @@ class JerseyQueryParamValidatorGenerator {
         content.append("    Supplier<ValidationBuilder<RequestInfo>> supplier = validationsListMap.get(key);\n");
         content.append("    if (supplier != null) {\n");
         content.append("      ValidationBuilder<RequestInfo> validationBuilder = supplier.get();\n");
-        content.append("      return validationBuilder.validate(requestInfo);\n");
+        content.append("      return validationBuilder.build().validate(requestInfo).stream().findFirst().orElse(null);\n");
         content.append("    }\n");
         content.append("    return null;\n");
         content.append("  }\n");

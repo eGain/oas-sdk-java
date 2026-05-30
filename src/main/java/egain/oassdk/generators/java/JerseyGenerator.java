@@ -87,6 +87,9 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 buildGenerator.generateMainApplicationClass(spec, outputDir, packageName);
 
                 new JerseyResourceGenerator(ctx, this::getJavaType).generate();
+                // Standalone builds have no eGain platform on the classpath, so emit local stubs for
+                // the authorization types (Actor/ActorType/OAuthScope) the resources reference.
+                new JerseyAuthorizationFrameworkGenerator(ctx).generate();
                 validationGenerator.generate();
 
                 buildGenerator.generateServices(outputDir, packageName);

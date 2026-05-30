@@ -257,7 +257,7 @@ class JerseyResourceGenerator {
      * knowledge.contentmgr.read -> KNOWLEDGE_CONTENTMGR_READ
      * knowledge.contentmgr.onbehalfof.read -> KNOWLEDGE_CONTENTMGR_CLIENT_ON_BEHALF_OF_READ
      */
-    private String convertScopeToEnum(String scope) {
+    static String convertScopeToEnum(String scope) {
         if (scope == null || scope.isEmpty()) {
             return null;
         }
@@ -275,6 +275,75 @@ class JerseyResourceGenerator {
         enumScope = enumScope.replaceAll("[^A-Z0-9_]", "");
 
         return enumScope;
+    }
+
+    /**
+     * Collect the complete set of {@code OAuthScope} enum constant names referenced by any
+     * operation's security requirements across the spec. Used by the standalone-mode framework
+     * generator to emit an {@code OAuthScope} enum containing exactly the constants the generated
+     * {@code @Actor} annotations reference (so the generated code compiles).
+     */
+    static Set<String> collectOAuthScopes(Map<String, Object> spec) {
+        Set<String> scopes = new TreeSet<>();
+        if (spec == null) {
+            return scopes;
+        }
+        Map<String, Object> paths = Util.asStringObjectMap(spec.get("paths"));
+        if (paths == null) {
+            return scopes;
+        }
+        String[] methods = {"get", "post", "put", "delete", "patch"};
+        for (Object pathItemObj : paths.values()) {
+            Map<String, Object> pathItem = Util.asStringObjectMap(pathItemObj);
+            if (pathItem == null) {
+                continue;
+            }
+            for (String method : methods) {
+                collectScopesFromOperation(Util.asStringObjectMap(pathItem.get(method)), scopes);
+            }
+        }
+        return scopes;
+    }
+
+    /**
+     * Mirror of the scope-extraction logic in {@link #generateActorAnnotationForOperation} so the
+     * collected enum constants stay identical to what the annotations emit.
+     */
+    private static void collectScopesFromOperation(Map<String, Object> operation, Set<String> scopes) {
+        if (operation == null || !operation.containsKey("security")) {
+            return;
+        }
+        List<Map<String, Object>> securityList = Util.asStringObjectMapList(operation.get("security"));
+        if (securityList == null) {
+            return;
+        }
+        for (Map<String, Object> securityMap : securityList) {
+            if (securityMap == null) {
+                continue;
+            }
+            for (Map.Entry<String, Object> entry : securityMap.entrySet()) {
+                if (entry.getValue() instanceof List<?> scopeList) {
+                    for (Object scope : scopeList) {
+                        if (scope instanceof String scopeStr) {
+                            scopeStr = scopeStr.replace("${SCOPE_PREFIX}", "");
+                            String enumScope = convertScopeToEnum(scopeStr);
+                            if (enumScope != null && !enumScope.isEmpty()) {
+                                scopes.add(enumScope);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * The complete set of {@code ActorType} enum constant names the generated {@code @Actor}
+     * annotations can reference (the distinct values of the security-scheme → actor-type mapping,
+     * which already includes the {@code CLIENT_APP} default).
+     */
+    static Set<String> collectActorTypes() {
+        return new TreeSet<>(securitySchemeToActorTypeMap().values());
     }
 
     private void appendClassLevelMediaAnnotations(StringBuilder content, List<PathOperation> operations) {

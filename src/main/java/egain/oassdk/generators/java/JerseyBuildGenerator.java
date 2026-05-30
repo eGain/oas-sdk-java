@@ -366,6 +366,13 @@ class JerseyBuildGenerator {
                                     <version>${jackson.version}</version>
                                 </dependency>
 
+                                <!-- Guava: used by the generated egain.ws.oas.RequestInfo / Validations support classes -->
+                                <dependency>
+                                    <groupId>com.google.guava</groupId>
+                                    <artifactId>guava</artifactId>
+                                    <version>33.4.0-jre</version>
+                                </dependency>
+
                             %s
                             %s
                             </dependencies>

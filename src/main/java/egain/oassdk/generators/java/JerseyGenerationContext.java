@@ -117,6 +117,17 @@ public final class JerseyGenerationContext {
     }
 
     /**
+     * Returns true when generating for standalone (open-source) mode, where proprietary
+     * eGain platform classes (JAXBBean, Actor, CallerContext, etc.) are not available and
+     * must be emitted as local stubs instead. Controlled by the "standaloneMode" additional
+     * property in GeneratorConfig.
+     */
+    boolean isStandaloneMode() {
+        return config != null && config.getAdditionalProperties() != null
+                && "true".equals(String.valueOf(config.getAdditionalProperties().get("standaloneMode")));
+    }
+
+    /**
      * Helper to check if observability generation is enabled.
      */
     boolean isObservabilityEnabled() {
