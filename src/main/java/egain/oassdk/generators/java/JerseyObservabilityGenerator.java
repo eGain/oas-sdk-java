@@ -222,13 +222,13 @@ class JerseyObservabilityGenerator {
                 import io.opentelemetry.api.GlobalOpenTelemetry;
                 import io.opentelemetry.api.common.Attributes;
                 import io.opentelemetry.context.propagation.ContextPropagators;
-                import io.opentelemetry.extension.trace.propagation.W3CTraceContextPropagator;
+                import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
                 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
                 import io.opentelemetry.sdk.OpenTelemetrySdk;
                 import io.opentelemetry.sdk.resources.Resource;
                 import io.opentelemetry.sdk.trace.SdkTracerProvider;
                 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
-                import io.opentelemetry.semconv.ResourceAttributes;
+                import io.opentelemetry.semconv.ServiceAttributes;
 
                 /**
                  * Bootstraps OpenTelemetry SDK with OTLP exporter and W3C trace context propagation.
@@ -247,7 +247,7 @@ class JerseyObservabilityGenerator {
                      */
                     public static void initialize(String serviceName) {
                         Resource resource = Resource.getDefault()
-                                .merge(Resource.create(Attributes.of(ResourceAttributes.SERVICE_NAME, serviceName)));
+                                .merge(Resource.create(Attributes.of(ServiceAttributes.SERVICE_NAME, serviceName)));
 
                         OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
                                 .build();

@@ -429,6 +429,11 @@ class JerseyBuildGenerator {
                             <groupId>io.opentelemetry</groupId>
                             <artifactId>opentelemetry-exporter-otlp</artifactId>
                             <version>1.51.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>io.opentelemetry.semconv</groupId>
+                            <artifactId>opentelemetry-semconv</artifactId>
+                            <version>1.41.1</version>
                         </dependency>""";
     }
 
