@@ -270,11 +270,11 @@ public class JerseyGeneratorFrameworkTest {
                     String content = Files.readString(validationFile);
                     
                     // Check for framework validation imports
-                    assertTrue(content.contains("import com.egain.platform.framework.validation.ValidationError;"),
+                    assertTrue(content.contains("import egain.framework.validation.ValidationError;"),
                         validationFile.getFileName() + " should import ValidationError");
-                    assertTrue(content.contains("import com.egain.platform.framework.validation.ValidationErrorHelper;"),
+                    assertTrue(content.contains("import egain.framework.validation.ValidationErrorHelper;"),
                         validationFile.getFileName() + " should import ValidationErrorHelper");
-                    assertTrue(content.contains("import com.egain.platform.framework.validation.ValidatorAction;"),
+                    assertTrue(content.contains("import egain.framework.validation.ValidatorAction;"),
                         validationFile.getFileName() + " should import ValidatorAction");
                 }
             }
@@ -299,7 +299,7 @@ public class JerseyGeneratorFrameworkTest {
             String content = Files.readString(queryParamValidatorsFile);
             
             // Check for framework validation imports
-            assertTrue(content.contains("import com.egain.platform.framework.validation.ValidationBuilder;"),
+            assertTrue(content.contains("import egain.framework.validation.ValidationBuilder;"),
                 "QueryParamValidators should import ValidationBuilder");
         }
     }
@@ -323,10 +323,10 @@ public class JerseyGeneratorFrameworkTest {
             String content = Files.readString(validationMapHelperFile);
             
             // Check for framework validation imports
-            assertTrue(content.contains("import com.egain.platform.framework.validation.ValidationBuilder;"),
+            assertTrue(content.contains("import egain.framework.validation.ValidationBuilder;"),
                 "ValidationMapHelper should import ValidationBuilder");
             // ValidationError is used in the return type, check for it in the method signature
-            assertTrue(content.contains("ValidationError") || content.contains("com.egain.platform.framework.validation.ValidationError"),
+            assertTrue(content.contains("ValidationError") || content.contains("egain.framework.validation.ValidationError"),
                 "ValidationMapHelper should use ValidationError (either imported or fully qualified)");
         } else {
             // If ValidationMapHelper doesn't exist, that's okay - it's only generated when needed

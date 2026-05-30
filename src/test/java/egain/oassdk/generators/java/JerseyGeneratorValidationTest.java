@@ -146,7 +146,7 @@ public class JerseyGeneratorValidationTest {
             
             assertTrue(content.contains("implements ValidatorAction<RequestInfo>"),
                 className + " should implement ValidatorAction<RequestInfo>");
-            assertTrue(content.contains("import com.egain.platform.framework.validation.ValidatorAction;"),
+            assertTrue(content.contains("import egain.framework.validation.ValidatorAction;"),
                 className + " should import ValidatorAction");
             assertTrue(content.contains("import egain.ws.oas.RequestInfo;"),
                 className + " should import RequestInfo");
@@ -500,7 +500,7 @@ public class JerseyGeneratorValidationTest {
         Path multipleOfValidatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/NumericMultipleOfValidator.java");
         assertTrue(Files.exists(multipleOfValidatorFile), "NumericMultipleOfValidator should exist");
         String multipleOfContent = Files.readString(multipleOfValidatorFile);
-        assertTrue(multipleOfContent.contains("Math.abs(val % multiple)"),
+        assertTrue(multipleOfContent.contains("Math.abs(numericValue % multiple)"),
             "NumericMultipleOfValidator should check modulo");
     }
     
@@ -597,11 +597,11 @@ public class JerseyGeneratorValidationTest {
             String className = validationFile.getFileName().toString();
             
             // Common imports that should be present
-            assertTrue(content.contains("import com.egain.platform.framework.validation.ValidationError;"),
+            assertTrue(content.contains("import egain.framework.validation.ValidationError;"),
                 className + " should import ValidationError");
-            assertTrue(content.contains("import com.egain.platform.framework.validation.ValidationErrorHelper;"),
+            assertTrue(content.contains("import egain.framework.validation.ValidationErrorHelper;"),
                 className + " should import ValidationErrorHelper");
-            assertTrue(content.contains("import com.egain.platform.framework.validation.ValidatorAction;"),
+            assertTrue(content.contains("import egain.framework.validation.ValidatorAction;"),
                 className + " should import ValidatorAction");
             assertTrue(content.contains("import egain.ws.oas.RequestInfo;"),
                 className + " should import RequestInfo");
