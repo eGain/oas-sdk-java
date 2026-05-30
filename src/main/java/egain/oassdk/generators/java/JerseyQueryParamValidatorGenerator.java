@@ -406,7 +406,7 @@ class JerseyQueryParamValidatorGenerator {
 			String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_BOOLEAN";
 			sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(paramName)
 							.append("\", \"placeholder\");\n");
-            sb.append("    v.add(new BooleanValidator(\"").append(paramName).append("\", \"").append(paramName)
+            sb.append("    v.add(new BooleanValidator(\"").append(paramName)
 							.append("\", \"").append(errorCode).append("\", arguments").append(getCurrentArgCounter())
 							.append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
         }
@@ -429,7 +429,7 @@ class JerseyQueryParamValidatorGenerator {
 
         StringBuilder content = new StringBuilder();
         content.append("package ").append(validatorPackage).append(";\n\n");
-        content.append("import com.egain.platform.framework.validation.ValidationBuilder;\n");
+        content.append("import egain.framework.validation.ValidationBuilder;\n");
         content.append("import egain.ws.oas.RequestInfo;\n");
         content.append("import ").append(validatorPackage).append(".AllowedParameterValidator;\n");
         content.append("import ").append(validatorPackage).append(".ArrayMaxItemsValidators;\n");
@@ -468,7 +468,7 @@ class JerseyQueryParamValidatorGenerator {
 
         StringBuilder content = new StringBuilder();
         content.append("package ").append(validatorPackage).append(";\n\n");
-        content.append("import com.egain.platform.framework.validation.ValidationBuilder;\n");
+        content.append("import egain.framework.validation.ValidationBuilder;\n");
         content.append("import egain.ws.oas.RequestInfo;\n");
         content.append("import egain.ws.oas.Validations.ParameterValidatorMapKey;\n");
         content.append("import java.util.Map;\n");
@@ -499,7 +499,7 @@ class JerseyQueryParamValidatorGenerator {
         content.append("   * @param requestInfo The RequestInfo object containing path and query parameters\n");
         content.append("   * @return ValidationError if validation fails, null if validation passes\n");
         content.append("   */\n");
-        content.append("  public static com.egain.platform.framework.validation.ValidationError validate(\n");
+        content.append("  public static egain.framework.validation.ValidationError validate(\n");
         content.append("      String path, String httpMethod, egain.ws.oas.RequestInfo requestInfo) {\n");
         content.append("    ParameterValidatorMapKey key = new ParameterValidatorMapKey(path, httpMethod);\n");
         content.append("    Supplier<ValidationBuilder<RequestInfo>> supplier = validationsListMap.get(key);\n");

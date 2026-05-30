@@ -65,9 +65,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
 
@@ -101,11 +101,11 @@ class JerseyValidationGenerator {
                     {
                         if (nameSpace.equalsIgnoreCase("path") && !val.pathParameters().containsKey(requiredParameter))
                         {
-                            return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                            return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                         }
                         if (nameSpace.equalsIgnoreCase("query") && !val.queryParameters().containsKey(requiredParameter))
                         {
-                            return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                            return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                         }
                         return null;
                     }
@@ -125,9 +125,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -168,7 +168,7 @@ class JerseyValidationGenerator {
                                 {
                                     if (!Validations.matchesPattern.apply(item, this.val))
                                     {
-                                        return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                        return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                     }
                                 }
                             }
@@ -176,7 +176,7 @@ class JerseyValidationGenerator {
                             {
                                 if (!Validations.matchesPattern.apply(input, this.val))
                                 {
-                                    return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                    return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                 }
                             }
                         }
@@ -198,9 +198,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -243,7 +243,7 @@ class JerseyValidationGenerator {
                                     {
                                         if (item.length() > maxLen)
                                         {
-                                            return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                            return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                         }
                                     }
                                 }
@@ -251,7 +251,7 @@ class JerseyValidationGenerator {
                                 {
                                     if (input.length() > maxLen)
                                     {
-                                        return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                        return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                     }
                                 }
                             } catch (NumberFormatException e) {
@@ -276,9 +276,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -321,7 +321,7 @@ class JerseyValidationGenerator {
                                     {
                                         if (item.length() < minLen)
                                         {
-                                            return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                            return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                         }
                                     }
                                 }
@@ -329,7 +329,7 @@ class JerseyValidationGenerator {
                                 {
                                     if (input.length() < minLen)
                                     {
-                                        return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                        return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                     }
                                 }
                             } catch (NumberFormatException e) {
@@ -354,9 +354,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -402,11 +402,11 @@ class JerseyValidationGenerator {
 							{
 								if (isExclusive && Validations.isGreaterThanOrEqualTo.apply(item, this.val))
 								{
-									return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+									return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
 								}
 								else if (!isExclusive && Validations.isGreaterThan.apply(item, this.val))
 								{
-									return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+									return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
 								}
 							}
 						}
@@ -414,11 +414,11 @@ class JerseyValidationGenerator {
 						{
 							if (isExclusive && Validations.isGreaterThanOrEqualTo.apply(input, this.val))
 							{
-								return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+								return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
 							}
 							else if (!isExclusive && Validations.isGreaterThan.apply(input, this.val))
 							{
-								return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+								return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
 							}
 						}
 						return null;
@@ -439,9 +439,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -487,11 +487,11 @@ class JerseyValidationGenerator {
 							{
 								if (isExclusive && Validations.isLessThanOrEqualTo.apply(item, this.val))
 								{
-									return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+									return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
 								}
 								else if (!isExclusive && Validations.isLessThan.apply(item, this.val))
 								{
-									return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+									return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
 								}
 							}
 						}
@@ -499,11 +499,11 @@ class JerseyValidationGenerator {
 						{
 							if (isExclusive && Validations.isLessThanOrEqualTo.apply(input, this.val))
 							{
-								return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+								return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
 							}
 							else if (!isExclusive && Validations.isLessThan.apply(input, this.val))
 							{
-								return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+								return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
 							}
 						}
 						return null;
@@ -524,9 +524,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -567,19 +567,19 @@ class JerseyValidationGenerator {
                                     String[] items = input.split(",");
                                     for (String item : items)
                                     {
-                                        double val = Double.parseDouble(item.trim());
-                                        if (Math.abs(val %% multiple) > 0.0001)
+                                        double numericValue = Double.parseDouble(item.trim());
+                                        if (Math.abs(numericValue %% multiple) > 0.0001)
                                         {
-                                            return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                            return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                         }
                                     }
                                 }
                                 else
                                 {
-                                    double val = Double.parseDouble(input);
-                                    if (Math.abs(val %% multiple) > 0.0001)
+                                    double numericValue = Double.parseDouble(input);
+                                    if (Math.abs(numericValue %% multiple) > 0.0001)
                                     {
-                                        return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                        return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                     }
                                 }
                             } catch (NumberFormatException e) {
@@ -607,9 +607,9 @@ class JerseyValidationGenerator {
                 import java.util.Arrays;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -651,7 +651,7 @@ class JerseyValidationGenerator {
                                 {
                                     if (!allowedValues.contains(item.trim()))
                                     {
-                                        return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                        return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                     }
                                 }
                             }
@@ -659,7 +659,7 @@ class JerseyValidationGenerator {
                             {
                                 if (!allowedValues.contains(input.trim()))
                                 {
-                                    return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                    return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                 }
                             }
                         }
@@ -680,10 +680,11 @@ class JerseyValidationGenerator {
 
                 import java.util.ArrayList;
                 import java.util.List;
+                import java.util.Locale;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -723,7 +724,7 @@ class JerseyValidationGenerator {
                                     String trimmed = item.trim().toLowerCase(Locale.ROOT);
                                     if (!"true".equals(trimmed) && !"false".equals(trimmed))
                                     {
-                                        return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                        return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                     }
                                 }
                             }
@@ -732,7 +733,7 @@ class JerseyValidationGenerator {
                                 String trimmed = input.trim().toLowerCase(Locale.ROOT);
                                 if (!"true".equals(trimmed) && !"false".equals(trimmed))
                                 {
-                                    return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                    return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                 }
                             }
                         }
@@ -755,9 +756,9 @@ class JerseyValidationGenerator {
                 import java.util.List;
                 import java.util.regex.Pattern;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -808,7 +809,7 @@ class JerseyValidationGenerator {
                                     {
                                         if (!pattern.matcher(item.trim()).matches())
                                         {
-                                            return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                            return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                         }
                                     }
                                 }
@@ -816,7 +817,7 @@ class JerseyValidationGenerator {
                                 {
                                     if (!pattern.matcher(input.trim()).matches())
                                     {
-                                        return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                        return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                     }
                                 }
                             }
@@ -829,7 +830,7 @@ class JerseyValidationGenerator {
                                     {
                                         if (!validateNumericFormat(format, item.trim()))
                                         {
-                                            return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                            return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                         }
                                     }
                                 }
@@ -837,7 +838,7 @@ class JerseyValidationGenerator {
                                 {
                                     if (!validateNumericFormat(format, input.trim()))
                                     {
-                                        return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                        return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                     }
                                 }
                             }
@@ -919,9 +920,9 @@ class JerseyValidationGenerator {
 
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
 
@@ -941,7 +942,7 @@ class JerseyValidationGenerator {
                         {
                             if (!allowedParameters.contains(param))
                             {
-                                return ValidationErrorHelper.createValidationError("L10N_INVALID_QUERY_PARAMETER",
+                                return ValidationErrorHelper.createValidationError("", "L10N_INVALID_QUERY_PARAMETER",
                                     List.of(param), List.of());
                             }
                         }
@@ -963,9 +964,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -1000,7 +1001,7 @@ class JerseyValidationGenerator {
 						if (input != null && !Validations.hasMaxItems.apply(input.split(","),
 										this.val))
 						{
-							return ValidationErrorHelper.createValidationError(l10nKey,
+							return ValidationErrorHelper.createValidationError("", l10nKey,
 											arguments,
 											localizedArgs);
 						}
@@ -1022,9 +1023,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -1059,7 +1060,7 @@ class JerseyValidationGenerator {
 						if (input != null && !Validations.hasMinItems.apply(input.split(","),
 										this.val))
 						{
-							return ValidationErrorHelper.createValidationError(l10nKey,
+							return ValidationErrorHelper.createValidationError("", l10nKey,
 											arguments,
 											localizedArgs);
 						}
@@ -1083,9 +1084,9 @@ class JerseyValidationGenerator {
                 import java.util.List;
                 import java.util.Set;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -1124,7 +1125,7 @@ class JerseyValidationGenerator {
                                 String trimmed = item.trim();
                                 if (seen.contains(trimmed))
                                 {
-                                    return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                                    return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                                 }
                                 seen.add(trimmed);
                             }
@@ -1147,9 +1148,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
 
@@ -1195,9 +1196,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
                 import egain.ws.oas.Validations;
@@ -1229,7 +1230,7 @@ class JerseyValidationGenerator {
                             : Validations.getPathParameterValue.apply(val, parameterName);
                         if (input != null && input.trim().isEmpty())
                         {
-                            return ValidationErrorHelper.createValidationError(l10nKey, arguments, localizedArgs);
+                            return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
                         }
                         return null;
                     }
@@ -1249,9 +1250,9 @@ class JerseyValidationGenerator {
                 import java.util.ArrayList;
                 import java.util.List;
 
-                import com.egain.platform.framework.validation.ValidationError;
-                import com.egain.platform.framework.validation.ValidationErrorHelper;
-                import com.egain.platform.framework.validation.ValidatorAction;
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
 
                 import egain.ws.oas.RequestInfo;
 
