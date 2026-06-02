@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -74,6 +75,41 @@ class JerseyModelGeneratorFolderYamlParityTest {
                 normalizeWs(expectedFragment),
                 normalizeWs(extracted),
                 "CreateFolder oneOf XOR validation block should match golden fragment (Folder.yaml / createFolder).");
+    }
+
+    @Test
+    @DisplayName("Bundled Folder.yaml EditFolder.permissions uses List<EditFolderPermissionsEntry>")
+    void editFolderPermissionsFieldUsesEditEntryType() throws OASSDKException, IOException {
+        Path specPath = Path.of("src/test/resources/folder_contentmgr_bundle/knowledge/models/contentmgr/v4/Folder.yaml")
+                .toAbsolutePath();
+        Path bundleRoot = Path.of("src/test/resources/folder_contentmgr_bundle").toAbsolutePath();
+        Path outputDir = tempOutputDir.resolve("edit-folder-models");
+
+        GeneratorConfig config = GeneratorConfig.builder()
+                .modelsOnly(true)
+                .packageName("com.egain.bindings.ws.model.xsds.common.v4.content")
+                .outputDir(outputDir.toString())
+                .searchPaths(List.of(bundleRoot.toString()))
+                .build();
+
+        try (OASSDK sdk = new OASSDK(config, null, null)) {
+            sdk.loadSpec(specPath.toString());
+            sdk.generateApplication("java", "jersey", config.getPackageName(), outputDir.toString());
+        }
+
+        Path editFolderJava;
+        try (Stream<Path> walk = Files.walk(outputDir)) {
+            editFolderJava = walk
+                    .filter(p -> p.getFileName().toString().equals("EditFolder.java"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("EditFolder.java not found under " + outputDir));
+        }
+
+        String generated = Files.readString(editFolderJava, StandardCharsets.UTF_8);
+        assertTrue(generated.contains("List<EditFolderPermissionsEntry>"),
+                "EditFolder.permissions should be List<EditFolderPermissionsEntry>");
+        assertFalse(generated.contains("List<FolderPermissionsEntry>"),
+                "EditFolder must not use List<FolderPermissionsEntry> for permissions");
     }
 
     private static String readResource(String classpathPath) throws IOException {

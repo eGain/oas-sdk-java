@@ -344,6 +344,87 @@ class JerseySchemaUtilsTest {
         assertEquals(14, idSchema.get("minLength"));
     }
 
+    @Test
+    @DisplayName("mergeSchemaProperties editFolder permissions keeps EditFolderPermissionsEntry not FolderPermissionsEntry")
+    void mergeSchemaProperties_editFolder_permissionsUsesEditEntryType() {
+        Map<String, Object> editEntryItems = Map.of("$ref", "#/components/schemas/EditFolderPermissionDetails");
+        Map<String, Object> editEntryProps = Map.of(
+                "identity", Map.of("$ref", "#/components/schemas/IdentityPayload"),
+                "permission", Map.of("type", "array", "items", editEntryItems));
+        Map<String, Object> editFolderPermissionsEntry = new LinkedHashMap<>();
+        editFolderPermissionsEntry.put("type", "object");
+        editFolderPermissionsEntry.put("properties", editEntryProps);
+
+        Map<String, Object> folderEntryItems = Map.of("$ref", "#/components/schemas/FolderPermissionDetail");
+        Map<String, Object> folderPermissionsEntry = new LinkedHashMap<>();
+        folderPermissionsEntry.put("type", "object");
+        folderPermissionsEntry.put("required", List.of("permission"));
+        folderPermissionsEntry.put("properties", Map.of(
+                "permission", Map.of("type", "array", "items", folderEntryItems)));
+
+        Map<String, Object> editFolderPermissions = new LinkedHashMap<>();
+        editFolderPermissions.put("type", "array");
+        editFolderPermissions.put("items", Map.of("$ref", "#/components/schemas/EditFolderPermissionsEntry"));
+
+        Map<String, Object> folderPermissions = new LinkedHashMap<>();
+        folderPermissions.put("type", "array");
+        folderPermissions.put("items", Map.of("$ref", "#/components/schemas/FolderPermissionsEntry"));
+
+        Map<String, Object> folder = new LinkedHashMap<>();
+        folder.put("type", "object");
+        folder.put("properties", Map.of(
+                "permissions", Map.of(
+                        "allOf", List.of(
+                                Map.of("readOnly", true),
+                                Map.of("$ref", "#/components/schemas/FolderPermissions")))));
+
+        List<Object> editPermAllOf = new ArrayList<>();
+        editPermAllOf.add(Map.of(
+                "description", "Folder permissions to edit",
+                "writeOnly", true,
+                "minItems", 1,
+                "maxItems", 75));
+        editPermAllOf.add(Map.of("$ref", "#/components/schemas/EditFolderPermissions"));
+
+        Map<String, Object> editOverlay = new LinkedHashMap<>();
+        editOverlay.put("type", "object");
+        editOverlay.put("properties", Map.of("permissions", Map.of("allOf", editPermAllOf)));
+
+        Map<String, Object> editFolder = new LinkedHashMap<>();
+        editFolder.put("allOf", List.of(editOverlay, Map.of("$ref", "#/components/schemas/Folder")));
+
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("EditFolderPermissionsEntry", editFolderPermissionsEntry);
+        schemas.put("FolderPermissionsEntry", folderPermissionsEntry);
+        schemas.put("EditFolderPermissions", editFolderPermissions);
+        schemas.put("FolderPermissions", folderPermissions);
+        schemas.put("Folder", folder);
+        schemas.put("editFolder", editFolder);
+
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", schemas));
+
+        Map<String, Object> allProps = new LinkedHashMap<>();
+        List<String> allRequired = new ArrayList<>();
+        JerseySchemaUtils.mergeSchemaProperties(editFolder, allProps, allRequired, spec);
+
+        Map<String, Object> permissionsSchema = Util.asStringObjectMap(allProps.get("permissions"));
+        assertNotNull(permissionsSchema);
+        Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(permissionsSchema, spec);
+        assertNotNull(effective);
+        assertEquals("array", effective.get("type"));
+        Map<String, Object> items = Util.asStringObjectMap(effective.get("items"));
+        assertNotNull(items);
+        String itemRef = (String) items.get("$ref");
+        if (itemRef == null) {
+            itemRef = (String) items.get("x-resolved-ref");
+        }
+        assertNotNull(itemRef);
+        assertTrue(itemRef.contains("/EditFolderPermissionsEntry"),
+                "Expected EditFolderPermissionsEntry in items ref but got: " + itemRef);
+        assertFalse(itemRef.contains("/FolderPermissionsEntry"),
+                "Must not resolve to FolderPermissionsEntry but got: " + itemRef);
+    }
+
     // -----------------------------------------------------------------------
     //  isSchemaReference
     // -----------------------------------------------------------------------
