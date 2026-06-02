@@ -170,6 +170,15 @@ public final class JerseySchemaUtils {
         }
         Map<String, Object> out = new LinkedHashMap<>(later);
         if (earlier != null) {
+            List<Map<String, Object>> earlierAllOf = Util.asStringObjectMapList(earlier.get("allOf"));
+            List<Map<String, Object>> laterAllOf = Util.asStringObjectMapList(later.get("allOf"));
+            if (earlierAllOf != null && !earlierAllOf.isEmpty()
+                    && laterAllOf != null && !laterAllOf.isEmpty()) {
+                List<Map<String, Object>> combinedAllOf = new ArrayList<>(earlierAllOf.size() + laterAllOf.size());
+                combinedAllOf.addAll(earlierAllOf);
+                combinedAllOf.addAll(laterAllOf);
+                out.put("allOf", combinedAllOf);
+            }
             if (!later.containsKey("readOnly") && isSchemaFlagTrue(earlier, "readOnly")) {
                 out.put("readOnly", true);
             }
