@@ -41,13 +41,6 @@ This directory contains examples demonstrating how to use the eGain OAS SDK Java
      ```
      When it works, SDK is under `C:\eGain\published\sdk\`.
 
-### **Generate bindings QueryParamValidators (modelsOnly)**
-- **File**: `egain/oassdk/examples/GenerateBindingsQueryParamValidators.java`
-- **Description**: Regenerates `QueryParamValidators.txt` and `ValidationMapHelper.txt` for package `com.egain.bindings.ws.model.xsds.common.v4` from `examples/bundle-openapi 3.yaml`.
-- **Output**: `target/generated-bindings-query-param-validators/com/egain/bindings/ws/model/xsds/common/v4/` (also written when running `JerseyQueryParamValidatorBooleanTest`).
-- **Integration**: Copy `QueryParamValidators.txt` → `QueryParamValidators.java` in the bindings WS project (same for `ValidationMapHelper.txt` when the endpoint map changed). After commit a2ec82f, `BooleanValidator` call sites use `(parameterName, l10nKey, ...)` — not a duplicate parameter name.
-- **How to run**: `mvn test -Dtest=JerseyQueryParamValidatorBooleanTest` or run `GenerateBindingsQueryParamValidators` from the IDE with project classpath.
-
 ### **Generate tests for published V4 APIs**
 - **File**: `egain/oassdk/examples/GeneratePublishedV4Tests.java`
 - **Description**: Finds every `v4/api.yaml` under the published root, uses `GeneratorConfig.searchPaths` so `$ref` to `models/` and sibling files resolve, and writes Java tests (unit, integration, NFR, performance, security, Postman, mock data) into `generated-tests` next to each spec (for example `core/usermgr/v4/generated-tests/`). Add `schemathesis` to the generated test types list in that driver if you also want a Schemathesis bundle per spec.

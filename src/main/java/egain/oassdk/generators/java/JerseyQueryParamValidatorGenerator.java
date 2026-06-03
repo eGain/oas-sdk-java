@@ -406,7 +406,7 @@ class JerseyQueryParamValidatorGenerator {
 			String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_BOOLEAN";
 			sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(paramName)
 							.append("\", \"placeholder\");\n");
-            sb.append("    v.add(new BooleanValidator(\"").append(paramName)
+            sb.append("    v.add(new BooleanValidator(\"").append(paramName).append("\", \"").append(paramName)
 							.append("\", \"").append(errorCode).append("\", arguments").append(getCurrentArgCounter())
 							.append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
         }
