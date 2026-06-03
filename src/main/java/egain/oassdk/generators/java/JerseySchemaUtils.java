@@ -69,8 +69,25 @@ public final class JerseySchemaUtils {
                     mergeIntoEffectiveSchema(merged, resolved);
                 }
             }
-            if (refCount == 1 && singleRefSchemaName != null && !merged.isEmpty()) {
-                merged.put("x-java-type-ref", singleRefSchemaName);
+            if (singleRefSchemaName != null && !merged.isEmpty()) {
+                Set<String> distinctRefNames = new LinkedHashSet<>();
+                for (Map<String, Object> sub : allOfSchemas) {
+                    if (sub == null) continue;
+                    String refName = getSchemaNameFromRef(sub);
+                    if (refName == null) {
+                        String ref = (String) sub.get("x-resolved-ref");
+                        if (ref == null) ref = (String) sub.get("$ref");
+                        if (ref != null && ref.contains("components/schemas/")) {
+                            refName = ref.substring(ref.lastIndexOf("/") + 1);
+                        }
+                    }
+                    if (refName != null) {
+                        distinctRefNames.add(refName);
+                    }
+                }
+                if (refCount == 1 || distinctRefNames.size() == 1) {
+                    merged.put("x-java-type-ref", singleRefSchemaName);
+                }
             }
             return merged.isEmpty() ? schema : merged;
         }
@@ -174,10 +191,10 @@ public final class JerseySchemaUtils {
             List<Map<String, Object>> laterAllOf = Util.asStringObjectMapList(later.get("allOf"));
             if (earlierAllOf != null && !earlierAllOf.isEmpty()
                     && laterAllOf != null && !laterAllOf.isEmpty()) {
-                List<Map<String, Object>> combinedAllOf = new ArrayList<>(earlierAllOf.size() + laterAllOf.size());
-                combinedAllOf.addAll(earlierAllOf);
-                combinedAllOf.addAll(laterAllOf);
-                out.put("allOf", combinedAllOf);
+                List<Map<String, Object>> mergedAllOf = mergePropertyLevelAllOf(earlierAllOf, laterAllOf, earlier, later);
+                if (!mergedAllOf.isEmpty()) {
+                    out.put("allOf", mergedAllOf);
+                }
             }
             if (!later.containsKey("readOnly") && isSchemaFlagTrue(earlier, "readOnly")) {
                 out.put("readOnly", true);
@@ -406,6 +423,100 @@ public final class JerseySchemaUtils {
                 }
             }
         }
+    }
+
+    // ---------------------------------------------------------------------------
+    //  Property-level allOf merge helpers
+    // ---------------------------------------------------------------------------
+
+    /** True when an allOf branch carries only inline constraints (no component $ref). */
+    private static boolean isConstraintOnlyAllOfBranch(Map<String, Object> branch) {
+        if (branch == null) {
+            return false;
+        }
+        return getSchemaNameFromRef(branch) == null && !branch.containsKey("$ref");
+    }
+
+    private static boolean allOfBranchesContainFlag(List<Map<String, Object>> branches, String flag) {
+        if (branches == null) {
+            return false;
+        }
+        for (Map<String, Object> branch : branches) {
+            if (branch != null && isSchemaFlagTrue(branch, flag)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Map<String, Object>> extractRefBranches(List<Map<String, Object>> branches) {
+        List<Map<String, Object>> refs = new ArrayList<>();
+        if (branches == null) {
+            return refs;
+        }
+        for (Map<String, Object> branch : branches) {
+            if (branch != null && (branch.containsKey("$ref") || getSchemaNameFromRef(branch) != null)) {
+                refs.add(branch);
+            }
+        }
+        return refs;
+    }
+
+    private static List<Map<String, Object>> dedupeRefBranchesByTarget(List<Map<String, Object>> refBranches) {
+        List<Map<String, Object>> deduped = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (Map<String, Object> branch : refBranches) {
+            String name = getSchemaNameFromRef(branch);
+            if (name == null) {
+                deduped.add(branch);
+                continue;
+            }
+            if (!seen.contains(name)) {
+                seen.add(name);
+                deduped.add(branch);
+            }
+        }
+        return deduped;
+    }
+
+    /**
+     * Merge two property-level {@code allOf} lists when both sides use composition.
+     * Constraint-only branches from both sides are kept; {@code $ref} branches are chosen from
+     * {@code later} unless {@code earlier} is a write-only overlay merged under a read-only base
+     * (editFolder permissions pattern).
+     */
+    private static List<Map<String, Object>> mergePropertyLevelAllOf(List<Map<String, Object>> earlierAllOf,
+                                                                     List<Map<String, Object>> laterAllOf,
+                                                                     Map<String, Object> earlier,
+                                                                     Map<String, Object> later) {
+        List<Map<String, Object>> merged = new ArrayList<>();
+        for (Map<String, Object> branch : earlierAllOf) {
+            if (isConstraintOnlyAllOfBranch(branch)) {
+                merged.add(new LinkedHashMap<>(branch));
+            }
+        }
+        for (Map<String, Object> branch : laterAllOf) {
+            if (isConstraintOnlyAllOfBranch(branch)) {
+                merged.add(new LinkedHashMap<>(branch));
+            }
+        }
+        boolean earlierWrite = allOfBranchesContainFlag(earlierAllOf, "writeOnly")
+                || isSchemaFlagTrue(earlier, "writeOnly");
+        boolean laterRead = allOfBranchesContainFlag(laterAllOf, "readOnly")
+                || isSchemaFlagTrue(later, "readOnly");
+        boolean laterWrite = allOfBranchesContainFlag(laterAllOf, "writeOnly")
+                || isSchemaFlagTrue(later, "writeOnly");
+        boolean preferEarlierRefs = earlierWrite && laterRead && !laterWrite;
+
+        List<Map<String, Object>> refSource = preferEarlierRefs ? earlierAllOf : laterAllOf;
+        List<Map<String, Object>> refBranches = dedupeRefBranchesByTarget(extractRefBranches(refSource));
+        if (refBranches.isEmpty() && !preferEarlierRefs) {
+            refBranches = dedupeRefBranchesByTarget(extractRefBranches(earlierAllOf));
+        }
+        for (Map<String, Object> branch : refBranches) {
+            merged.add(new LinkedHashMap<>(branch));
+        }
+        return merged;
     }
 
     // ---------------------------------------------------------------------------

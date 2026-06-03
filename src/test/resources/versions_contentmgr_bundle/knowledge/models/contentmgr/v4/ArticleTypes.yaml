@@ -1,0 +1,51 @@
+openapi: '3.0.2'
+info:
+  title: dummy
+  version: '3.0.0'
+paths:
+  /test:
+    get:
+      operationId: placeHolder
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    ArticleTypeProperties:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        isSearchable:
+          type: boolean
+        isDisplayable:
+          type: boolean
+        isSystemCreated:
+          type: boolean
+    ArticleType:
+      allOf:
+        - $ref: "#/components/schemas/ArticleTypeProperties"
+        - type: object
+          required:
+            - name
+    ArticleTypeForCreateEditArticle:
+      allOf:
+        - $ref: "#/components/schemas/ArticleTypeProperties"
+        - type: object
+          required:
+            - id
+          properties:
+            name:
+              readOnly: true
+            description:
+              readOnly: true
+            isSearchable:
+              readOnly: true
+            isDisplayable:
+              readOnly: true
+            isSystemCreated:
+              readOnly: true

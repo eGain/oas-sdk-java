@@ -1,0 +1,23 @@
+openapi: '3.0.2'
+info:
+  title: dummy
+  version: '3.0.0'
+paths:
+  /test:
+    get:
+      operationId: placeHolder
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    Personalization:
+      type: object
+      properties:
+        id:
+          type: string
+    PersonalizationForCreateEditArticle:
+      type: object
+      properties:
+        id:
+          type: string

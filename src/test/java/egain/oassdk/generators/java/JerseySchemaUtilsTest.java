@@ -425,6 +425,100 @@ class JerseySchemaUtilsTest {
                 "Must not resolve to FolderPermissionsEntry but got: " + itemRef);
     }
 
+    @Test
+    @DisplayName("mergeSchemaProperties VersionForCreateArticle ownedBy and articleType keep BasicUser and edit article type")
+    void mergeSchemaProperties_versionForCreateArticle_ownedByAndArticleType() {
+        Map<String, Object> articleTypeProperties = new LinkedHashMap<>();
+        articleTypeProperties.put("type", "object");
+        articleTypeProperties.put("properties", Map.of("id", Map.of("type", "string"), "name", Map.of("type", "string")));
+
+        Map<String, Object> articleType = new LinkedHashMap<>();
+        articleType.put("allOf", List.of(
+                Map.of("$ref", "#/components/schemas/ArticleTypeProperties"),
+                Map.of("required", List.of("name"))));
+
+        Map<String, Object> articleTypeForCreate = new LinkedHashMap<>();
+        articleTypeForCreate.put("allOf", List.of(
+                Map.of("$ref", "#/components/schemas/ArticleTypeProperties"),
+                Map.of("required", List.of("id"))));
+
+        Map<String, Object> basicUser = Map.of("type", "object", "properties", Map.of("id", Map.of("type", "string")));
+
+        Map<String, Object> versionOwnedBy = new LinkedHashMap<>();
+        versionOwnedBy.put("allOf", List.of(
+                Map.of("type", "object", "properties", Map.of("id", Map.of("readOnly", false, "writeOnly", true))),
+                Map.of("$ref", "#/components/schemas/BasicUser"),
+                Map.of("type", "object", "title", "User")));
+
+        Map<String, Object> overlayOwnedBy = new LinkedHashMap<>();
+        overlayOwnedBy.put("title", "User");
+        overlayOwnedBy.put("allOf", List.of(
+                Map.of("type", "object", "required", List.of("id"),
+                        "properties", Map.of("id", Map.of("readOnly", false, "writeOnly", true, "type", "string"))),
+                Map.of("$ref", "#/components/schemas/BasicUser")));
+
+        Map<String, Object> version = new LinkedHashMap<>();
+        version.put("type", "object");
+        version.put("properties", Map.of(
+                "articleType", Map.of("allOf", articleType.get("allOf")),
+                "ownedBy", versionOwnedBy,
+                "name", Map.of("type", "string")));
+
+        Map<String, Object> versionForCreate = new LinkedHashMap<>();
+        versionForCreate.put("allOf", List.of(
+                Map.of("$ref", "#/components/schemas/Version"),
+                Map.of("type", "object", "properties", Map.of(
+                        "articleType", Map.of("allOf", articleTypeForCreate.get("allOf")),
+                        "ownedBy", overlayOwnedBy,
+                        "name", Map.of("type", "string")))));
+
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("ArticleTypeProperties", articleTypeProperties);
+        schemas.put("ArticleType", articleType);
+        schemas.put("ArticleTypeForCreateEditArticle", articleTypeForCreate);
+        schemas.put("BasicUser", basicUser);
+        schemas.put("Version", version);
+        schemas.put("VersionForCreateArticle", versionForCreate);
+
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", schemas));
+
+        Map<String, Object> allProps = new LinkedHashMap<>();
+        List<String> allRequired = new ArrayList<>();
+        JerseySchemaUtils.mergeSchemaProperties(versionForCreate, allProps, allRequired, spec);
+
+        Map<String, Object> ownedBySchema = Util.asStringObjectMap(allProps.get("ownedBy"));
+        assertNotNull(ownedBySchema);
+        Map<String, Object> ownedByEffective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(ownedBySchema, spec);
+        assertNotNull(ownedByEffective);
+        assertEquals("BasicUser", ownedByEffective.get("x-java-type-ref"));
+
+        Map<String, Object> articleTypeSchema = Util.asStringObjectMap(allProps.get("articleType"));
+        assertNotNull(articleTypeSchema);
+        Map<String, Object> articleTypeEffective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(articleTypeSchema, spec);
+        assertNotNull(articleTypeEffective);
+        assertEquals("ArticleTypeProperties", articleTypeEffective.get("x-java-type-ref"));
+    }
+
+    @Test
+    @DisplayName("mergePropertyDefinitionsForComposition duplicate ArticleTypeProperties refs dedupe to single type ref")
+    void mergePropertyDefinitions_duplicateArticleTypePropertiesRefs() {
+        List<Object> earlierAllOf = List.of(
+                Map.of("$ref", "#/components/schemas/ArticleTypeProperties"),
+                Map.of("required", List.of("name")));
+        List<Object> laterAllOf = List.of(
+                Map.of("$ref", "#/components/schemas/ArticleTypeProperties"),
+                Map.of("required", List.of("id")));
+        Map<String, Object> earlier = Map.of("allOf", earlierAllOf);
+        Map<String, Object> later = Map.of("allOf", laterAllOf);
+
+        Map<String, Object> merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(earlier, later);
+        Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(merged, Map.of(
+                "components", Map.of("schemas", Map.of(
+                        "ArticleTypeProperties", Map.of("type", "object")))));
+        assertNotNull(effective);
+        assertEquals("ArticleTypeProperties", effective.get("x-java-type-ref"));
+    }
+
     // -----------------------------------------------------------------------
     //  isSchemaReference
     // -----------------------------------------------------------------------

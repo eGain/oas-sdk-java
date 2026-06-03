@@ -1,0 +1,174 @@
+openapi: '3.0.2'
+info:
+  title: dummy
+  version: '3.0.0'
+servers:
+  - url: https://api.server.test/v1
+paths:
+  /test:
+    get:
+      operationId: placeHolder
+      tags:
+        - dummy
+      description: dummy
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    Version:
+      title: Version
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        versionNumber:
+          type: integer
+          readOnly: true
+        created:
+          allOf:
+            - $ref: '../../../../models/v4/common.yaml#/components/schemas/DateAndUser'
+            - readOnly: true
+        lastModified:
+          $ref: '../../../../models/v4/common.yaml#/components/schemas/DateAndUser'
+        description:
+          type: string
+        keywords:
+          type: string
+        summary:
+          type: string
+        additionalInfo:
+          type: string
+        content:
+          type: string
+        availabilityDate:
+          type: string
+          format: date-time
+        expirationDate:
+          type: string
+          format: date-time
+        label:
+          type: string
+        imageUrl:
+          type: string
+        attachments:
+          type: array
+          items:
+            $ref: './Attachments.yaml#/components/schemas/Attachment'
+          readOnly: true
+        articleType:
+          $ref: "./ArticleTypes.yaml#/components/schemas/ArticleType"
+        articleState:
+          type: string
+          readOnly: true
+        translationStatus:
+          type: string
+          readOnly: true
+        availableEditions:
+          type: array
+          items:
+            $ref: "./Edition.yaml#/components/schemas/Edition"
+          readOnly: true
+        personalization:
+          $ref: "./Personalization.yaml#/components/schemas/Personalization"
+        ownedBy:
+          allOf:
+            - type: object
+              properties:
+                id:
+                  readOnly: false
+                  writeOnly: true
+            - $ref: '../../../../models/v4/User.yaml#/components/schemas/BasicUser'
+            - type: object
+              title: User
+        isMajorUpdate:
+          type: boolean
+        includeInGenAI:
+          type: boolean
+
+    VersionForCreateArticle:
+      title: Version
+      allOf:
+        - $ref: "#/components/schemas/Version"
+        - type: object
+          required:
+            - name
+          properties:
+            articleType:
+              $ref: "./ArticleTypes.yaml#/components/schemas/ArticleTypeForCreateEditArticle"
+            personalization:
+              $ref: "./Personalization.yaml#/components/schemas/PersonalizationForCreateEditArticle"
+            ownedBy:
+              title: User
+              allOf:
+                - type: object
+                  required:
+                    - id
+                  properties:
+                    id:
+                      readOnly: false
+                      writeOnly: true
+                      type: string
+                - $ref: '../../../../models/v4/User.yaml#/components/schemas/BasicUser'
+            name:
+              type: string
+              minLength: 1
+              maxLength: 255
+            lastModified:
+              allOf:
+                - $ref: '../../../../models/v4/common.yaml#/components/schemas/DateAndUser'
+                - readOnly: true
+            availabilityDateTimeZone:
+              readOnly: true
+              type: string
+            expiryDateTimeZone:
+              readOnly: true
+              type: string
+            attachments:
+              readOnly: true
+              type: array
+              items:
+                $ref: './Attachments.yaml#/components/schemas/Attachment'
+
+    VersionForEditArticle:
+      title: Version
+      allOf:
+        - $ref: "#/components/schemas/Version"
+        - type: object
+          required:
+            - lastModified
+          properties:
+            articleType:
+              $ref: "./ArticleTypes.yaml#/components/schemas/ArticleTypeForCreateEditArticle"
+            personalization:
+              $ref: "./Personalization.yaml#/components/schemas/PersonalizationForCreateEditArticle"
+            ownedBy:
+              title: User
+              allOf:
+                - type: object
+                  required:
+                    - id
+                  properties:
+                    id:
+                      readOnly: false
+                      writeOnly: true
+                      type: string
+                - $ref: '../../../../models/v4/User.yaml#/components/schemas/BasicUser'
+            lastModified:
+              $ref: '../../../../models/v4/common.yaml#/components/schemas/DateAndUser'
+            availabilityDateTimeZone:
+              readOnly: true
+              type: string
+            expiryDateTimeZone:
+              readOnly: true
+              type: string
+            attachments:
+              readOnly: true
+              type: array
+              items:
+                $ref: './Attachments.yaml#/components/schemas/Attachment'
