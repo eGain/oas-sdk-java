@@ -1,0 +1,2 @@
+v.add(new BooleanValidator("languages", "L10N_INVALID_VALUE_FOR_QUERY_PARAM_INVALID_BOOLEAN"
+v.add(new BooleanValidator("getLastSavedQuickPickForInteraction", "L10N_INVALID_VALUE_FOR_QUERY_PARAM_INVALID_BOOLEAN"
