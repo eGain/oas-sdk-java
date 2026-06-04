@@ -1,0 +1,4 @@
+// Observability
+register(__PACKAGE__.observability.MetricsFilter.class);
+register(__PACKAGE__.observability.TracingFilter.class);
+register(__PACKAGE__.observability.MetricsEndpoint.class);

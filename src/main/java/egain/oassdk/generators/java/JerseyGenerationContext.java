@@ -4,7 +4,9 @@ import egain.oassdk.Util;
 import egain.oassdk.config.GeneratorConfig;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -63,6 +65,20 @@ public final class JerseyGenerationContext {
 
     public String getWsNs() {
         return wsNs;
+    }
+
+    /**
+     * Read a fixed, spec-independent runtime class from the classpath (UTF-8). These classes are
+     * stored verbatim under {@code src/main/resources/runtime/jersey} and copied into the generated
+     * output as-is, rather than emitted from inline text blocks.
+     */
+    static String readRuntimeResource(String resourcePath) throws IOException {
+        try (InputStream in = JerseyGenerationContext.class.getClassLoader().getResourceAsStream(resourcePath)) {
+            if (in == null) {
+                throw new IOException("Missing runtime resource on classpath: " + resourcePath);
+            }
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     /**
