@@ -56,6 +56,9 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             // Generate exception handlers
             generateExceptionHandlers(outputDir, packageName);
 
+            // Generate security dependency stubs (referenced by secured routes)
+            generateSecurity(outputDir, packageName);
+
             // Generate build files
             generateBuildFiles(spec, outputDir);
 
@@ -138,15 +141,30 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
      */
     private void generateMainApplication(Map<String, Object> spec, String outputDir, String packageName) throws IOException {
         StringBuilder content = new StringBuilder();
+        String pkg = packageName != null ? packageName : "api";
         content.append("from fastapi import FastAPI\n");
         content.append("from fastapi.middleware.cors import CORSMiddleware\n");
-        content.append("from ").append(packageName != null ? packageName : "api").append(".routers import *\n");
-        content.append("from ").append(packageName != null ? packageName : "api").append(".exceptions import setup_exception_handlers\n\n");
+        // Import the handler from its submodule: the package __init__ does not re-export it.
+        content.append("from ").append(pkg).append(".exceptions.handlers import setup_exception_handlers\n");
+        // Explicit, correctly-named router imports (see the include section below).
+        String serverBasePath = extractServerBasePath(spec);
+        Map<String, Object> pathsForImport = Util.asStringObjectMap(spec.get("paths"));
+        Set<String> importedRouters = new LinkedHashSet<>();
+        if (pathsForImport != null) {
+            for (String path : pathsForImport.keySet()) {
+                String routerModule = generateRouterName(buildFullPath(serverBasePath, extractParentPath(path))).toLowerCase();
+                if (importedRouters.add(routerModule)) {
+                    content.append("from ").append(pkg).append(".routers.").append(routerModule)
+                           .append(" import ").append(routerModule).append("_router\n");
+                }
+            }
+        }
+        content.append("\n");
 
         content.append("app = FastAPI(\n");
-        content.append("    title=\"").append(getAPITitle(spec)).append("\",\n");
-        content.append("    description=\"").append(getAPIDescription(spec)).append("\",\n");
-        content.append("    version=\"").append(getAPIVersion(spec)).append("\"\n");
+        content.append("    title=").append(pyStr(getAPITitle(spec))).append(",\n");
+        content.append("    description=").append(pyStr(getAPIDescription(spec))).append(",\n");
+        content.append("    version=").append(pyStr(getAPIVersion(spec))).append("\n");
         content.append(")\n\n");
 
         content.append("# CORS middleware\n");
@@ -186,17 +204,15 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("# Setup exception handlers\n");
         content.append("setup_exception_handlers(app)\n\n");
 
-        // Include routers dynamically
+        // Include routers (names match the explicit imports emitted above).
         content.append("# Include routers\n");
         Map<String, Object> paths = Util.asStringObjectMap(spec.get("paths"));
         if (paths != null) {
-            Set<String> parentPaths = new HashSet<>();
+            Set<String> includedRouters = new LinkedHashSet<>();
             for (String path : paths.keySet()) {
-                String parentPath = extractParentPath(path);
-                if (!parentPaths.contains(parentPath)) {
-                    parentPaths.add(parentPath);
-                    String routerName = generateRouterName(parentPath);
-                    content.append("app.include_router(").append(routerName.toLowerCase()).append("_router)\n");
+                String routerModule = generateRouterName(buildFullPath(serverBasePath, extractParentPath(path))).toLowerCase();
+                if (includedRouters.add(routerModule)) {
+                    content.append("app.include_router(").append(routerModule).append("_router)\n");
                 }
             }
         }
@@ -247,6 +263,7 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
         }
 
         // Generate one router per parent path
+        List<String> routerModules = new ArrayList<>();
         for (Map.Entry<String, List<PathOperation>> groupEntry : pathGroups.entrySet()) {
             String parentPath = groupEntry.getKey();
             List<PathOperation> operations = groupEntry.getValue();
@@ -255,7 +272,15 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             String fullParentPath = buildFullPath(serverBasePath, parentPath);
 
             generateRouterForParentPath(fullParentPath, operations, outputDir, packagePath, packageName, serverBasePath);
+            routerModules.add(generateRouterName(fullParentPath).toLowerCase());
         }
+
+        // Re-export each router var from the package __init__.
+        StringBuilder routersInit = new StringBuilder();
+        for (String mod : routerModules) {
+            routersInit.append("from .").append(mod).append(" import ").append(mod).append("_router\n");
+        }
+        writeFile(outputDir + "/" + packagePath + "/routers/__init__.py", routersInit.toString());
     }
 
     /**
@@ -290,6 +315,7 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
         StringBuilder content = new StringBuilder();
         content.append("from fastapi import APIRouter, Query, Path, Header, Body, Depends, HTTPException, status\n");
         content.append("from typing import Optional, List\n");
+        content.append("from datetime import date, datetime\n");
         content.append("from ").append(packageName != null ? packageName : "api").append(".models import *\n");
         content.append("from ").append(packageName != null ? packageName : "api").append(".services import api_service\n");
 
@@ -371,32 +397,37 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
                 boolean required = param.containsKey("required") ? (Boolean) param.get("required") : false;
 
                 if (name != null && in != null && schema != null) {
-                    String pythonName = toSnakeCase(name);
+                    // The OpenAPI parameter name is the wire name (e.g. "startDate",
+                    // "$pagenum"). It may not be a valid Python identifier, so derive a
+                    // safe identifier and bind the wire name via alias when they differ.
+                    String pythonName = toPyIdentifier(name);
+                    boolean aliasNeeded = !pythonName.equals(name);
                     String pythonType = getPythonType(schema);
 
                     switch (in) {
                         case "query" -> {
-                            // Build query parameter with validation
-                            String paramDef = buildQueryParameterWithValidation(pythonName, pythonType, schema, required);
+                            String paramDef = buildQueryParameterWithValidation(pythonName, name, pythonType, schema, required);
                             parameterList.add(paramDef);
                         }
                         case "path" -> {
-                            // Path parameters are always required
-                            String paramDef = pythonName + ": " + pythonType + " = Path(...)";
-                            parameterList.add(paramDef);
+                            // Path params bind to the {placeholder} in the route. If the wire
+                            // name is already a valid identifier, use it verbatim (binds directly);
+                            // otherwise sanitize and bind via alias.
+                            if (isValidPyIdentifier(name)) {
+                                parameterList.add(name + ": " + pythonType + " = Path(...)");
+                            } else {
+                                parameterList.add(pythonName + ": " + pythonType + " = Path(..., alias=\"" + name + "\")");
+                            }
                         }
                         case "header" -> {
-                            // Header parameters
                             String defaultValue = required ? "..." : "None";
                             String optionalType = required ? pythonType : "Optional[" + pythonType + "]";
-                            String paramDef = pythonName + ": " + optionalType + " = Header(" + defaultValue + ")";
-                            parameterList.add(paramDef);
+                            String aliasArg = aliasNeeded ? ", alias=\"" + name + "\"" : "";
+                            parameterList.add(pythonName + ": " + optionalType + " = Header(" + defaultValue + aliasArg + ")");
                         }
                         default -> {
-                            // Fallback
-                            String pythonType2 = getPythonType(schema);
                             String paramAnnotation = getParameterAnnotation(in, name);
-                            parameterList.add(paramAnnotation + ": " + pythonType2);
+                            parameterList.add(pythonName + ": " + pythonType + " = " + paramAnnotation);
                         }
                     }
                 }
@@ -458,18 +489,32 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
     /**
      * Build query parameter with FastAPI validation constraints
      */
-    private String buildQueryParameterWithValidation(String pythonName, String pythonType, Map<String, Object> schema, boolean required) {
+    private String buildQueryParameterWithValidation(String pythonName, String wireName, String pythonType, Map<String, Object> schema, boolean required) {
         StringBuilder paramDef = new StringBuilder();
+
+        // A string `pattern` constraint is invalid on a date/datetime-typed field
+        // (pydantic v2 raises at startup). The spec models these as `type: string`,
+        // so keep them as `str` when a pattern is present and let the handler parse.
+        if (("date".equals(pythonType) || "datetime".equals(pythonType)) && schema.containsKey("pattern")) {
+            pythonType = "str";
+        }
 
         // Determine if type should be Optional
         String actualType = required ? pythonType : "Optional[" + pythonType + "]";
         paramDef.append(pythonName).append(": ").append(actualType).append(" = Query(");
 
-        // Default value
+        // Default value: required -> ..., else honor the schema default, else None.
         if (required) {
             paramDef.append("...");
+        } else if (schema.containsKey("default")) {
+            paramDef.append(pyLiteral(schema.get("default")));
         } else {
             paramDef.append("None");
+        }
+
+        // Bind the wire name when the Python identifier differs (e.g. $pagenum, startDate).
+        if (wireName != null && !wireName.equals(pythonName)) {
+            paramDef.append(", alias=\"").append(wireName).append("\"");
         }
 
         // Add validation constraints
@@ -483,10 +528,9 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             if (schema.containsKey("maxLength")) {
                 paramDef.append(", max_length=").append(schema.get("maxLength"));
             }
-            // Pattern (regex)
+            // Pattern (FastAPI/pydantic v2 uses `pattern`, not the deprecated `regex`).
             if (schema.containsKey("pattern")) {
-                String pattern = (String) schema.get("pattern");
-                paramDef.append(", regex=\"").append(pattern.replace("\"", "\\\"")).append("\"");
+                paramDef.append(", pattern=").append(pyRegex((String) schema.get("pattern")));
             }
         } else if ("integer".equals(type) || "number".equals(type)) {
             // Min/Max value
@@ -533,8 +577,7 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
 
         // Add description if available
         if (schema.containsKey("description")) {
-            String description = (String) schema.get("description");
-            paramDef.append(", description=\"").append(description.replace("\"", "\\\"")).append("\"");
+            paramDef.append(", description=").append(pyStr((String) schema.get("description")));
         }
 
         paramDef.append(")");
@@ -620,6 +663,7 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
         // Check if we should filter models
         boolean shouldFilterModels = !referencedSchemas.isEmpty();
 
+        List<String> generatedModels = new ArrayList<>();
         for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
             String schemaName = schemaEntry.getKey();
             Map<String, Object> schema = Util.asStringObjectMap(schemaEntry.getValue());
@@ -638,7 +682,16 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             String pythonClassName = toPythonClassName(schemaName);
 
             generateModel(pythonClassName, schema, outputDir, packagePath, spec);
+            generatedModels.add(pythonClassName);
         }
+
+        // Re-export every model from the package __init__ so `from <pkg>.models import *`
+        // (used by the routers) actually resolves the classes.
+        StringBuilder modelsInit = new StringBuilder();
+        for (String cls : generatedModels) {
+            modelsInit.append("from .").append(cls.toLowerCase()).append(" import ").append(cls).append("\n");
+        }
+        writeFile(outputDir + "/" + packagePath + "/models/__init__.py", modelsInit.toString());
     }
 
     /**
@@ -854,19 +907,22 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             // Check if field is required
             boolean isRequired = allRequired.contains(fieldName);
 
-            // Generate field with Field() if name differs or if optional
-            if (!fieldName.equals(pythonFieldName) || !isRequired) {
-                content.append(pythonFieldName).append(": ");
-                if (!isRequired) {
-                    content.append("Optional[").append(fieldType).append("] = None");
-                } else {
-                    content.append(fieldType);
-                }
-                if (!fieldName.equals(pythonFieldName)) {
+            // Generate field declaration. Compose a single right-hand side to avoid
+            // the invalid `name: Optional[T] = None = Field(...)` double-assignment.
+            boolean aliasNeeded = !fieldName.equals(pythonFieldName);
+            content.append(pythonFieldName).append(": ");
+            if (isRequired) {
+                content.append(fieldType);
+                if (aliasNeeded) {
                     content.append(" = Field(..., alias=\"").append(fieldName).append("\")");
                 }
             } else {
-                content.append(pythonFieldName).append(": ").append(fieldType);
+                content.append("Optional[").append(fieldType).append("]");
+                if (aliasNeeded) {
+                    content.append(" = Field(default=None, alias=\"").append(fieldName).append("\")");
+                } else {
+                    content.append(" = None");
+                }
             }
 
             content.append("\n");
@@ -904,7 +960,7 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
 
         String configContent = "from pydantic_settings import BaseSettings\n\n";
         configContent += "class Settings(BaseSettings):\n";
-        configContent += "    app_name: str = \"" + getAPITitle(spec) + "\"\n";
+        configContent += "    app_name: str = " + pyStr(getAPITitle(spec)) + "\n";
         configContent += "    debug: bool = False\n\n";
         configContent += "    class Config:\n";
         configContent += "        env_file = \".env\"\n\n";
@@ -1030,7 +1086,10 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
 
     private String getAPIVersion(Map<String, Object> spec) {
         Map<String, Object> info = Util.asStringObjectMap(spec.get("info"));
-        return info != null ? (String) info.get("version") : "1.0.0";
+        String version = info != null ? (String) info.get("version") : null;
+        // FastAPI/OpenAPI require a non-empty version (an empty string trips a startup
+        // assertion). Fall back when the spec omits or blanks it.
+        return (version != null && !version.isBlank()) ? version : "1.0.0";
     }
 
     private String generateRouterName(String path) {
@@ -1040,6 +1099,145 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
 
     private void writeFile(String filePath, String content) throws IOException {
         Files.write(Paths.get(filePath), content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Python reserved words that cannot be used as identifiers. */
+    private static final Set<String> PY_KEYWORDS = Set.of(
+            "False", "None", "True", "and", "as", "assert", "async", "await", "break",
+            "class", "continue", "def", "del", "elif", "else", "except", "finally", "for",
+            "from", "global", "if", "import", "in", "is", "lambda", "nonlocal", "not", "or",
+            "pass", "raise", "return", "try", "while", "with", "yield", "match", "case");
+
+    /**
+     * Emit a safe double-quoted Python string literal, escaping backslashes, quotes
+     * and newlines so multi-line spec text (e.g. info.description) does not break the
+     * generated source.
+     */
+    private String pyStr(String s) {
+        if (s == null) {
+            return "\"\"";
+        }
+        String esc = s.replace("\\", "\\\\")
+                      .replace("\"", "\\\"")
+                      .replace("\r", "\\r")
+                      .replace("\n", "\\n")
+                      .replace("\t", "\\t");
+        return "\"" + esc + "\"";
+    }
+
+    /** Emit a Python literal for a schema default value (string, number, or boolean). */
+    private String pyLiteral(Object value) {
+        if (value == null) {
+            return "None";
+        }
+        if (value instanceof Boolean b) {
+            return b ? "True" : "False";
+        }
+        if (value instanceof Number) {
+            return value.toString();
+        }
+        return pyStr(value.toString());
+    }
+
+    /**
+     * Emit a regex pattern as a Python literal. Prefer a raw string (avoids invalid
+     * escape-sequence warnings for \d, \w, etc.); fall back to an escaped normal
+     * string if the pattern contains a double-quote (illegal to escape in a raw string).
+     */
+    private String pyRegex(String pattern) {
+        if (pattern == null) {
+            return "\"\"";
+        }
+        if (!pattern.contains("\"")) {
+            return "r\"" + pattern + "\"";
+        }
+        return pyStr(pattern);
+    }
+
+    /** True if the string is a valid, non-reserved Python identifier. */
+    private boolean isValidPyIdentifier(String s) {
+        if (s == null || s.isEmpty() || PY_KEYWORDS.contains(s)) {
+            return false;
+        }
+        if (!Character.isLetter(s.charAt(0)) && s.charAt(0) != '_') {
+            return false;
+        }
+        for (int i = 1; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != '_') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Derive a valid Python identifier from an arbitrary wire name (e.g. "$pagenum"
+     * -> "pagenum", "startDate" -> "start_date"). Callers bind the original wire name
+     * via an alias when it differs from the returned identifier.
+     */
+    private String toPyIdentifier(String name) {
+        if (name == null || name.isEmpty()) {
+            return "param";
+        }
+        String snake = toSnakeCase(name);
+        StringBuilder sb = new StringBuilder();
+        for (char c : snake.toCharArray()) {
+            sb.append((Character.isLetterOrDigit(c) || c == '_') ? c : '_');
+        }
+        // Collapse leading underscores produced by stripped symbols (e.g. "$pagenum").
+        String id = sb.toString().replaceAll("^_+", "");
+        if (id.isEmpty()) {
+            id = "param";
+        }
+        if (Character.isDigit(id.charAt(0))) {
+            id = "_" + id;
+        }
+        if (PY_KEYWORDS.contains(id)) {
+            id = id + "_";
+        }
+        return id;
+    }
+
+    /**
+     * Generate a security module with auth dependency stubs. These are intentionally
+     * permissive placeholders so the generated app boots and endpoints are reachable;
+     * they MUST be replaced with real token verification before any production use.
+     */
+    private void generateSecurity(String outputDir, String packageName) throws IOException {
+        String packagePath = packageName != null ? packageName.replace(".", "/") : "api";
+        String content = """
+                from fastapi import Depends, HTTPException, status
+                from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+                from typing import List, Optional
+
+                # NOTE: These are PLACEHOLDER auth dependencies generated for scaffolding.
+                # They do NOT verify tokens or enforce scopes. Replace get_current_user with
+                # real token validation (e.g. JWT decode + scope extraction) and make
+                # check_scopes enforce required scopes before deploying.
+
+                bearer_scheme = HTTPBearer(auto_error=False)
+
+
+                async def get_current_user(
+                    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+                ) -> dict:
+                    \"\"\"Resolve the current user from the bearer token. Placeholder: returns a
+                    stub identity so the generated app is runnable without a real IdP.\"\"\"
+                    token = credentials.credentials if credentials else None
+                    # TODO: verify the token and populate real scopes.
+                    return {"token": token, "scopes": []}
+
+
+                def check_scopes(current_user: dict, required_scopes: List[str]) -> None:
+                    \"\"\"Ensure the user holds all required scopes. Placeholder: no-op.\"\"\"
+                    # TODO: enforce scopes, e.g.:
+                    #   missing = [s for s in required_scopes if s not in current_user.get("scopes", [])]
+                    #   if missing:
+                    #       raise HTTPException(status.HTTP_403_FORBIDDEN, f"Missing scopes: {missing}")
+                    return None
+                """;
+        writeFile(outputDir + "/" + packagePath + "/security.py", content);
     }
 
     /**
@@ -1289,20 +1487,25 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             Map<String, Object> firstServer = servers.getFirst();
             String url = (String) firstServer.get("url");
             if (url != null && !url.isEmpty()) {
-                try {
-                    // Try to parse as full URL
-                    URI uri = URI.create(url);
-                    java.net.URL parsedUrl = uri.toURL();
-                    String path = parsedUrl.getPath();
-                    return (path != null && !path.isEmpty() && !path.equals("/")) ? path : "";
-                } catch (Exception e) {
-                    // If not a full URL, treat as path
-                    if (url.startsWith("/")) {
-                        return url.equals("/") ? "" : url;
-                    } else {
-                        return "/" + url;
-                    }
+                // Server URLs commonly contain template variables (e.g.
+                // "https://${API_DOMAIN}/core/usagemgr/v4") which make URI parsing
+                // throw. Extract the path portion manually so it works regardless.
+                String path;
+                int schemeIdx = url.indexOf("://");
+                if (schemeIdx >= 0) {
+                    // Skip scheme + authority: find the first '/' after "://".
+                    int authorityStart = schemeIdx + 3;
+                    int pathStart = url.indexOf('/', authorityStart);
+                    path = (pathStart >= 0) ? url.substring(pathStart) : "";
+                } else {
+                    // Already a path (with or without leading slash).
+                    path = url.startsWith("/") ? url : "/" + url;
                 }
+                // Normalize: drop trailing slash; treat "/" or empty as no base.
+                if (path.endsWith("/")) {
+                    path = path.substring(0, path.length() - 1);
+                }
+                return (path.isEmpty() || path.equals("/")) ? "" : path;
             }
         }
         return "";
