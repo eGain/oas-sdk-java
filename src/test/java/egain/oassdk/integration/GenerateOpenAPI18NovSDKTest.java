@@ -62,17 +62,23 @@ public class GenerateOpenAPI18NovSDKTest {
         // Verify Validation package was generated
         Path validationDir = outputDir.resolve("src/main/java/egain/ws/oas/validation");
         if (Files.exists(validationDir)) {
-            long validationFileCount = Files.list(validationDir)
+            long validationJavaCount = Files.list(validationDir)
                 .filter(Files::isRegularFile)
                 .filter(path -> path.toString().endsWith(".java"))
                 .count();
-            System.out.println("   ✓ Validation package generated with " + validationFileCount + " validator classes");
+            long validationTxtCount = Files.list(validationDir)
+                .filter(Files::isRegularFile)
+                .filter(path -> path.toString().endsWith(".txt"))
+                .count();
+            System.out.println("   ✓ Validation package generated with " + validationJavaCount
+                + " validator classes and " + validationTxtCount + " merge artifacts");
         } else {
             System.out.println("   ⚠ Validation package directory not found");
         }
-        
+
         // Verify ValidationMapHelper has validate method
-        Path validationMapHelper = outputDir.resolve("src/main/java/egain/ws/oas/gen/ValidationMapHelper.java");
+        Path validationMapHelper = outputDir.resolve(
+            "src/main/java/com/egain/openapi3/api/ValidationMapHelper.java");
         if (Files.exists(validationMapHelper)) {
             String content = new String(Files.readAllBytes(validationMapHelper));
             if (content.contains("public static") && content.contains("validate(")) {
