@@ -426,23 +426,24 @@ class JerseyQueryParamValidatorGenerator {
     private void generateQueryParamValidatorsFile(String outputDir, List<EndpointValidator> validators, String packageName) throws IOException {
         String validatorPackage = packageName != null ? packageName : "egain.ws.oas.gen";
         String validatorPackagePath = validatorPackage.replace(".", "/");
+        String validationPackage = JerseyValidationGenerator.VALIDATION_PACKAGE;
 
         StringBuilder content = new StringBuilder();
         content.append("package ").append(validatorPackage).append(";\n\n");
         content.append("import egain.framework.validation.ValidationBuilder;\n");
         content.append("import egain.ws.oas.RequestInfo;\n");
-        content.append("import ").append(validatorPackage).append(".AllowedParameterValidator;\n");
-        content.append("import ").append(validatorPackage).append(".ArrayMaxItemsValidators;\n");
-        content.append("import ").append(validatorPackage).append(".ArrayMinItemsValidator;\n");
-        content.append("import ").append(validatorPackage).append(".BooleanValidator;\n");
-        content.append("import ").append(validatorPackage).append(".EnumValidator;\n");
-        content.append("import ").append(validatorPackage).append(".FormatValidator;\n");
-        content.append("import ").append(validatorPackage).append(".IsRequiredValidator;\n");
-        content.append("import ").append(validatorPackage).append(".MaxLengthValidator;\n");
-        content.append("import ").append(validatorPackage).append(".MinLengthValidator;\n");
-        content.append("import ").append(validatorPackage).append(".NumericMaxValidator;\n");
-        content.append("import ").append(validatorPackage).append(".NumericMinValidator;\n");
-        content.append("import ").append(validatorPackage).append(".PatternValidator;\n");
+        content.append("import ").append(validationPackage).append(".AllowedParameterValidator;\n");
+        content.append("import ").append(validationPackage).append(".ArrayMaxItemsValidators;\n");
+        content.append("import ").append(validationPackage).append(".ArrayMinItemsValidator;\n");
+        content.append("import ").append(validationPackage).append(".BooleanValidator;\n");
+        content.append("import ").append(validationPackage).append(".EnumValidator;\n");
+        content.append("import ").append(validationPackage).append(".FormatValidator;\n");
+        content.append("import ").append(validationPackage).append(".IsRequiredValidator;\n");
+        content.append("import ").append(validationPackage).append(".MaxLengthValidator;\n");
+        content.append("import ").append(validationPackage).append(".MinLengthValidator;\n");
+        content.append("import ").append(validationPackage).append(".NumericMaxValidator;\n");
+        content.append("import ").append(validationPackage).append(".NumericMinValidator;\n");
+        content.append("import ").append(validationPackage).append(".PatternValidator;\n");
         content.append("import java.lang.String;\n");
         content.append("import java.util.Collections;\n");
         content.append("import java.util.List;\n\n");

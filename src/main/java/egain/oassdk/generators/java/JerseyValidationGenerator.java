@@ -10,6 +10,8 @@ import java.nio.file.Paths;
  */
 class JerseyValidationGenerator {
 
+    static final String VALIDATION_PACKAGE = "egain.ws.oas.validation";
+
     private final JerseyGenerationContext ctx;
 
     JerseyValidationGenerator(JerseyGenerationContext ctx) {
@@ -20,39 +22,37 @@ class JerseyValidationGenerator {
      * Entry point: generate every validation class into the appropriate output directory.
      */
     void generate() throws IOException {
-        generateValidationClasses(ctx.outputDir, ctx.packageName);
-    }
-
-    private void generateValidationClasses(String outputDir, String packageName) throws IOException {
-        if (outputDir == null) {
+        if (ctx.outputDir == null) {
             throw new IllegalArgumentException("Output directory cannot be null");
         }
-        String validationPackage = packageName != null ? packageName : "egain.ws.oas.validation";
-        String packagePath = validationPackage.replace(".", "/");
-        String sourceRoot = outputDir + (ctx.modelsOnly ? "/" : "/src/main/java/");
+        generateValidationClasses(getSourceRoot());
+    }
+
+    private void generateValidationClasses(String sourceRoot) throws IOException {
+        String packagePath = VALIDATION_PACKAGE.replace(".", "/");
         String validationDir = sourceRoot + packagePath;
 
         // Ensure target directory exists
         Files.createDirectories(Paths.get(validationDir));
 
         // Generate all validator classes
-        generateIsRequiredValidator(validationDir, validationPackage);
-        generatePatternValidator(validationDir, validationPackage);
-        generateMaxLengthValidator(validationDir, validationPackage);
-        generateMinLengthValidator(validationDir, validationPackage);
-        generateNumericMaxValidator(validationDir, validationPackage);
-        generateNumericMinValidator(validationDir, validationPackage);
-        generateNumericMultipleOfValidator(validationDir, validationPackage);
-        generateEnumValidator(validationDir, validationPackage);
-        generateBooleanValidator(validationDir, validationPackage);
-        generateFormatValidator(validationDir, validationPackage);
-        generateAllowedParameterValidator(validationDir, validationPackage);
-        generateArrayMaxItemsValidators(validationDir, validationPackage);
-        generateArrayMinItemsValidator(validationDir, validationPackage);
-        generateArrayUniqueItemsValidators(validationDir, validationPackage);
-        generateArraySimpleStyleValidator(validationDir, validationPackage);
-        generateIsAllowEmptyValueValidator(validationDir, validationPackage);
-        generateIsAllowReservedValidator(validationDir, validationPackage);
+        generateIsRequiredValidator(validationDir, VALIDATION_PACKAGE);
+        generatePatternValidator(validationDir, VALIDATION_PACKAGE);
+        generateMaxLengthValidator(validationDir, VALIDATION_PACKAGE);
+        generateMinLengthValidator(validationDir, VALIDATION_PACKAGE);
+        generateNumericMaxValidator(validationDir, VALIDATION_PACKAGE);
+        generateNumericMinValidator(validationDir, VALIDATION_PACKAGE);
+        generateNumericMultipleOfValidator(validationDir, VALIDATION_PACKAGE);
+        generateEnumValidator(validationDir, VALIDATION_PACKAGE);
+        generateBooleanValidator(validationDir, VALIDATION_PACKAGE);
+        generateFormatValidator(validationDir, VALIDATION_PACKAGE);
+        generateAllowedParameterValidator(validationDir, VALIDATION_PACKAGE);
+        generateArrayMaxItemsValidators(validationDir, VALIDATION_PACKAGE);
+        generateArrayMinItemsValidator(validationDir, VALIDATION_PACKAGE);
+        generateArrayUniqueItemsValidators(validationDir, VALIDATION_PACKAGE);
+        generateArraySimpleStyleValidator(validationDir, VALIDATION_PACKAGE);
+        generateIsAllowEmptyValueValidator(validationDir, VALIDATION_PACKAGE);
+        generateIsAllowReservedValidator(validationDir, VALIDATION_PACKAGE);
     }
 
     /**
@@ -1289,18 +1289,17 @@ class JerseyValidationGenerator {
     }
 
     /**
-     * Generate the runtime support classes (RequestInfo, Validations) into the fixed
-     * {@code egain.ws.oas} package that every generated validator imports from.
+     * Generate the runtime support classes (RequestInfo, Validations) and parameter validators into
+     * the fixed {@code egain.ws.oas} package tree.
      *
      * <p>These are emitted regardless of the {@code modelsOnly} flag — the orchestrator calls this
-     * unconditionally so the support classes are always present, while the validators themselves
-     * are only generated in full (non-models-only) mode.
+     * unconditionally so support classes and parameter validators are always present.
      */
     public void generateSupportClasses() throws IOException {
         if (ctx.outputDir == null) {
             throw new IllegalArgumentException("Output directory cannot be null");
         }
-        String sourceRoot = ctx.outputDir + (ctx.modelsOnly ? "/" : "/src/main/java/");
+        String sourceRoot = getSourceRoot();
         String supportDir = sourceRoot + "egain/ws/oas";
 
         // RequestInfo's only spec-independent variation is the javax/jakarta namespace prefix.
@@ -1312,6 +1311,12 @@ class JerseyValidationGenerator {
         String validations = JerseyGenerationContext
                 .readRuntimeResource("runtime/jersey/egain/ws/oas/Validations.java");
         writeFile(supportDir + "/Validations.java", validations);
+
+        generateValidationClasses(sourceRoot);
+    }
+
+    private String getSourceRoot() {
+        return ctx.outputDir + (ctx.modelsOnly ? "/" : "/src/main/java/");
     }
 
     private void writeFile(String filePath, String content) throws IOException {

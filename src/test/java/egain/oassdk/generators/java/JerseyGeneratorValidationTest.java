@@ -24,9 +24,11 @@ public class JerseyGeneratorValidationTest {
     @TempDir
     Path tempOutputDir;
     
-    // Package used in tests; validation and gen classes are generated under this package
+    // Package used in tests; QueryParamValidators and application code are generated here.
     private static final String TEST_PACKAGE = "com.test.api";
     private static final String TEST_PACKAGE_PATH = "com/test/api";
+    private static final String VALIDATION_PACKAGE = "egain.ws.oas.validation";
+    private static final String VALIDATION_PACKAGE_PATH = "egain/ws/oas/validation";
 
     // Expected validation classes
     private static final List<String> EXPECTED_VALIDATION_CLASSES = Arrays.asList(
@@ -61,8 +63,8 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        // Check validation directory exists (under passed-in package)
-        Path validationDir = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH);
+        // Check validation directory exists under the fixed egain.ws.oas.validation package.
+        Path validationDir = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH);
         assertTrue(Files.exists(validationDir), "Validation directory should exist");
         assertTrue(Files.isDirectory(validationDir), "Validation path should be a directory");
         
@@ -97,7 +99,7 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validationDir = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH);
+        Path validationDir = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH);
         
         // Check a few key validation classes for correct package
         String[] classesToCheck = {
@@ -112,8 +114,8 @@ public class JerseyGeneratorValidationTest {
             assertTrue(Files.exists(classFile), className + " should exist");
             
             String content = Files.readString(classFile);
-            assertTrue(content.contains("package " + TEST_PACKAGE + ";"),
-                className + " should have package " + TEST_PACKAGE);
+            assertTrue(content.contains("package " + VALIDATION_PACKAGE + ";"),
+                className + " should have package " + VALIDATION_PACKAGE);
             assertFalse(content.contains("package egain.ws.oas.Validation;"),
                 className + " should not have uppercase Validation package");
         }
@@ -131,7 +133,7 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validationDir = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH);
+        Path validationDir = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH);
         
         // Check all validation classes (not QueryParamValidators/ValidationMapHelper/Application) implement ValidatorAction
         List<Path> validationFiles = Files.list(validationDir)
@@ -165,7 +167,7 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/IsRequiredValidator.java");
+        Path validatorFile = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH + "/IsRequiredValidator.java");
         assertTrue(Files.exists(validatorFile), "IsRequiredValidator should exist");
         
         String content = Files.readString(validatorFile);
@@ -195,7 +197,7 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/PatternValidator.java");
+        Path validatorFile = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH + "/PatternValidator.java");
         assertTrue(Files.exists(validatorFile), "PatternValidator should exist");
         
         String content = Files.readString(validatorFile);
@@ -223,7 +225,7 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/EnumValidator.java");
+        Path validatorFile = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH + "/EnumValidator.java");
         assertTrue(Files.exists(validatorFile), "EnumValidator should exist");
         
         String content = Files.readString(validatorFile);
@@ -251,7 +253,7 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/FormatValidator.java");
+        Path validatorFile = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH + "/FormatValidator.java");
         assertTrue(Files.exists(validatorFile), "FormatValidator should exist");
         
         String content = Files.readString(validatorFile);
@@ -446,7 +448,7 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/AllowedParameterValidator.java");
+        Path validatorFile = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH + "/AllowedParameterValidator.java");
         assertTrue(Files.exists(validatorFile), "AllowedParameterValidator should exist");
         
         String content = Files.readString(validatorFile);
@@ -475,7 +477,7 @@ public class JerseyGeneratorValidationTest {
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
         // Test NumericMaxValidator (uses Validations comparators with string val)
-        Path maxValidatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/NumericMaxValidator.java");
+        Path maxValidatorFile = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH + "/NumericMaxValidator.java");
         assertTrue(Files.exists(maxValidatorFile), "NumericMaxValidator should exist");
         String maxContent = Files.readString(maxValidatorFile);
         assertTrue(maxContent.contains("Validations.isGreaterThan"),
@@ -486,7 +488,7 @@ public class JerseyGeneratorValidationTest {
             "NumericMaxValidator should have max limit as String val");
         
         // Test NumericMinValidator (uses Validations comparators with string val)
-        Path minValidatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/NumericMinValidator.java");
+        Path minValidatorFile = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH + "/NumericMinValidator.java");
         assertTrue(Files.exists(minValidatorFile), "NumericMinValidator should exist");
         String minContent = Files.readString(minValidatorFile);
         assertTrue(minContent.contains("Validations.isLessThan"),
@@ -497,7 +499,7 @@ public class JerseyGeneratorValidationTest {
             "NumericMinValidator should have min limit as String val");
         
         // Test NumericMultipleOfValidator
-        Path multipleOfValidatorFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/NumericMultipleOfValidator.java");
+        Path multipleOfValidatorFile = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH + "/NumericMultipleOfValidator.java");
         assertTrue(Files.exists(multipleOfValidatorFile), "NumericMultipleOfValidator should exist");
         String multipleOfContent = Files.readString(multipleOfValidatorFile);
         assertTrue(multipleOfContent.contains("Math.abs(numericValue % multiple)"),
@@ -517,7 +519,7 @@ public class JerseyGeneratorValidationTest {
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
         // Test ArrayMaxItemsValidators
-        Path maxItemsFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/ArrayMaxItemsValidators.java");
+        Path maxItemsFile = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH + "/ArrayMaxItemsValidators.java");
         assertTrue(Files.exists(maxItemsFile), "ArrayMaxItemsValidators should exist");
         String maxItemsContent = Files.readString(maxItemsFile);
         assertTrue(maxItemsContent.contains("private final String val"),
@@ -526,7 +528,7 @@ public class JerseyGeneratorValidationTest {
             "Should use Validations.hasMaxItems for max items check");
         
         // Test ArrayMinItemsValidator
-        Path minItemsFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/ArrayMinItemsValidator.java");
+        Path minItemsFile = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH + "/ArrayMinItemsValidator.java");
         assertTrue(Files.exists(minItemsFile), "ArrayMinItemsValidator should exist");
         String minItemsContent = Files.readString(minItemsFile);
         assertTrue(minItemsContent.contains("private final String val"),
@@ -535,7 +537,7 @@ public class JerseyGeneratorValidationTest {
             "Should use Validations.hasMinItems for min items check");
         
         // Test ArrayUniqueItemsValidators
-        Path uniqueItemsFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/ArrayUniqueItemsValidators.java");
+        Path uniqueItemsFile = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH + "/ArrayUniqueItemsValidators.java");
         assertTrue(Files.exists(uniqueItemsFile), "ArrayUniqueItemsValidators should exist");
         String uniqueItemsContent = Files.readString(uniqueItemsFile);
         assertTrue(uniqueItemsContent.contains("Set<String> seen"),
@@ -556,8 +558,8 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        // Verify directory structure (under passed-in package)
-        Path validationDir = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH);
+        // Verify directory structure under fixed validation package.
+        Path validationDir = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH);
         assertTrue(Files.exists(validationDir), "Validation directory should exist");
         assertTrue(Files.isDirectory(validationDir), "Should be a directory");
         
@@ -566,7 +568,7 @@ public class JerseyGeneratorValidationTest {
         assertFalse(Files.exists(rootValidation), "Validation should not be at root level");
         
         // Verify correct package path
-        String expectedPath = "src/main/java/" + TEST_PACKAGE_PATH;
+        String expectedPath = "src/main/java/" + VALIDATION_PACKAGE_PATH;
         assertTrue(validationDir.toString().replace("\\", "/").endsWith(expectedPath),
             "Validation directory should be at " + expectedPath);
     }
@@ -583,7 +585,7 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validationDir = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH);
+        Path validationDir = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH);
         
         // Check common imports across validation class files only (exclude QueryParamValidators, ValidationMapHelper, Application)
         List<Path> validationFiles = Files.list(validationDir)
@@ -620,17 +622,17 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        // Check QueryParamValidators imports validation classes (same package as passed-in packageName)
+        // Check QueryParamValidators imports validation classes from the fixed package.
         Path queryParamValidatorsFile = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/QueryParamValidators.java");
         assertTrue(Files.exists(queryParamValidatorsFile), "QueryParamValidators should exist");
         
         String content = Files.readString(queryParamValidatorsFile);
         
-        // Verify imports use passed-in package
-        assertTrue(content.contains("import " + TEST_PACKAGE + ".IsRequiredValidator;"),
-            "Should import IsRequiredValidator from package " + TEST_PACKAGE);
-        assertTrue(content.contains("import " + TEST_PACKAGE + ".PatternValidator;"),
-            "Should import PatternValidator from package " + TEST_PACKAGE);
+        // Verify imports use fixed validation package
+        assertTrue(content.contains("import " + VALIDATION_PACKAGE + ".IsRequiredValidator;"),
+            "Should import IsRequiredValidator from package " + VALIDATION_PACKAGE);
+        assertTrue(content.contains("import " + VALIDATION_PACKAGE + ".PatternValidator;"),
+            "Should import PatternValidator from package " + VALIDATION_PACKAGE);
         assertFalse(content.contains("import egain.ws.oas.Validation."),
             "Should not import from uppercase Validation package");
     }
@@ -647,7 +649,7 @@ public class JerseyGeneratorValidationTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validationDir = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH);
+        Path validationDir = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH);
         
         // Check that all files are valid Java files
         List<Path> validationFiles = Files.list(validationDir)

@@ -72,7 +72,8 @@ public class GenerateOpenAPI18NovSDKTest {
         }
         
         // Verify ValidationMapHelper has validate method
-        Path validationMapHelper = outputDir.resolve("src/main/java/egain/ws/oas/gen/ValidationMapHelper.java");
+        Path validationMapHelper = outputDir.resolve(
+            "src/main/java/com/egain/openapi3/api/ValidationMapHelper.java");
         if (Files.exists(validationMapHelper)) {
             String content = new String(Files.readAllBytes(validationMapHelper));
             if (content.contains("public static") && content.contains("validate(")) {
