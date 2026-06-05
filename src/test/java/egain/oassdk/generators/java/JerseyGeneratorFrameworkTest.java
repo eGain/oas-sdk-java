@@ -256,13 +256,13 @@ public class JerseyGeneratorFrameworkTest {
         sdk.loadSpec(yamlFile);
         sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         
-        Path validationDir = outputDir.resolve("src/main/java/com/test/api");
+        Path validationDir = outputDir.resolve("src/main/java/egain/ws/oas/validation");
         
         if (Files.exists(validationDir)) {
             try (var paths = Files.list(validationDir)) {
                 List<Path> validationFiles = paths
                     .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith("Validator.java"))
+                    .filter(p -> p.toString().endsWith("Validator.txt"))
                     .limit(3) // Check first 3 validators
                     .collect(Collectors.toList());
                 
@@ -331,7 +331,7 @@ public class JerseyGeneratorFrameworkTest {
         } else {
             // If ValidationMapHelper doesn't exist, that's okay - it's only generated when needed
             // Just verify that validation classes directory exists
-            Path validationDir = outputDir.resolve("src/main/java/com/test/api");
+            Path validationDir = outputDir.resolve("src/main/java/egain/ws/oas/validation");
             assertTrue(Files.exists(validationDir), "Validation directory should exist even if ValidationMapHelper is not generated");
         }
     }

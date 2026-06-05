@@ -17,7 +17,10 @@ import java.util.stream.Collectors;
  */
 @DisplayName("Query Parameter Validation and Enum Handling Test")
 public class QueryParameterValidationTest {
-    
+
+    private static final String VALIDATION_PACKAGE = "egain.ws.oas.validation";
+    private static final String VALIDATION_PACKAGE_PATH = "egain/ws/oas/validation";
+
     @TempDir
     Path tempOutputDir;
     
@@ -78,8 +81,10 @@ public class QueryParameterValidationTest {
         String validatorsContent = Files.readString(queryParamValidators);
         assertTrue(validatorsContent.contains("public class QueryParamValidators"),
             "QueryParamValidators should be a public class");
-        assertTrue(validatorsContent.contains("import " + packageName + "."),
-            "Should import validation classes from package " + packageName);
+        assertTrue(validatorsContent.contains("import " + VALIDATION_PACKAGE + ".IsRequiredValidator;"),
+            "Should import validation classes from package " + VALIDATION_PACKAGE);
+        assertTrue(validatorsContent.contains("import " + VALIDATION_PACKAGE + ".PatternValidator;"),
+            "Should import PatternValidator from package " + VALIDATION_PACKAGE);
 
         // Check ValidationMapHelper.java exists and has validate() method (under passed-in package)
         Path validationMapHelper = packageDir.resolve("ValidationMapHelper.java");
@@ -97,8 +102,7 @@ public class QueryParameterValidationTest {
     }
     
     private void checkValidationClassesGenerated(Path outputDir, String packageName) throws IOException {
-        String packagePath = packageName.replace(".", "/");
-        Path validationDir = outputDir.resolve("src/main/java").resolve(packagePath);
+        Path validationDir = outputDir.resolve("src/main/java/" + VALIDATION_PACKAGE_PATH);
         assertTrue(Files.exists(validationDir), "Validation directory should exist");
         assertTrue(Files.isDirectory(validationDir), "Validation path should be a directory");
 
@@ -107,17 +111,19 @@ public class QueryParameterValidationTest {
             .filter(path -> path.toString().endsWith(".java"))
             .map(path -> path.getFileName().toString().replace(".java", ""))
             .collect(Collectors.toList());
-        
-        assertTrue(validationClasses.size() >= 10, 
+
+        assertTrue(validationClasses.size() >= 10,
             "At least 10 validation classes should be generated, found: " + validationClasses.size());
         System.out.println("   ✓ " + validationClasses.size() + " validation classes generated");
-        
-        // Check key validation classes exist
-        String[] keyClasses = {"IsRequiredValidator", "PatternValidator", "EnumValidator", 
+
+        String[] keyClasses = {"IsRequiredValidator", "PatternValidator", "EnumValidator",
                               "MaxLengthValidator", "MinLengthValidator"};
         for (String className : keyClasses) {
             assertTrue(validationClasses.contains(className),
                 className + " should be generated");
+            Path textArtifact = validationDir.resolve(className + ".txt");
+            assertTrue(Files.exists(textArtifact),
+                className + " merge artifact should exist as .txt");
         }
         System.out.println("   ✓ Key validation classes present");
     }
