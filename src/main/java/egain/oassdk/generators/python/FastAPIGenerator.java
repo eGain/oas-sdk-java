@@ -663,25 +663,63 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
         // Check if we should filter models
         boolean shouldFilterModels = !referencedSchemas.isEmpty();
 
-        List<String> generatedModels = new ArrayList<>();
+        // Some schemas are only ever referenced via an inlined $ref (the parser replaces
+        // the ref with its content + x-resolved-ref) and were never registered as
+        // top-level schemas. Register them so referenced model classes are generated.
+        registerResolvedRefSchemas(schemas);
+
+        // Reverse map (class name -> schema key) so a referenced class resolves back to
+        // the schema to generate.
+        Map<String, String> classToKey = new LinkedHashMap<>();
+        for (String key : schemas.keySet()) {
+            classToKey.putIfAbsent(toPythonClassName(key), key);
+        }
+
+        // Seed the selection from the operation-referenced schemas (or all, unfiltered).
+        Set<String> selectedKeys = new LinkedHashSet<>();
         for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
             String schemaName = schemaEntry.getKey();
             Map<String, Object> schema = Util.asStringObjectMap(schemaEntry.getValue());
-
-            // Filter out error schemas
             if (isErrorSchema(schemaName, schema)) {
                 continue;
             }
-
-            // Only filter models if we found referenced schemas
             if (shouldFilterModels && !referencedSchemas.contains(schemaName)) {
                 continue;
             }
+            selectedKeys.add(schemaName);
+        }
 
-            // Convert schema name to valid Python class name
-            String pythonClassName = toPythonClassName(schemaName);
+        // Close the selection over field references: every class a selected model emits
+        // in its annotations must itself be generated (e.g. a response -> its record and
+        // pagination types). Derived from the same logic getPythonType uses, so the
+        // generated set and each model's imports always agree.
+        Deque<String> work = new ArrayDeque<>(selectedKeys);
+        while (!work.isEmpty()) {
+            Map<String, Object> schema = Util.asStringObjectMap(schemas.get(work.poll()));
+            if (schema == null) continue;
+            Set<String> refClasses = new LinkedHashSet<>();
+            collectModelReferencedClasses(schema, spec, refClasses);
+            for (String cls : refClasses) {
+                // A type referenced by a generated model's field must itself be
+                // generated, even if it looks like an error schema — otherwise the
+                // annotation references an undefined name.
+                String depKey = classToKey.get(cls);
+                if (depKey != null && selectedKeys.add(depKey)) {
+                    work.add(depKey);
+                }
+            }
+        }
 
-            generateModel(pythonClassName, schema, outputDir, packagePath, spec);
+        Set<String> knownClasses = new LinkedHashSet<>();
+        for (String key : selectedKeys) {
+            knownClasses.add(toPythonClassName(key));
+        }
+
+        List<String> generatedModels = new ArrayList<>();
+        for (String key : selectedKeys) {
+            Map<String, Object> schema = Util.asStringObjectMap(schemas.get(key));
+            String pythonClassName = toPythonClassName(key);
+            generateModel(pythonClassName, schema, outputDir, packagePath, spec, knownClasses);
             generatedModels.add(pythonClassName);
         }
 
@@ -692,6 +730,50 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             modelsInit.append("from .").append(cls.toLowerCase()).append(" import ").append(cls).append("\n");
         }
         writeFile(outputDir + "/" + packagePath + "/models/__init__.py", modelsInit.toString());
+    }
+
+    /**
+     * Walk every schema's properties for inlined sub-schemas that carry an
+     * x-resolved-ref to a named component schema (the parser inlines $ref-only
+     * schemas) and register any that are missing from the top-level schema map, using
+     * the inlined definition. Without this, a model field can reference a class that
+     * was never generated.
+     */
+    private void registerResolvedRefSchemas(Map<String, Object> schemas) {
+        Map<String, Object> toAdd = new LinkedHashMap<>();
+        // Identity-based visited set: the inlined object graph can contain shared and
+        // cyclic Map references, so guard against revisiting the same node.
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        // Snapshot values first: we mutate `schemas` only after walking.
+        for (Object schemaObj : new ArrayList<>(schemas.values())) {
+            collectResolvedRefSchemas(schemaObj, schemas, toAdd, visited);
+        }
+        schemas.putAll(toAdd);
+    }
+
+    private void collectResolvedRefSchemas(Object node, Map<String, Object> existing, Map<String, Object> toAdd, Set<Object> visited) {
+        if (node == null || !visited.add(node)) {
+            return;
+        }
+        if (node instanceof Map<?, ?> m) {
+            Map<String, Object> schema = Util.asStringObjectMap(node);
+            String refName = resolvedRefSchemaName(schema);
+            // Only register when the inlined node is itself a full definition (has
+            // properties); a bare alias without a body cannot be generated.
+            if (refName != null && schema.containsKey("properties")
+                    && !existing.containsKey(refName) && !toAdd.containsKey(refName)) {
+                Map<String, Object> def = new LinkedHashMap<>(schema);
+                def.remove("x-resolved-ref");
+                toAdd.put(refName, def);
+            }
+            for (Object v : schema.values()) {
+                collectResolvedRefSchemas(v, existing, toAdd, visited);
+            }
+        } else if (node instanceof List<?> list) {
+            for (Object v : list) {
+                collectResolvedRefSchemas(v, existing, toAdd, visited);
+            }
+        }
     }
 
     /**
@@ -787,13 +869,15 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
 
         Map<String, Object> schema = Util.asStringObjectMap(schemaObj);
 
-        // Check for direct $ref
-        if (schema.containsKey("$ref")) {
-            String ref = (String) schema.get("$ref");
-            if (ref != null && ref.startsWith("#/components/schemas/")) {
-                String schemaName = ref.substring(ref.lastIndexOf("/") + 1);
-                addSchemaAndCollectNested(schemaName, referencedSchemas, spec);
-            }
+        // Check for a direct $ref, or a parser-inlined ref (x-resolved-ref). Honoring
+        // the latter is what lets model filtering follow references the parser already
+        // expanded — without it, nothing is "referenced" and every schema is emitted.
+        String resolvedName = resolvedRefSchemaName(schema);
+        if (resolvedName != null) {
+            // addSchemaAndCollectNested recurses into the registered definition (with a
+            // name-based cycle guard), so its full closure is collected. Return here —
+            // walking the inlined copy's properties could recurse on cyclic content.
+            addSchemaAndCollectNested(resolvedName, referencedSchemas, spec);
             return;
         }
 
@@ -860,14 +944,7 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
      * Generate individual model (Pydantic model)
      */
     private void generateModel(String schemaName, Map<String, Object> schema, String outputDir, String packagePath,
-                               Map<String, Object> spec) throws IOException {
-        StringBuilder content = new StringBuilder();
-        content.append("from pydantic import BaseModel, Field\n");
-        content.append("from typing import Optional, List, Union, Any\n");
-        content.append("from datetime import date, datetime\n\n");
-
-        content.append("class ").append(schemaName).append("(BaseModel):\n");
-
+                               Map<String, Object> spec, Set<String> knownClasses) throws IOException {
         // Extract properties from schema (handling allOf, oneOf, anyOf, and direct properties)
         Map<String, Object> allProperties = new LinkedHashMap<>();
         List<String> allRequired = new ArrayList<>();
@@ -893,39 +970,57 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             mergeSchemaProperties(schema, allProperties, allRequired, spec);
         }
 
-        // Generate fields from merged properties
+        // Generate fields, collecting the sibling model classes they reference so we can
+        // import them (a Pydantic annotation like List[Foo] must have Foo in scope).
+        StringBuilder fields = new StringBuilder();
+        Set<String> referencedClasses = new LinkedHashSet<>();
         for (Map.Entry<String, Object> property : allProperties.entrySet()) {
             String fieldName = property.getKey();
             Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
 
-            // Generate field declaration
-            content.append("    ");
-
             String pythonFieldName = toSnakeCase(fieldName);
             String fieldType = getPythonType(fieldSchema);
-
-            // Check if field is required
+            collectReferencedClasses(fieldSchema, referencedClasses);
             boolean isRequired = allRequired.contains(fieldName);
 
-            // Generate field declaration. Compose a single right-hand side to avoid
-            // the invalid `name: Optional[T] = None = Field(...)` double-assignment.
+            fields.append("    ");
+            // Compose a single right-hand side to avoid the invalid
+            // `name: Optional[T] = None = Field(...)` double-assignment.
             boolean aliasNeeded = !fieldName.equals(pythonFieldName);
-            content.append(pythonFieldName).append(": ");
+            fields.append(pythonFieldName).append(": ");
             if (isRequired) {
-                content.append(fieldType);
+                fields.append(fieldType);
                 if (aliasNeeded) {
-                    content.append(" = Field(..., alias=\"").append(fieldName).append("\")");
+                    fields.append(" = Field(..., alias=\"").append(fieldName).append("\")");
                 }
             } else {
-                content.append("Optional[").append(fieldType).append("]");
+                fields.append("Optional[").append(fieldType).append("]");
                 if (aliasNeeded) {
-                    content.append(" = Field(default=None, alias=\"").append(fieldName).append("\")");
+                    fields.append(" = Field(default=None, alias=\"").append(fieldName).append("\")");
                 } else {
-                    content.append(" = None");
+                    fields.append(" = None");
                 }
             }
+            fields.append("\n");
+        }
 
-            content.append("\n");
+        StringBuilder content = new StringBuilder();
+        content.append("from pydantic import BaseModel, Field\n");
+        content.append("from typing import Optional, List, Union, Any\n");
+        content.append("from datetime import date, datetime\n");
+        // Import referenced sibling models (acyclic refs; deep cycles are not handled).
+        for (String cls : referencedClasses) {
+            if (knownClasses.contains(cls) && !cls.equals(schemaName)) {
+                content.append("from .").append(cls.toLowerCase()).append(" import ").append(cls).append("\n");
+            }
+        }
+        content.append("\n");
+
+        content.append("class ").append(schemaName).append("(BaseModel):\n");
+        if (allProperties.isEmpty()) {
+            content.append("    pass\n");
+        } else {
+            content.append(fields);
         }
 
         // Add Config class for Pydantic v2 compatibility
@@ -934,6 +1029,56 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
         content.append("        from_attributes = True\n");
 
         writeFile(outputDir + "/" + packagePath + "/models/" + schemaName.toLowerCase() + ".py", content.toString());
+    }
+
+    /**
+     * Merge a model schema's properties (allOf/oneOf/anyOf/direct, same as
+     * generateModel) and collect the class names its fields reference. Used to close
+     * the generated-model set over its own field references.
+     */
+    private void collectModelReferencedClasses(Map<String, Object> schema, Map<String, Object> spec, Set<String> out) {
+        Map<String, Object> allProperties = new LinkedHashMap<>();
+        List<String> allRequired = new ArrayList<>();
+        if (schema.containsKey("allOf")) {
+            for (Map<String, Object> sub : Util.asStringObjectMapList(schema.get("allOf"))) {
+                mergeSchemaProperties(sub, allProperties, allRequired, spec);
+            }
+        } else if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+            List<Map<String, Object>> subs = Util.asStringObjectMapList(
+                    schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
+            for (Map<String, Object> sub : subs) {
+                mergeSchemaProperties(sub, allProperties, allRequired, spec);
+            }
+        } else {
+            mergeSchemaProperties(schema, allProperties, allRequired, spec);
+        }
+        for (Object prop : allProperties.values()) {
+            collectReferencedClasses(Util.asStringObjectMap(prop), out);
+        }
+    }
+
+    /**
+     * Collect the component-schema class names a field schema references, recursing
+     * into array items and allOf/oneOf/anyOf compositions.
+     */
+    private void collectReferencedClasses(Map<String, Object> fieldSchema, Set<String> out) {
+        if (fieldSchema == null) return;
+        String refName = resolvedRefSchemaName(fieldSchema);
+        if (refName != null) {
+            out.add(toPythonClassName(refName));
+        }
+        Map<String, Object> items = Util.asStringObjectMap(fieldSchema.get("items"));
+        if (items != null) {
+            collectReferencedClasses(items, out);
+        }
+        for (String comp : new String[]{"allOf", "oneOf", "anyOf"}) {
+            List<Map<String, Object>> subs = Util.asStringObjectMapList(fieldSchema.get(comp));
+            if (subs != null) {
+                for (Map<String, Object> sub : subs) {
+                    collectReferencedClasses(sub, out);
+                }
+            }
+        }
     }
 
     /**
@@ -1152,6 +1297,21 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             return "r\"" + pattern + "\"";
         }
         return pyStr(pattern);
+    }
+
+    /**
+     * Return the component-schema name a schema refers to, via the parser's
+     * x-resolved-ref (set when a $ref is inlined) or a literal $ref. Null if neither.
+     */
+    private String resolvedRefSchemaName(Map<String, Object> schema) {
+        for (String key : new String[]{"x-resolved-ref", "$ref"}) {
+            Object v = schema.get(key);
+            if (v instanceof String s && s.contains("#/components/schemas/")) {
+                String frag = s.substring(s.indexOf("#/components/schemas/") + "#/components/schemas/".length());
+                return frag.contains("/") ? frag.substring(frag.lastIndexOf("/") + 1) : frag;
+            }
+        }
+        return null;
     }
 
     /** True if the string is a valid, non-reserved Python identifier. */
@@ -1538,6 +1698,15 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             return "Any";
         }
 
+        // A $ref to a named schema lets us emit the model class instead of a generic
+        // dict/Any. The parser inlines $ref-only schemas but preserves the target in
+        // x-resolved-ref; honor either so response fields like `data` and
+        // `paginationInfo` are strongly typed.
+        String refName = resolvedRefSchemaName(schema);
+        if (refName != null) {
+            return toPythonClassName(refName);
+        }
+
         String type = (String) schema.get("type");
         String format = (String) schema.get("format");
 
@@ -1640,8 +1809,9 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
         if (schema != null) {
             Object description = schema.get("description");
             if (description instanceof String descStr) {
-                String desc = descStr.toLowerCase();
-                return desc.contains("error") || desc.contains("exception") || desc.contains("fault");
+                // Match whole words only: substring matching wrongly flags e.g.
+                // "default" (contains "fault") or "terror" (contains "error").
+                return descStr.toLowerCase().matches("(?s).*\\b(error|exception|fault)\\b.*");
             }
         }
 

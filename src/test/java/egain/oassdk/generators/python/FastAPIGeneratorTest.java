@@ -166,6 +166,59 @@ public class FastAPIGeneratorTest {
         assertTrue(router.contains("Query(\"total\""), "schema default must be honored");
     }
 
+    /**
+     * Regression test for strongly-typed $ref fields: a response model's fields must be
+     * typed as the referenced model classes (not dict/Any), those classes must be
+     * imported and generated, the generated set must be closed over field references
+     * and filtered to what's reachable, and a schema whose description merely contains
+     * "default" must not be misclassified as an error schema (the "fault" substring bug).
+     */
+    @Test
+    public void testRefFieldsAreStronglyTypedAndClosed(@TempDir Path tempDir) throws Exception {
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("info", new LinkedHashMap<>(Map.of("title", "Ref Test", "version", "1.0.0")));
+
+        // GET /widgets -> 200 references WidgetList, which references Widget and PageMeta.
+        Map<String, Object> okSchema = Map.of("schema", Map.of("$ref", "#/components/schemas/WidgetList"));
+        Map<String, Object> resp200 = Map.of("content", Map.of("application/json", okSchema));
+        Map<String, Object> get = new LinkedHashMap<>();
+        get.put("operationId", "listWidgets");
+        get.put("responses", Map.of("200", resp200));
+        spec.put("paths", Map.of("/widgets", Map.of("get", get)));
+
+        Map<String, Object> widgetList = Map.of("type", "object", "properties", new LinkedHashMap<>(Map.of(
+                "items", Map.of("type", "array", "items", Map.of("$ref", "#/components/schemas/Widget")),
+                "page", Map.of("$ref", "#/components/schemas/PageMeta"))));
+        Map<String, Object> widget = Map.of("type", "object",
+                "properties", Map.of("id", Map.of("type", "string")));
+        // Description contains "default" — must NOT be treated as an error schema.
+        Map<String, Object> pageMeta = Map.of("type", "object",
+                "description", "Pagination metadata. Overrides the platform default of 75.",
+                "properties", Map.of("count", Map.of("type", "integer")));
+        // Not referenced by any operation — must be filtered out.
+        Map<String, Object> unused = Map.of("type", "object",
+                "properties", Map.of("x", Map.of("type", "string")));
+        spec.put("components", Map.of("schemas", new LinkedHashMap<>(Map.of(
+                "WidgetList", widgetList, "Widget", widget, "PageMeta", pageMeta, "Unused", unused))));
+
+        generator.generate(spec, tempDir.toString(), new GeneratorConfig(), "api");
+
+        Path models = tempDir.resolve("api/models");
+        String widgetListModel = read(models.resolve("widgetlist.py"));
+
+        // Fields are typed as the referenced classes, and those classes are imported.
+        assertTrue(widgetListModel.contains("List[Widget]"), "array items must be typed as the model");
+        assertTrue(widgetListModel.contains("PageMeta"), "object ref must be typed as the model");
+        assertTrue(widgetListModel.contains("from .widget import Widget"));
+        assertTrue(widgetListModel.contains("from .pagemeta import PageMeta"));
+
+        // Referenced models are generated (closure); "default" did not exclude PageMeta.
+        assertTrue(Files.exists(models.resolve("widget.py")));
+        assertTrue(Files.exists(models.resolve("pagemeta.py")), "schema with 'default' in its description must not be dropped");
+        // Unreachable schema is filtered out.
+        assertFalse(Files.exists(models.resolve("unused.py")), "unreferenced schema must not be generated");
+    }
+
     private String read(Path p) throws IOException {
         return Files.readString(p);
     }
