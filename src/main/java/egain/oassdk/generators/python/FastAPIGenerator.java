@@ -21,6 +21,13 @@ import java.util.*;
 public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
 
     private GeneratorConfig config;
+    /**
+     * Security scheme names whose authentication is enforced at the API Gateway edge
+     * (marked with the x-amazon-apigateway-authtype extension, e.g. awsSigv4, Cognito,
+     * custom Lambda authorizers). These require NO in-application auth dependency — the
+     * gateway authenticates before the request ever reaches the handler.
+     */
+    private Set<String> edgeAuthSchemes = new HashSet<>();
     // Map to store in-lined schemas: schema object -> generated model name
     private final Map<Object, String> inlinedSchemas = new java.util.IdentityHashMap<>();
 
@@ -32,6 +39,8 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
         this.config = config;
 
         try {
+            this.edgeAuthSchemes = collectEdgeAuthSchemes(spec);
+
             // Create directory structure
             createDirectoryStructure(outputDir, packageName);
 
@@ -56,8 +65,11 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             // Generate exception handlers
             generateExceptionHandlers(outputDir, packageName);
 
-            // Generate security dependency stubs (referenced by secured routes)
-            generateSecurity(outputDir, packageName);
+            // Generate security dependency stubs only if some operation needs app-level
+            // (non-edge) auth. Edge-enforced schemes (e.g. SigV4) get no in-app auth.
+            if (anyOperationHasAppAuth(spec)) {
+                generateSecurity(outputDir, packageName);
+            }
 
             // Generate build files
             generateBuildFiles(spec, outputDir);
@@ -586,11 +598,60 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
     }
 
     /**
-     * Check if any operations have security requirements
+     * Names of edge-enforced security schemes (x-amazon-apigateway-authtype present).
+     */
+    private Set<String> collectEdgeAuthSchemes(Map<String, Object> spec) {
+        Set<String> edge = new HashSet<>();
+        if (spec == null) return edge;
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        if (components == null) return edge;
+        Map<String, Object> schemes = Util.asStringObjectMap(components.get("securitySchemes"));
+        if (schemes == null) return edge;
+        for (Map.Entry<String, Object> e : schemes.entrySet()) {
+            Map<String, Object> scheme = Util.asStringObjectMap(e.getValue());
+            if (scheme != null && scheme.containsKey("x-amazon-apigateway-authtype")) {
+                edge.add(e.getKey());
+            }
+        }
+        return edge;
+    }
+
+    /** True if the operation has a security requirement that is NOT edge-enforced. */
+    private boolean operationHasAppAuth(Map<String, Object> operation) {
+        if (operation == null || !operation.containsKey("security")) return false;
+        List<Map<String, Object>> securityList = Util.asStringObjectMapList(operation.get("security"));
+        if (securityList == null) return false;
+        for (Map<String, Object> req : securityList) {
+            if (req == null) continue;
+            for (String schemeName : req.keySet()) {
+                if (!edgeAuthSchemes.contains(schemeName)) return true;
+            }
+        }
+        return false;
+    }
+
+    /** True if any operation in the spec needs app-level (non-edge) auth. */
+    private boolean anyOperationHasAppAuth(Map<String, Object> spec) {
+        Map<String, Object> paths = Util.asStringObjectMap(spec.get("paths"));
+        if (paths == null) return false;
+        for (Object pathItemObj : paths.values()) {
+            Map<String, Object> pathItem = Util.asStringObjectMap(pathItemObj);
+            if (pathItem == null) continue;
+            for (String method : Constants.HTTP_METHODS) {
+                if (pathItem.containsKey(method) && operationHasAppAuth(Util.asStringObjectMap(pathItem.get(method)))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if any operations have app-level (non-edge-enforced) security requirements.
      */
     private boolean hasSecurityRequirements(List<PathOperation> operations) {
         for (PathOperation pathOp : operations) {
-            if (pathOp.operation != null && pathOp.operation.containsKey("security")) {
+            if (operationHasAppAuth(pathOp.operation)) {
                 return true;
             }
         }
@@ -620,10 +681,17 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
         SecurityInfo info = new SecurityInfo(true);
         List<Map<String, Object>> securityList = Util.asStringObjectMapList(operation.get("security"));
 
+        boolean hasAppAuth = false;
         if (securityList != null) {
             for (Map<String, Object> securityMap : securityList) {
                 if (securityMap != null) {
                     for (Map.Entry<String, Object> entry : securityMap.entrySet()) {
+                        // Edge-enforced schemes (e.g. SigV4) are handled by the gateway,
+                        // not the app — skip them entirely.
+                        if (edgeAuthSchemes.contains(entry.getKey())) {
+                            continue;
+                        }
+                        hasAppAuth = true;
                         // Extract scopes
                         if (entry.getValue() instanceof List<?> scopeList) {
                             for (Object scope : scopeList) {
@@ -641,7 +709,8 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             }
         }
 
-        return info;
+        // No non-edge requirement -> no in-application auth dependency.
+        return hasAppAuth ? info : null;
     }
 
     /**

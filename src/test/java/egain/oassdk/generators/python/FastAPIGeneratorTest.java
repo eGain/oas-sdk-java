@@ -255,6 +255,33 @@ public class FastAPIGeneratorTest {
         assertTrue(Files.exists(tempDir.resolve("api/models/b.py")));
     }
 
+    /**
+     * Edge-enforced auth (a security scheme marked x-amazon-apigateway-authtype, e.g.
+     * AWS SigV4) is handled at the API Gateway, so the generated app must contain NO
+     * in-application auth: no security.py, no get_current_user dependency.
+     */
+    @Test
+    public void testEdgeEnforcedAuthEmitsNoInAppAuth(@TempDir Path tempDir) throws Exception {
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("info", new LinkedHashMap<>(Map.of("title", "SigV4", "version", "1.0.0")));
+        Map<String, Object> get = new LinkedHashMap<>();
+        get.put("operationId", "getThing");
+        get.put("security", List.of(Map.of("sigv4", List.of())));
+        get.put("responses", Map.of("200", Map.of("description", "OK")));
+        spec.put("paths", Map.of("/things", Map.of("get", get)));
+        spec.put("components", Map.of("securitySchemes", Map.of(
+                "sigv4", Map.of("type", "apiKey", "name", "Authorization", "in", "header",
+                        "x-amazon-apigateway-authtype", "awsSigv4"))));
+
+        generator.generate(spec, tempDir.toString(), new GeneratorConfig(), "api");
+
+        assertFalse(Files.exists(tempDir.resolve("api/security.py")),
+                "edge-enforced auth must not generate an in-app security module");
+        String routers = readAll(tempDir.resolve("api/routers"));
+        assertFalse(routers.contains("get_current_user"), "no in-app auth dependency for SigV4");
+        assertFalse(routers.contains("check_scopes"), "no in-app scope check for SigV4");
+    }
+
     private String read(Path p) throws IOException {
         return Files.readString(p);
     }
