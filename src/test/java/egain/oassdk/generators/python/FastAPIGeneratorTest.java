@@ -219,6 +219,42 @@ public class FastAPIGeneratorTest {
         assertFalse(Files.exists(models.resolve("unused.py")), "unreferenced schema must not be generated");
     }
 
+    /**
+     * Regression test for recursive / mutually-referential schemas: models must defer
+     * annotations, import siblings only under TYPE_CHECKING (so an A<->B cycle does not
+     * deadlock at import time), and the package __init__ must rebuild forward references.
+     */
+    @Test
+    public void testCyclicModelsUseForwardRefsAndRebuild(@TempDir Path tempDir) throws Exception {
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("info", new LinkedHashMap<>(Map.of("title", "Cyclic", "version", "1.0.0")));
+        Map<String, Object> get = new LinkedHashMap<>();
+        get.put("operationId", "getA");
+        get.put("responses", Map.of("200", Map.of("content",
+                Map.of("application/json", Map.of("schema", Map.of("$ref", "#/components/schemas/A"))))));
+        spec.put("paths", Map.of("/a", Map.of("get", get)));
+        // A references B and B references A (mutual cycle).
+        Map<String, Object> a = Map.of("type", "object",
+                "properties", Map.of("b", Map.of("$ref", "#/components/schemas/B")));
+        Map<String, Object> b = Map.of("type", "object",
+                "properties", Map.of("a", Map.of("$ref", "#/components/schemas/A")));
+        spec.put("components", Map.of("schemas", new LinkedHashMap<>(Map.of("A", a, "B", b))));
+
+        generator.generate(spec, tempDir.toString(), new GeneratorConfig(), "api");
+
+        String aModel = read(tempDir.resolve("api/models/a.py"));
+        assertTrue(aModel.startsWith("from __future__ import annotations"), "must defer annotations");
+        assertTrue(aModel.contains("if TYPE_CHECKING:"), "sibling import must be TYPE_CHECKING-guarded");
+        assertTrue(aModel.contains("from .b import B"), "must reference sibling B");
+        // The sibling import must NOT be a runtime (unguarded) import — that would deadlock.
+        assertFalse(aModel.replace("if TYPE_CHECKING:\n    from .b import B", "")
+                .contains("from .b import B"), "sibling import must only appear under TYPE_CHECKING");
+
+        String init = read(tempDir.resolve("api/models/__init__.py"));
+        assertTrue(init.contains("model_rebuild("), "package __init__ must rebuild forward refs");
+        assertTrue(Files.exists(tempDir.resolve("api/models/b.py")));
+    }
+
     private String read(Path p) throws IOException {
         return Files.readString(p);
     }

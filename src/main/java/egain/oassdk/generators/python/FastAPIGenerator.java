@@ -729,6 +729,22 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
         for (String cls : generatedModels) {
             modelsInit.append("from .").append(cls.toLowerCase()).append(" import ").append(cls).append("\n");
         }
+        // Now that every model class is imported in this namespace, resolve all forward
+        // references (including cyclic ones) in one pass. This is what makes mutually
+        // referential models work: the model files only import siblings under
+        // TYPE_CHECKING, so model_rebuild supplies the missing names here.
+        if (!generatedModels.isEmpty()) {
+            modelsInit.append("import sys as _sys\n\n");
+            modelsInit.append("_MODELS = (").append(String.join(", ", generatedModels)).append(",)\n");
+            modelsInit.append("_CLASSES = {_c.__name__: _c for _c in _MODELS}\n");
+            modelsInit.append("for _m in _MODELS:\n");
+            // Merge each model's own module globals (typing names, date, etc.) with the
+            // full set of model classes, so model_rebuild resolves every forward ref
+            // regardless of pydantic version (2.5 does not auto-merge module globals).
+            modelsInit.append("    _ns = dict(vars(_sys.modules[_m.__module__]))\n");
+            modelsInit.append("    _ns.update(_CLASSES)\n");
+            modelsInit.append("    _m.model_rebuild(_types_namespace=_ns)\n");
+        }
         writeFile(outputDir + "/" + packagePath + "/models/__init__.py", modelsInit.toString());
     }
 
@@ -1004,14 +1020,28 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             fields.append("\n");
         }
 
-        StringBuilder content = new StringBuilder();
-        content.append("from pydantic import BaseModel, Field\n");
-        content.append("from typing import Optional, List, Union, Any\n");
-        content.append("from datetime import date, datetime\n");
-        // Import referenced sibling models (acyclic refs; deep cycles are not handled).
+        // Collect the sibling model classes this model references.
+        List<String> siblingImports = new ArrayList<>();
         for (String cls : referencedClasses) {
             if (knownClasses.contains(cls) && !cls.equals(schemaName)) {
-                content.append("from .").append(cls.toLowerCase()).append(" import ").append(cls).append("\n");
+                siblingImports.add(cls);
+            }
+        }
+
+        StringBuilder content = new StringBuilder();
+        // Defer annotation evaluation (PEP 563/649) so self- and forward-references
+        // resolve on every supported Python version (3.8+), not just 3.14.
+        content.append("from __future__ import annotations\n");
+        content.append("from pydantic import BaseModel, Field\n");
+        content.append("from typing import TYPE_CHECKING, Optional, List, Union, Any\n");
+        content.append("from datetime import date, datetime\n");
+        // Import referenced sibling models under TYPE_CHECKING so mutually-referential
+        // models do not trigger a circular import at runtime. The forward references are
+        // resolved by model_rebuild() in the package __init__ once every class exists.
+        if (!siblingImports.isEmpty()) {
+            content.append("if TYPE_CHECKING:\n");
+            for (String cls : siblingImports) {
+                content.append("    from .").append(cls.toLowerCase()).append(" import ").append(cls).append("\n");
             }
         }
         content.append("\n");
