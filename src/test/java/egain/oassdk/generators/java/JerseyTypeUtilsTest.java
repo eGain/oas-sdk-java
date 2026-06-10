@@ -175,6 +175,38 @@ class JerseyTypeUtilsTest {
     // -----------------------------------------------------------------------
 
     @Test
+    @DisplayName("getJavaType returns Identity for Identity allOf overlay registered in spec")
+    void getJavaType_identityAllOfOverlay_returnsIdentityNotBasicUser() {
+        Map<String, Object> identity = new LinkedHashMap<>();
+        identity.put("allOf", List.of(
+                Map.of("properties", Map.of("id", Map.of("type", "string", "readOnly", false))),
+                Map.of("$ref", "#/components/schemas/BasicUser")));
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("Identity", identity);
+        schemas.put("BasicUser", Map.of("type", "object", "properties", Map.of("id", Map.of("type", "string", "readOnly", true))));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", schemas));
+
+        assertEquals("Identity", createTypeUtils(spec).getJavaType(identity));
+    }
+
+    @Test
+    @DisplayName("computeFieldTypeForProperty returns Identity for registered Identity allOf schema")
+    void computeFieldTypeForProperty_identityAllOf_returnsIdentity() {
+        Map<String, Object> identity = new LinkedHashMap<>();
+        identity.put("allOf", List.of(
+                Map.of("properties", Map.of("id", Map.of("type", "string", "readOnly", false))),
+                Map.of("$ref", "#/components/schemas/BasicUser")));
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("Identity", identity);
+        schemas.put("BasicUser", Map.of("type", "object"));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", schemas));
+
+        JerseyTypeUtils typeUtils = createTypeUtils(spec);
+        assertEquals("Identity",
+                typeUtils.computeFieldTypeForProperty("user", identity, false, spec));
+    }
+
+    @Test
     @DisplayName("getJavaType returns XMLGregorianCalendar for date format")
     void getJavaType_date() {
         Map<String, Object> schema = Map.of("type", "string", "format", "date");

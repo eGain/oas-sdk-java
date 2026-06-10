@@ -96,7 +96,8 @@ public final class JerseySchemaUtils {
                         distinctRefNames.add(refName);
                     }
                 }
-                if (refCount == 1 || distinctRefNames.size() == 1) {
+                if ((refCount == 1 || distinctRefNames.size() == 1)
+                        && !allOfHasPropertyOverlayBranches(allOfSchemas)) {
                     merged.put("x-java-type-ref", singleRefSchemaName);
                 }
             }
@@ -187,62 +188,163 @@ public final class JerseySchemaUtils {
 
     /**
      * Merge two JSON-Schema property definition maps as sequential {@code allOf} branches would:
-     * {@code earlier} is merged first, then {@code later}. The result favours {@code later} for type
-     * and constraints, but preserves {@code readOnly}/{@code writeOnly} from {@code earlier} when
-     * {@code later} omits those keys and the earlier flag is true.
+     * {@code earlier} is merged first, then {@code later}. When {@code later} is a constraint or nested
+     * overlay (e.g. {@code readOnly: true} or {@code properties.user.readOnly}) and {@code earlier}
+     * carries the component type ({@code $ref}, array {@code items}, etc.), the base type is preserved
+     * and {@code later} is applied on top. Otherwise {@code later} defines the type and {@code earlier}
+     * constraints are back-filled.
      */
     public static Map<String, Object> mergePropertyDefinitionsForComposition(Map<String, Object> earlier,
                                                                         Map<String, Object> later) {
         if (later == null || later.isEmpty()) {
             return earlier != null ? new LinkedHashMap<>(earlier) : new LinkedHashMap<>();
         }
-        Map<String, Object> out = new LinkedHashMap<>(later);
-        if (earlier != null) {
-            List<Map<String, Object>> earlierAllOf = Util.asStringObjectMapList(earlier.get("allOf"));
-            List<Map<String, Object>> laterAllOf = Util.asStringObjectMapList(later.get("allOf"));
-            if (earlierAllOf != null && !earlierAllOf.isEmpty()
-                    && laterAllOf != null && !laterAllOf.isEmpty()) {
-                List<Map<String, Object>> mergedAllOf = mergePropertyLevelAllOf(earlierAllOf, laterAllOf, earlier, later);
-                if (!mergedAllOf.isEmpty()) {
-                    out.put("allOf", mergedAllOf);
-                }
-            }
-            for (String key : COMPOSITION_CONSTRAINT_KEYS) {
-                if (!out.containsKey(key) && earlier.containsKey(key)) {
-                    out.put(key, earlier.get(key));
-                }
-            }
-            if (!later.containsKey("readOnly") && isSchemaFlagTrue(earlier, "readOnly")) {
-                out.put("readOnly", true);
-            }
-            if (!later.containsKey("writeOnly") && isSchemaFlagTrue(earlier, "writeOnly")) {
-                out.put("writeOnly", true);
-            }
-            Map<String, Object> laterProps = Util.asStringObjectMap(later.get("properties"));
-            Map<String, Object> earlierProps = Util.asStringObjectMap(earlier.get("properties"));
-            if (earlierProps != null && !earlierProps.isEmpty()) {
-                Map<String, Object> mergedProps = new LinkedHashMap<>();
-                if (laterProps != null) {
-                    mergedProps.putAll(laterProps);
-                }
-                for (Map.Entry<String, Object> pe : earlierProps.entrySet()) {
-                    String pk = pe.getKey();
-                    Map<String, Object> eSub = Util.asStringObjectMap(pe.getValue());
-                    if (!mergedProps.containsKey(pk)) {
-                        mergedProps.put(pk, pe.getValue());
-                    } else {
-                        Map<String, Object> lSub = Util.asStringObjectMap(mergedProps.get(pk));
-                        if (eSub != null && lSub != null) {
-                            mergedProps.put(pk, mergePropertyDefinitionsForComposition(eSub, lSub));
-                        } else {
-                            mergedProps.put(pk, pe.getValue());
-                        }
-                    }
-                }
-                out.put("properties", mergedProps);
-            }
+        if (earlier == null || earlier.isEmpty()) {
+            return new LinkedHashMap<>(later);
+        }
+        Map<String, Object> out;
+        if (!definesOwnPropertyType(later) && definesOwnPropertyType(earlier)) {
+            out = new LinkedHashMap<>(earlier);
+            applyPropertyOverlayOnBase(out, earlier, later);
+        } else {
+            out = new LinkedHashMap<>(later);
+            mergeEarlierIntoLaterPropertyBase(out, earlier, later);
         }
         return out;
+    }
+
+    /**
+     * True when a property schema carries its own type identity ({@code $ref}, array {@code items},
+     * property-level {@code allOf} with a schema body, or a fully typed inline object/array).
+     */
+    static boolean definesOwnPropertyType(Map<String, Object> schema) {
+        if (schema == null || schema.isEmpty()) {
+            return false;
+        }
+        if (schema.containsKey("$ref") || getSchemaNameFromRef(schema) != null) {
+            return true;
+        }
+        if (schema.containsKey("items")) {
+            return true;
+        }
+        if (schema.containsKey("allOf")) {
+            List<Map<String, Object>> allOf = Util.asStringObjectMapList(schema.get("allOf"));
+            if (allOf != null) {
+                for (Map<String, Object> branch : allOf) {
+                    if (branch == null) {
+                        continue;
+                    }
+                    if (isAllOfRefBranch(branch) || isResolvedSchemaAllOfBranch(branch)) {
+                        return true;
+                    }
+                    if (branch.containsKey("items") || "array".equals(branch.get("type"))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        if ("array".equals(schema.get("type")) && schema.containsKey("items")) {
+            return true;
+        }
+        return schema.containsKey("type");
+    }
+
+    /** Apply a constraint/nested overlay ({@code later}) onto a typed base ({@code out} copied from {@code earlier}). */
+    private static void applyPropertyOverlayOnBase(Map<String, Object> out,
+                                                   Map<String, Object> earlier,
+                                                   Map<String, Object> later) {
+        List<Map<String, Object>> earlierAllOf = Util.asStringObjectMapList(earlier.get("allOf"));
+        List<Map<String, Object>> laterAllOf = Util.asStringObjectMapList(later.get("allOf"));
+        if (earlierAllOf != null && !earlierAllOf.isEmpty()
+                && laterAllOf != null && !laterAllOf.isEmpty()) {
+            List<Map<String, Object>> mergedAllOf = mergePropertyLevelAllOf(earlierAllOf, laterAllOf, earlier, later);
+            if (!mergedAllOf.isEmpty()) {
+                out.put("allOf", mergedAllOf);
+            }
+        }
+        for (String key : COMPOSITION_CONSTRAINT_KEYS) {
+            if (later.containsKey(key)) {
+                out.put(key, later.get(key));
+            }
+        }
+        if (later.containsKey("readOnly")) {
+            out.put("readOnly", later.get("readOnly"));
+        } else if (isSchemaFlagTrue(earlier, "readOnly")) {
+            out.put("readOnly", true);
+        }
+        if (later.containsKey("writeOnly")) {
+            out.put("writeOnly", later.get("writeOnly"));
+        } else if (isSchemaFlagTrue(earlier, "writeOnly")) {
+            out.put("writeOnly", true);
+        }
+        Map<String, Object> laterProps = Util.asStringObjectMap(later.get("properties"));
+        if (laterProps == null || laterProps.isEmpty()) {
+            return;
+        }
+        Map<String, Object> baseProps = Util.asStringObjectMap(out.get("properties"));
+        if (baseProps == null) {
+            baseProps = new LinkedHashMap<>();
+            out.put("properties", baseProps);
+        }
+        for (Map.Entry<String, Object> pe : laterProps.entrySet()) {
+            String pk = pe.getKey();
+            Map<String, Object> overlaySub = Util.asStringObjectMap(pe.getValue());
+            Map<String, Object> baseSub = Util.asStringObjectMap(baseProps.get(pk));
+            if (baseSub != null && overlaySub != null) {
+                baseProps.put(pk, mergePropertyDefinitionsForComposition(baseSub, overlaySub));
+            } else {
+                baseProps.put(pk, pe.getValue());
+            }
+        }
+    }
+
+    /** Merge {@code earlier} constraints into a {@code later}-typed property base ({@code out}). */
+    private static void mergeEarlierIntoLaterPropertyBase(Map<String, Object> out,
+                                                          Map<String, Object> earlier,
+                                                          Map<String, Object> later) {
+        List<Map<String, Object>> earlierAllOf = Util.asStringObjectMapList(earlier.get("allOf"));
+        List<Map<String, Object>> laterAllOf = Util.asStringObjectMapList(later.get("allOf"));
+        if (earlierAllOf != null && !earlierAllOf.isEmpty()
+                && laterAllOf != null && !laterAllOf.isEmpty()) {
+            List<Map<String, Object>> mergedAllOf = mergePropertyLevelAllOf(earlierAllOf, laterAllOf, earlier, later);
+            if (!mergedAllOf.isEmpty()) {
+                out.put("allOf", mergedAllOf);
+            }
+        }
+        for (String key : COMPOSITION_CONSTRAINT_KEYS) {
+            if (!out.containsKey(key) && earlier.containsKey(key)) {
+                out.put(key, earlier.get(key));
+            }
+        }
+        if (!later.containsKey("readOnly") && isSchemaFlagTrue(earlier, "readOnly")) {
+            out.put("readOnly", true);
+        }
+        if (!later.containsKey("writeOnly") && isSchemaFlagTrue(earlier, "writeOnly")) {
+            out.put("writeOnly", true);
+        }
+        Map<String, Object> laterProps = Util.asStringObjectMap(later.get("properties"));
+        Map<String, Object> earlierProps = Util.asStringObjectMap(earlier.get("properties"));
+        if (earlierProps != null && !earlierProps.isEmpty()) {
+            Map<String, Object> mergedProps = new LinkedHashMap<>();
+            if (laterProps != null) {
+                mergedProps.putAll(laterProps);
+            }
+            for (Map.Entry<String, Object> pe : earlierProps.entrySet()) {
+                String pk = pe.getKey();
+                Map<String, Object> eSub = Util.asStringObjectMap(pe.getValue());
+                if (!mergedProps.containsKey(pk)) {
+                    mergedProps.put(pk, pe.getValue());
+                } else {
+                    Map<String, Object> lSub = Util.asStringObjectMap(mergedProps.get(pk));
+                    if (eSub != null && lSub != null) {
+                        mergedProps.put(pk, mergePropertyDefinitionsForComposition(eSub, lSub));
+                    } else {
+                        mergedProps.put(pk, pe.getValue());
+                    }
+                }
+            }
+            out.put("properties", mergedProps);
+        }
     }
 
     /**
@@ -455,6 +557,82 @@ public final class JerseySchemaUtils {
             return true;
         }
         return branch.containsKey("$ref") && !branch.containsKey("properties");
+    }
+
+    /**
+     * True when any {@code allOf} overlay branch carries a semantic property overlay
+     * (e.g. Identity {@code id: { type: string, readOnly: false }}). Constraint-only overlays
+     * ({@code readOnly: true} without redefining type) do not count — those still alias to the base ref.
+     */
+    static boolean allOfHasPropertyOverlayBranches(List<Map<String, Object>> allOfSchemas) {
+        if (allOfSchemas == null) {
+            return false;
+        }
+        List<Map<String, Object>> refBranches = new ArrayList<>();
+        List<Map<String, Object>> overlayBranches = new ArrayList<>();
+        partitionAllOfBranches(allOfSchemas, refBranches, overlayBranches);
+        for (Map<String, Object> branch : overlayBranches) {
+            Map<String, Object> props = Util.asStringObjectMap(branch.get("properties"));
+            if (props != null && !props.isEmpty() && overlayPropertiesAreSemantic(props)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** True when any property in an overlay {@code properties} map redefines type or overrides readOnly to false. */
+    private static boolean overlayPropertiesAreSemantic(Map<String, Object> props) {
+        for (Object val : props.values()) {
+            if (isSemanticPropertyOverlay(Util.asStringObjectMap(val))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True when a property overlay schema carries semantic identity ({@code type}, {@code $ref}, etc.)
+     * or explicitly sets {@code readOnly: false} to override a read-only base field.
+     */
+    private static boolean isSemanticPropertyOverlay(Map<String, Object> propSchema) {
+        if (propSchema == null || propSchema.isEmpty()) {
+            return false;
+        }
+        if (propSchema.containsKey("type") || propSchema.containsKey("$ref")
+                || propSchema.containsKey("items") || propSchema.containsKey("allOf")
+                || propSchema.containsKey("oneOf") || propSchema.containsKey("anyOf")) {
+            return true;
+        }
+        if (Boolean.FALSE.equals(propSchema.get("readOnly"))) {
+            return true;
+        }
+        Map<String, Object> nested = Util.asStringObjectMap(propSchema.get("properties"));
+        return nested != null && !nested.isEmpty() && overlayPropertiesAreSemantic(nested);
+    }
+
+    /**
+     * Name of the {@code components.schemas} entry for {@code schema}, when it is a registered component.
+     * Matches by object identity (parser-inlined refs) or bare internal {@code $ref}.
+     */
+    public static String findComponentSchemaName(Map<String, Object> schema, Map<String, Object> spec) {
+        if (schema == null || spec == null) {
+            return null;
+        }
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        Map<String, Object> schemas = components != null ? Util.asStringObjectMap(components.get("schemas")) : null;
+        if (schemas == null) {
+            return null;
+        }
+        for (Map.Entry<String, Object> entry : schemas.entrySet()) {
+            if (entry.getValue() == schema) {
+                return entry.getKey();
+            }
+        }
+        String refName = getSchemaNameFromRef(schema);
+        if (refName != null && schemas.containsKey(refName)) {
+            return refName;
+        }
+        return null;
     }
 
     /**

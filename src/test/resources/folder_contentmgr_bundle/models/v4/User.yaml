@@ -10,3 +10,10 @@ components:
       properties:
         id:
           type: string
+          readOnly: true
+          pattern: "^[1-9]\\d*$"
+          minLength: 1
+          maxLength: 9
+        userName:
+          type: string
+          readOnly: true

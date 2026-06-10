@@ -112,6 +112,94 @@ class JerseyModelGeneratorFolderYamlParityTest {
                 "EditFolder must not use List<FolderPermissionsEntry> for permissions");
     }
 
+    @Test
+    @DisplayName("Bundled Folder.yaml EditFolder keeps typed lastModified, parent, and department")
+    void editFolderOverlayFieldsKeepBaseTypes() throws OASSDKException, IOException {
+        Path specPath = Path.of("src/test/resources/folder_contentmgr_bundle/knowledge/models/contentmgr/v4/Folder.yaml")
+                .toAbsolutePath();
+        Path bundleRoot = Path.of("src/test/resources/folder_contentmgr_bundle").toAbsolutePath();
+        Path outputDir = tempOutputDir.resolve("edit-folder-typed-fields");
+
+        GeneratorConfig config = GeneratorConfig.builder()
+                .modelsOnly(true)
+                .packageName("com.egain.bindings.ws.model.xsds.common.v4.content")
+                .outputDir(outputDir.toString())
+                .searchPaths(List.of(bundleRoot.toString()))
+                .build();
+
+        try (OASSDK sdk = new OASSDK(config, null, null)) {
+            sdk.loadSpec(specPath.toString());
+            sdk.generateApplication("java", "jersey", config.getPackageName(), outputDir.toString());
+        }
+
+        Path editFolderJava;
+        try (Stream<Path> walk = Files.walk(outputDir)) {
+            editFolderJava = walk
+                    .filter(p -> p.getFileName().toString().equals("EditFolder.java"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("EditFolder.java not found under " + outputDir));
+        }
+
+        String generated = Files.readString(editFolderJava, StandardCharsets.UTF_8);
+        assertTrue(generated.contains("private DateAndUser lastModified"),
+                "EditFolder.lastModified should remain DateAndUser after overlay merge");
+        assertTrue(generated.contains("private FolderSummary parent"),
+                "EditFolder.parent should remain FolderSummary after readOnly overlay");
+        assertTrue(generated.contains("private Department department"),
+                "EditFolder.department should remain Department after readOnly overlay");
+        assertFalse(generated.contains("private Object lastModified"),
+                "EditFolder.lastModified must not degrade to Object");
+    }
+
+    @Test
+    @DisplayName("Bundled Permission.yaml IdentityPayload.user uses Identity not BasicUser")
+    void identityPayloadUserFieldUsesIdentityType() throws OASSDKException, IOException {
+        Path specPath = Path.of("src/test/resources/folder_contentmgr_bundle/knowledge/models/contentmgr/v4/Permission.yaml")
+                .toAbsolutePath();
+        Path bundleRoot = Path.of("src/test/resources/folder_contentmgr_bundle").toAbsolutePath();
+        Path outputDir = tempOutputDir.resolve("permission-models");
+
+        GeneratorConfig config = GeneratorConfig.builder()
+                .modelsOnly(true)
+                .packageName("com.egain.bindings.ws.model.xsds.common.v4.content")
+                .outputDir(outputDir.toString())
+                .searchPaths(List.of(bundleRoot.toString()))
+                .build();
+
+        try (OASSDK sdk = new OASSDK(config, null, null)) {
+            sdk.loadSpec(specPath.toString());
+            sdk.generateApplication("java", "jersey", config.getPackageName(), outputDir.toString());
+        }
+
+        Path identityPayloadJava;
+        Path identityJava;
+        try (Stream<Path> walk = Files.walk(outputDir)) {
+            List<Path> javaFiles = walk.filter(p -> p.getFileName().toString().endsWith(".java")).toList();
+            identityPayloadJava = javaFiles.stream()
+                    .filter(p -> p.getFileName().toString().equals("IdentityPayload.java"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("IdentityPayload.java not found under " + outputDir));
+            identityJava = javaFiles.stream()
+                    .filter(p -> p.getFileName().toString().equals("Identity.java"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Identity.java not found under " + outputDir));
+        }
+
+        String payload = Files.readString(identityPayloadJava, StandardCharsets.UTF_8);
+        assertTrue(payload.contains("private Identity user"),
+                "IdentityPayload.user should be Identity so overlay readOnly:false on id applies");
+        assertFalse(payload.contains("private BasicUser user"),
+                "IdentityPayload must not collapse Identity allOf to BasicUser");
+
+        String identity = Files.readString(identityJava, StandardCharsets.UTF_8);
+        int idFieldIdx = identity.indexOf("private String id;");
+        assertTrue(idFieldIdx > 0, "Identity should declare private String id field");
+        String idFieldBlock = identity.substring(Math.max(0, idFieldIdx - 400), idFieldIdx + 50);
+        assertFalse(idFieldBlock.contains("JsonProperty.Access.READ_ONLY"),
+                "Identity.id overlay readOnly:false must not emit READ_ONLY on id");
+        assertTrue(identity.contains("public void setId("), "Identity.id should have a public setter");
+    }
+
     private static String readResource(String classpathPath) throws IOException {
         try (InputStream in = JerseyModelGeneratorFolderYamlParityTest.class.getResourceAsStream(classpathPath)) {
             Objects.requireNonNull(in, "Missing classpath resource: " + classpathPath);

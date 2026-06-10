@@ -4,6 +4,7 @@ import egain.oassdk.OASSDK;
 import egain.oassdk.core.exceptions.OASSDKException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
@@ -14,13 +15,16 @@ import java.nio.file.*;
  */
 @DisplayName("Generate SDK from bundle-openapi 3.yaml")
 public class GenerateBundleSDKTest {
+
+    @TempDir
+    Path tempOutputDir;
     
     @Test
     @DisplayName("Generate SDK from bundle-openapi 3.yaml")
     public void testGenerateBundleSDK() throws OASSDKException, IOException {
         String yamlFile = "examples/bundle-openapi 3.yaml";
         String packageName = "egain.ws.v4.access";
-        String outputDir = "./generated-code/bundle-sdk";
+        Path outputDir = tempOutputDir.resolve("bundle-sdk");
         
         System.out.println("\n=== Generating SDK from bundle-openapi 3.yaml ===");
         System.out.println("Output directory: " + outputDir);
@@ -36,13 +40,13 @@ public class GenerateBundleSDKTest {
         // Generate application
         System.out.println("\n2. Generating Jersey application...");
         System.out.println("   Package: " + packageName);
-        System.out.println("   Output: " + outputDir);
-        sdk.generateApplication("java", "jersey", packageName, outputDir);
+        System.out.println("   Output: " + outputDir.toAbsolutePath());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
         System.out.println("   ✓ Application generated");
         
         // Verify generated files
         System.out.println("\n3. Verifying generated files...");
-        Path outputPath = Paths.get(outputDir);
+        Path outputPath = outputDir;
         assertTrue(Files.exists(outputPath), "Output directory should exist");
         
         Path pomFile = outputPath.resolve("pom.xml");

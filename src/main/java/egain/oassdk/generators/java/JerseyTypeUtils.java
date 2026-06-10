@@ -69,6 +69,11 @@ public final class JerseyTypeUtils {
             return "Object";
         }
 
+        String componentSchemaName = resolveNamedComponentType(schema);
+        if (componentSchemaName != null) {
+            return JerseyNamingUtils.toJavaClassName(componentSchemaName);
+        }
+
         // When allOf has exactly one ref branch (e.g. L10NString + enum constraints), use that ref's type
         if (schema.containsKey("allOf")) {
             List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
@@ -93,7 +98,8 @@ public final class JerseyTypeUtils {
                         }
                     }
                 }
-                if (refCount == 1 && singleRefSchemaName != null) {
+                if (refCount == 1 && singleRefSchemaName != null
+                        && !JerseySchemaUtils.allOfHasPropertyOverlayBranches(allOfSchemas)) {
                     return JerseyNamingUtils.toJavaClassName(singleRefSchemaName);
                 }
             }
@@ -289,6 +295,26 @@ public final class JerseyTypeUtils {
         }
     }
 
+    /**
+     * Resolve a registered component schema name when the schema is a named composition
+     * (semantic allOf overlay), not a single-ref alias like ArticleTypeForCreateEditArticle.
+     */
+    private String resolveNamedComponentType(Map<String, Object> schema) {
+        if (!shouldUseNamedComponentType(schema)) {
+            return null;
+        }
+        return JerseySchemaUtils.findComponentSchemaName(schema, ctx.spec);
+    }
+
+    /** Skip named-component resolution for allOf schemas that should alias to a single base ref. */
+    private static boolean shouldUseNamedComponentType(Map<String, Object> schema) {
+        if (schema == null || !schema.containsKey("allOf")) {
+            return true;
+        }
+        List<Map<String, Object>> allOf = Util.asStringObjectMapList(schema.get("allOf"));
+        return allOf != null && JerseySchemaUtils.allOfHasPropertyOverlayBranches(allOf);
+    }
+
     // ---------------------------------------------------------------------------
     //  Field type computation for model properties
     // ---------------------------------------------------------------------------
@@ -297,6 +323,10 @@ public final class JerseyTypeUtils {
      * Compute the Java field type for a property (same logic as in generateModel field loop).
      */
     String computeFieldTypeForProperty(String fieldName, Map<String, Object> fieldSchema, boolean isArrayType, Map<String, Object> spec) {
+        String componentType = resolveNamedComponentType(fieldSchema);
+        if (componentType != null) {
+            return JerseyNamingUtils.toJavaClassName(componentType);
+        }
         if (isArrayType && "items".equals(fieldName)) {
             String itemType = null;
             if (fieldSchema != null) {

@@ -534,6 +534,56 @@ class JerseySchemaUtilsTest {
     }
 
     @Test
+    @DisplayName("allOfHasPropertyOverlayBranches is true when overlay branch defines properties")
+    void allOfHasPropertyOverlayBranches_withPropertyOverlay() {
+        List<Map<String, Object>> allOf = List.of(
+                Map.of("properties", Map.of("id", Map.of("type", "string", "readOnly", false))),
+                Map.of("$ref", "#/components/schemas/BasicUser"));
+        assertTrue(JerseySchemaUtils.allOfHasPropertyOverlayBranches(allOf));
+    }
+
+    @Test
+    @DisplayName("allOfHasPropertyOverlayBranches is false for constraint-only overlay")
+    void allOfHasPropertyOverlayBranches_constraintOnlyOverlay() {
+        List<Map<String, Object>> allOf = List.of(
+                Map.of("enum", List.of("a", "b")),
+                Map.of("$ref", "#/components/schemas/L10NString"));
+        assertFalse(JerseySchemaUtils.allOfHasPropertyOverlayBranches(allOf));
+    }
+
+    @Test
+    @DisplayName("allOfHasPropertyOverlayBranches is false for readOnly-only property overlay on ArticleType")
+    void allOfHasPropertyOverlayBranches_falseForReadOnlyOnlyPropertyOverlay() {
+        List<Map<String, Object>> allOf = List.of(
+                Map.of("$ref", "#/components/schemas/ArticleTypeProperties"),
+                Map.of("type", "object",
+                        "properties", Map.of(
+                                "name", Map.of("readOnly", true),
+                                "description", Map.of("readOnly", true))));
+        assertFalse(JerseySchemaUtils.allOfHasPropertyOverlayBranches(allOf));
+    }
+
+    @Test
+    @DisplayName("findComponentSchemaName matches registered schema by object identity")
+    void findComponentSchemaName_byIdentity() {
+        Map<String, Object> identity = new LinkedHashMap<>();
+        identity.put("allOf", List.of(
+                Map.of("properties", Map.of("id", Map.of("type", "string", "readOnly", false))),
+                Map.of("$ref", "#/components/schemas/BasicUser")));
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("Identity", identity);
+        schemas.put("BasicUser", Map.of("type", "object"));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", schemas));
+
+        assertEquals("Identity", JerseySchemaUtils.findComponentSchemaName(identity, spec));
+        assertEquals("BasicUser", JerseySchemaUtils.findComponentSchemaName(
+                Map.of("$ref", "#/components/schemas/BasicUser"), spec));
+        Map<String, Object> inlinedIdentity = new LinkedHashMap<>(identity);
+        inlinedIdentity.put("x-resolved-ref", "#/components/schemas/Identity");
+        assertEquals("Identity", JerseySchemaUtils.findComponentSchemaName(inlinedIdentity, spec));
+    }
+
+    @Test
     @DisplayName("mergeSchemaProperties Identity overlay readOnly false wins over BasicUser id readOnly true")
     void mergeSchemaProperties_identityOverlayIdWinsOverBasicUser() {
         Map<String, Object> basicUserId = new LinkedHashMap<>();
@@ -689,6 +739,106 @@ class JerseySchemaUtilsTest {
         assertNotNull(itemRef);
         assertTrue(itemRef.contains("EditFolderPermissionsEntry"),
                 "Expected EditFolderPermissionsEntry but got: " + itemRef);
+    }
+
+    @Test
+    @DisplayName("mergePropertyDefinitionsForComposition preserves base $ref when later is readOnly overlay")
+    void mergePropertyDefinitions_preservesRefWhenLaterIsReadOnlyOverlay() {
+        Map<String, Object> earlier = Map.of("$ref", "#/components/schemas/FolderSummary");
+        Map<String, Object> later = Map.of("readOnly", true);
+
+        Map<String, Object> merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(earlier, later);
+
+        assertEquals("#/components/schemas/FolderSummary", merged.get("$ref"));
+        assertTrue(JerseySchemaUtils.isSchemaFlagTrue(merged, "readOnly"));
+    }
+
+    @Test
+    @DisplayName("mergePropertyDefinitionsForComposition preserves base $ref when later is nested readOnly overlay")
+    void mergePropertyDefinitions_preservesRefWhenLaterIsNestedOverlay() {
+        Map<String, Object> earlier = Map.of("$ref", "#/components/schemas/DateAndUser");
+        Map<String, Object> later = Map.of(
+                "properties", Map.of("user", Map.of("readOnly", true)));
+
+        Map<String, Object> merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(earlier, later);
+
+        assertEquals("#/components/schemas/DateAndUser", merged.get("$ref"));
+        Map<String, Object> user = Util.asStringObjectMap(
+                Util.asStringObjectMap(merged.get("properties")).get("user"));
+        assertNotNull(user);
+        assertTrue(JerseySchemaUtils.isSchemaFlagTrue(user, "readOnly"));
+    }
+
+    @Test
+    @DisplayName("mergePropertyDefinitionsForComposition type:object overlay over $ref uses later-wins path (known edge case)")
+    void mergePropertyDefinitions_typeObjectOverlayOverRef_laterWinsAndDropsRef() {
+        Map<String, Object> earlier = Map.of("$ref", "#/components/schemas/DateAndUser");
+        Map<String, Object> later = Map.of(
+                "type", "object",
+                "properties", Map.of("user", Map.of("readOnly", true)));
+
+        assertTrue(JerseySchemaUtils.definesOwnPropertyType(later));
+
+        Map<String, Object> merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(earlier, later);
+
+        assertEquals("object", merged.get("type"));
+        assertFalse(merged.containsKey("$ref"),
+                "later-wins path drops $ref when overlay carries explicit type: object");
+        Map<String, Object> user = Util.asStringObjectMap(
+                Util.asStringObjectMap(merged.get("properties")).get("user"));
+        assertNotNull(user);
+        assertTrue(JerseySchemaUtils.isSchemaFlagTrue(user, "readOnly"));
+    }
+
+    @Test
+    @DisplayName("mergeSchemaProperties bundled Folder.yaml editFolder preserves typed overlay fields")
+    void mergeSchemaProperties_editFolderFromBundledYaml_preservesTypedFields() throws OASSDKException {
+        Path specPath = Path.of("src/test/resources/folder_contentmgr_bundle/knowledge/models/contentmgr/v4/Folder.yaml")
+                .toAbsolutePath();
+        Path bundleRoot = Path.of("src/test/resources/folder_contentmgr_bundle").toAbsolutePath();
+        OASParser parser = new OASParser(List.of(bundleRoot.toString()));
+        Map<String, Object> spec = parser.parse(specPath.toString());
+        spec = parser.resolveReferences(spec, specPath.toString());
+
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+        Map<String, Object> editFolder = Util.asStringObjectMap(schemas.get("editFolder"));
+
+        Map<String, Object> allProps = new LinkedHashMap<>();
+        List<String> allRequired = new ArrayList<>();
+        JerseySchemaUtils.mergeAllOfBranchesIntoProperties(
+                Util.asStringObjectMapList(editFolder.get("allOf")), allProps, allRequired, spec);
+
+        assertRefNameContains(allProps.get("lastModified"), "DateAndUser");
+        assertRefNameContains(allProps.get("parent"), "FolderSummary");
+        assertRefNameContains(allProps.get("department"), "Department");
+    }
+
+    private static void assertRefNameContains(Object propertySchema, String expectedName) {
+        assertTrue(containsSchemaRefName(propertySchema, expectedName),
+                "Expected ref to " + expectedName + " in schema: " + propertySchema);
+    }
+
+    private static boolean containsSchemaRefName(Object schemaObj, String expectedName) {
+        Map<String, Object> schema = Util.asStringObjectMap(schemaObj);
+        if (schema == null) {
+            return false;
+        }
+        for (String key : List.of("$ref", "x-resolved-ref", "x-java-type-ref")) {
+            Object refObj = schema.get(key);
+            if (refObj instanceof String ref && ref.contains(expectedName)) {
+                return true;
+            }
+        }
+        List<Map<String, Object>> allOf = Util.asStringObjectMapList(schema.get("allOf"));
+        if (allOf != null) {
+            for (Map<String, Object> branch : allOf) {
+                if (containsSchemaRefName(branch, expectedName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Test
