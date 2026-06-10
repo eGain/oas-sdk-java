@@ -730,6 +730,37 @@ public class JerseyGeneratorValidationTest {
     }
 
     @Test
+    @DisplayName("Identity allOf overlay makes id writable while keeping BasicUser constraints (auth_v4)")
+    public void testIdentityAllOfOverlayIdReadWrite() throws OASSDKException, IOException {
+        Path outputDir = tempOutputDir.resolve("identity-allof-overlay-test");
+        String yamlFile = "src/test/resources/openapi-identity-allof-overlay.yaml";
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(yamlFile);
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path modelFile = outputDir.resolve("src/main/java/com/test/api/model/Identity.java");
+        assertTrue(Files.exists(modelFile), "Identity model should be generated");
+
+        String content = Files.readString(modelFile);
+        int idFieldIdx = content.indexOf("private String id;");
+        assertTrue(idFieldIdx > 0, "Identity should declare private String id field");
+        String idFieldBlock = content.substring(Math.max(0, idFieldIdx - 400), idFieldIdx + 50);
+        assertFalse(idFieldBlock.contains("JsonProperty.Access.READ_ONLY"),
+                "Identity.id overlay readOnly:false must not emit READ_ONLY on id");
+        assertTrue(idFieldBlock.contains("@Pattern"), "Identity.id should keep BasicUser pattern constraint");
+        assertTrue(idFieldBlock.contains("@Size"), "Identity.id should keep BasicUser size constraints");
+        assertTrue(content.contains("public void setId("), "Identity.id should have a public setter");
+
+        int userNameFieldIdx = content.indexOf("private String userName;");
+        assertTrue(userNameFieldIdx > 0, "Identity should include BasicUser userName field");
+        String userNameBlock = content.substring(Math.max(0, userNameFieldIdx - 200), userNameFieldIdx + 20);
+        assertTrue(userNameBlock.contains("JsonProperty.Access.READ_ONLY"),
+                "BasicUser userName should remain READ_ONLY");
+    }
+
+    @Test
     @DisplayName("readOnly on allOf overlay is preserved when base schema redefines same property names")
     public void testAllOfReadOnlyPropertyOverlayOnCreateModel() throws OASSDKException, IOException {
         Path outputDir = tempOutputDir.resolve("allof-readonly-overlay-test");

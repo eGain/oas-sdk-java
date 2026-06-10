@@ -1,10 +1,13 @@
 package egain.oassdk.generators.java;
 
 import egain.oassdk.Util;
+import egain.oassdk.core.exceptions.OASSDKException;
+import egain.oassdk.core.parser.OASParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -519,9 +522,174 @@ class JerseySchemaUtilsTest {
         assertEquals("ArticleTypeProperties", effective.get("x-java-type-ref"));
     }
 
+    @Test
+    @DisplayName("isAllOfRefBranch treats parser-resolved component ref with inlined properties as ref base")
+    void isAllOfRefBranch_resolvedRefWithProperties() {
+        Map<String, Object> resolved = new LinkedHashMap<>();
+        resolved.put("type", "object");
+        resolved.put("x-resolved-ref", "#/components/schemas/BasicUser");
+        resolved.put("properties", Map.of("id", Map.of("type", "string", "readOnly", true)));
+        assertTrue(JerseySchemaUtils.isAllOfRefBranch(resolved));
+        assertFalse(JerseySchemaUtils.isAllOfRefBranch(Map.of("properties", Map.of("id", Map.of("readOnly", false)))));
+    }
+
+    @Test
+    @DisplayName("mergeSchemaProperties Identity overlay readOnly false wins over BasicUser id readOnly true")
+    void mergeSchemaProperties_identityOverlayIdWinsOverBasicUser() {
+        Map<String, Object> basicUserId = new LinkedHashMap<>();
+        basicUserId.put("readOnly", true);
+        basicUserId.put("type", "string");
+        basicUserId.put("pattern", "^[1-9]\\d*$");
+        basicUserId.put("minLength", 1);
+        basicUserId.put("maxLength", 9);
+
+        Map<String, Object> basicUser = new LinkedHashMap<>();
+        basicUser.put("type", "object");
+        basicUser.put("properties", Map.of(
+                "id", basicUserId,
+                "userName", Map.of("readOnly", true, "type", "string")));
+
+        Map<String, Object> overlayProps = new LinkedHashMap<>();
+        overlayProps.put("id", Map.of("type", "string", "readOnly", false));
+
+        Map<String, Object> identity = new LinkedHashMap<>();
+        identity.put("title", "User Identity");
+        identity.put("required", List.of("id"));
+        identity.put("allOf", List.of(
+                Map.of("properties", overlayProps),
+                Map.of("$ref", "#/components/schemas/BasicUser")));
+
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("BasicUser", basicUser);
+        schemas.put("Identity", identity);
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", schemas));
+
+        Map<String, Object> allProps = new LinkedHashMap<>();
+        List<String> allRequired = new ArrayList<>();
+        JerseySchemaUtils.mergeSchemaProperties(identity, allProps, allRequired, spec);
+
+        Map<String, Object> idSchema = Util.asStringObjectMap(allProps.get("id"));
+        assertNotNull(idSchema);
+        assertFalse(JerseySchemaUtils.isSchemaFlagTrue(idSchema, "readOnly"),
+                "overlay readOnly: false must override BasicUser readOnly: true");
+        assertEquals("string", idSchema.get("type"));
+        assertEquals("^[1-9]\\d*$", idSchema.get("pattern"));
+        assertEquals(1, idSchema.get("minLength"));
+        assertEquals(9, idSchema.get("maxLength"));
+        assertTrue(allProps.containsKey("userName"));
+    }
+
+    @Test
+    @DisplayName("mergePropertyDefinitions edit permissions uses inlined later array when later ref is parser-resolved without extractable $ref")
+    void mergePropertyDefinitions_editPermissionsInlinedLaterArrayWins() {
+        List<Object> folderPermsAllOf = List.of(
+                Map.of("readOnly", true),
+                Map.of("$ref", "#/components/schemas/FolderPermissions"));
+        Map<String, Object> folderPerms = Map.of("allOf", folderPermsAllOf);
+
+        Map<String, Object> editArrayBranch = new LinkedHashMap<>();
+        editArrayBranch.put("type", "array");
+        editArrayBranch.put("items", Map.of("$ref", "#/components/schemas/EditFolderPermissionsEntry"));
+        editArrayBranch.put("minItems", 1);
+        editArrayBranch.put("maxItems", 75);
+        List<Object> editPermsAllOf = List.of(
+                Map.of("writeOnly", true, "readOnly", false),
+                editArrayBranch);
+        Map<String, Object> editPerms = Map.of("allOf", editPermsAllOf);
+
+        Map<String, Object> merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(folderPerms, editPerms);
+        Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(merged, Map.of(
+                "components", Map.of("schemas", Map.of(
+                        "FolderPermissions", Map.of("type", "array",
+                                "items", Map.of("$ref", "#/components/schemas/FolderPermissionsEntry")),
+                        "EditFolderPermissionsEntry", Map.of("type", "object")))));
+        assertNotNull(effective);
+        assertEquals("array", effective.get("type"));
+        Map<String, Object> items = Util.asStringObjectMap(effective.get("items"));
+        assertNotNull(items);
+        String itemRef = (String) items.get("$ref");
+        if (itemRef == null) {
+            itemRef = (String) items.get("x-resolved-ref");
+        }
+        assertNotNull(itemRef);
+        assertTrue(itemRef.contains("EditFolderPermissionsEntry"), "Expected EditFolderPermissionsEntry but got: " + itemRef);
+    }
+
+    @Test
+    @DisplayName("mergeSchemaProperties Identity overlay wins when BasicUser branch is parser-resolved with x-resolved-ref")
+    void mergeSchemaProperties_identityOverlayWinsOverResolvedBasicUserBranch() {
+        Map<String, Object> basicUserId = new LinkedHashMap<>();
+        basicUserId.put("readOnly", true);
+        basicUserId.put("type", "string");
+        basicUserId.put("pattern", "^[1-9]\\d*$");
+        basicUserId.put("minLength", 1);
+        basicUserId.put("maxLength", 9);
+
+        Map<String, Object> resolvedBasicUser = new LinkedHashMap<>();
+        resolvedBasicUser.put("type", "object");
+        resolvedBasicUser.put("x-resolved-ref", "#/components/schemas/BasicUser");
+        resolvedBasicUser.put("properties", Map.of(
+                "id", basicUserId,
+                "userName", Map.of("readOnly", true, "type", "string")));
+
+        Map<String, Object> identity = new LinkedHashMap<>();
+        identity.put("required", List.of("id"));
+        identity.put("allOf", List.of(
+                Map.of("properties", Map.of("id", Map.of("type", "string", "readOnly", false))),
+                resolvedBasicUser));
+
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("BasicUser", Map.of("type", "object"));
+        schemas.put("Identity", identity);
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", schemas));
+
+        Map<String, Object> allProps = new LinkedHashMap<>();
+        List<String> allRequired = new ArrayList<>();
+        JerseySchemaUtils.mergeSchemaProperties(identity, allProps, allRequired, spec);
+
+        Map<String, Object> idSchema = Util.asStringObjectMap(allProps.get("id"));
+        assertNotNull(idSchema);
+        assertFalse(JerseySchemaUtils.isSchemaFlagTrue(idSchema, "readOnly"));
+        assertEquals("^[1-9]\\d*$", idSchema.get("pattern"));
+    }
+
     // -----------------------------------------------------------------------
     //  isSchemaReference
     // -----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("mergeSchemaProperties bundled Folder.yaml editFolder permissions resolves to EditFolderPermissionsEntry")
+    void mergeSchemaProperties_editFolderFromBundledYaml() throws OASSDKException {
+        Path specPath = Path.of("src/test/resources/folder_contentmgr_bundle/knowledge/models/contentmgr/v4/Folder.yaml")
+                .toAbsolutePath();
+        Path bundleRoot = Path.of("src/test/resources/folder_contentmgr_bundle").toAbsolutePath();
+        OASParser parser = new OASParser(List.of(bundleRoot.toString()));
+        Map<String, Object> spec = parser.parse(specPath.toString());
+        spec = parser.resolveReferences(spec, specPath.toString());
+
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+        Map<String, Object> editFolder = Util.asStringObjectMap(schemas.get("editFolder"));
+
+        Map<String, Object> allProps = new LinkedHashMap<>();
+        List<String> allRequired = new ArrayList<>();
+        JerseySchemaUtils.mergeAllOfBranchesIntoProperties(
+                Util.asStringObjectMapList(editFolder.get("allOf")), allProps, allRequired, spec);
+
+        Map<String, Object> permissionsSchema = Util.asStringObjectMap(allProps.get("permissions"));
+        assertNotNull(permissionsSchema);
+        Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(permissionsSchema, spec);
+        assertNotNull(effective);
+        Map<String, Object> items = Util.asStringObjectMap(effective.get("items"));
+        assertNotNull(items);
+        String itemRef = (String) items.get("$ref");
+        if (itemRef == null) {
+            itemRef = (String) items.get("x-resolved-ref");
+        }
+        assertNotNull(itemRef);
+        assertTrue(itemRef.contains("EditFolderPermissionsEntry"),
+                "Expected EditFolderPermissionsEntry but got: " + itemRef);
+    }
 
     @Test
     @DisplayName("isSchemaReference matches by schema name")

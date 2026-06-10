@@ -1,0 +1,31 @@
+openapi: 3.0.0
+info:
+  title: Identity allOf overlay test (auth_v4 pattern)
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    BasicUser:
+      type: object
+      properties:
+        id:
+          readOnly: true
+          description: The ID of the user.
+          type: string
+          pattern: ^[1-9]\d*$
+          minLength: 1
+          maxLength: 9
+        userName:
+          readOnly: true
+          type: string
+    Identity:
+      title: User Identity
+      description: The user assigned permissions
+      required:
+        - id
+      allOf:
+        - properties:
+            id:
+              type: string
+              readOnly: false
+        - $ref: '#/components/schemas/BasicUser'

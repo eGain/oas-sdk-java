@@ -16,6 +16,11 @@ public final class JerseySchemaUtils {
     /** Max recursion depth for mergeSchemaProperties to prevent StackOverflow on large specs. */
     public static final int MAX_MERGE_SCHEMA_DEPTH = 15;
 
+    /** Schema constraint keys back-filled from an earlier allOf branch when a later overlay omits them. */
+    private static final String[] COMPOSITION_CONSTRAINT_KEYS = {
+            "type", "format", "pattern", "minLength", "maxLength", "minItems", "maxItems", "enum", "description"
+    };
+
     private JerseySchemaUtils() {
         // utility class - no instances
     }
@@ -49,7 +54,13 @@ public final class JerseySchemaUtils {
             String singleRefSchemaName = null;
             int refCount = 0;
             Map<String, Object> merged = new LinkedHashMap<>();
-            for (Map<String, Object> sub : allOfSchemas) {
+            List<Map<String, Object>> refBranches = new ArrayList<>();
+            List<Map<String, Object>> overlayBranches = new ArrayList<>();
+            partitionAllOfBranches(allOfSchemas, refBranches, overlayBranches);
+            List<Map<String, Object>> mergeOrder = new ArrayList<>(refBranches.size() + overlayBranches.size());
+            mergeOrder.addAll(refBranches);
+            mergeOrder.addAll(overlayBranches);
+            for (Map<String, Object> sub : mergeOrder) {
                 if (sub == null) continue;
                 String refName = getSchemaNameFromRef(sub);
                 if (refName == null) {
@@ -194,6 +205,11 @@ public final class JerseySchemaUtils {
                 List<Map<String, Object>> mergedAllOf = mergePropertyLevelAllOf(earlierAllOf, laterAllOf, earlier, later);
                 if (!mergedAllOf.isEmpty()) {
                     out.put("allOf", mergedAllOf);
+                }
+            }
+            for (String key : COMPOSITION_CONSTRAINT_KEYS) {
+                if (!out.containsKey(key) && earlier.containsKey(key)) {
+                    out.put(key, earlier.get(key));
                 }
             }
             if (!later.containsKey("readOnly") && isSchemaFlagTrue(earlier, "readOnly")) {
@@ -379,16 +395,10 @@ public final class JerseySchemaUtils {
             }
         }
 
-        // Handle allOf
+        // Handle allOf — $ref base branches first, then overlay branches (e.g. auth_v4 Identity)
         if (schema.containsKey("allOf")) {
             List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
-            if (allOfSchemas != null) {
-                for (Map<String, Object> subSchema : allOfSchemas) {
-                    if (subSchema != null) {
-                        mergeSchemaProperties(subSchema, allProperties, allRequired, spec, visited, depth + 1);
-                    }
-                }
-            }
+            mergeAllOfBranchesIntoProperties(allOfSchemas, allProperties, allRequired, spec, visited, depth + 1);
             return;
         }
 
@@ -426,12 +436,100 @@ public final class JerseySchemaUtils {
     }
 
     // ---------------------------------------------------------------------------
+    //  Schema-level allOf branch ordering (ref base, then overlay)
+    // ---------------------------------------------------------------------------
+
+    /**
+     * True when an {@code allOf} branch is a component {@code $ref} base. Includes bare
+     * {@code $ref} branches and parser-resolved refs that still carry {@code x-resolved-ref}
+     * alongside inlined {@code properties}.
+     */
+    static boolean isAllOfRefBranch(Map<String, Object> branch) {
+        if (branch == null) {
+            return false;
+        }
+        if (branch.containsKey("allOf") || branch.containsKey("oneOf") || branch.containsKey("anyOf")) {
+            return false;
+        }
+        if (getSchemaNameFromRef(branch) != null) {
+            return true;
+        }
+        return branch.containsKey("$ref") && !branch.containsKey("properties");
+    }
+
+    /**
+     * Split {@code allOf} branches into ref bases and overlays, preserving listed order within each group.
+     */
+    static void partitionAllOfBranches(List<Map<String, Object>> allOfSchemas,
+                                       List<Map<String, Object>> refBranches,
+                                       List<Map<String, Object>> overlayBranches) {
+        if (allOfSchemas == null) {
+            return;
+        }
+        for (Map<String, Object> branch : allOfSchemas) {
+            if (branch == null) {
+                continue;
+            }
+            if (isAllOfRefBranch(branch)) {
+                refBranches.add(branch);
+            } else {
+                overlayBranches.add(branch);
+            }
+        }
+    }
+
+    /**
+     * Merge {@code allOf} branches into property maps: all {@code $ref} bases first, then overlays on top.
+     */
+    public static void mergeAllOfBranchesIntoProperties(List<Map<String, Object>> allOfSchemas,
+                                                        Map<String, Object> allProperties,
+                                                        List<String> allRequired,
+                                                        Map<String, Object> spec) {
+        mergeAllOfBranchesIntoProperties(allOfSchemas, allProperties, allRequired, spec, new IdentityHashMap<>(), 0);
+    }
+
+    /**
+     * Merge {@code allOf} branches with cycle detection and depth limit.
+     */
+    public static void mergeAllOfBranchesIntoProperties(List<Map<String, Object>> allOfSchemas,
+                                                        Map<String, Object> allProperties,
+                                                        List<String> allRequired,
+                                                        Map<String, Object> spec,
+                                                        Map<Object, Boolean> visited,
+                                                        int depth) {
+        if (allOfSchemas == null || allOfSchemas.isEmpty()) {
+            return;
+        }
+        List<Map<String, Object>> refBranches = new ArrayList<>();
+        List<Map<String, Object>> overlayBranches = new ArrayList<>();
+        partitionAllOfBranches(allOfSchemas, refBranches, overlayBranches);
+        for (Map<String, Object> subSchema : refBranches) {
+            mergeSchemaProperties(subSchema, allProperties, allRequired, spec, visited, depth);
+        }
+        for (Map<String, Object> subSchema : overlayBranches) {
+            mergeSchemaProperties(subSchema, allProperties, allRequired, spec, visited, depth);
+        }
+    }
+
+    // ---------------------------------------------------------------------------
     //  Property-level allOf merge helpers
     // ---------------------------------------------------------------------------
 
-    /** True when an allOf branch carries only inline constraints (no component $ref). */
+    /** True when an allOf branch carries only inline constraints (no component $ref or schema body). */
     private static boolean isConstraintOnlyAllOfBranch(Map<String, Object> branch) {
         if (branch == null) {
+            return false;
+        }
+        if (getSchemaNameFromRef(branch) != null || branch.containsKey("$ref")) {
+            return false;
+        }
+        return !branch.containsKey("type") && !branch.containsKey("items") && !branch.containsKey("properties")
+                && !branch.containsKey("allOf") && !branch.containsKey("oneOf") && !branch.containsKey("anyOf");
+    }
+
+    /** True when an allOf branch is a parser-inlined schema body (type/items/properties) rather than a bare $ref. */
+    private static boolean isResolvedSchemaAllOfBranch(Map<String, Object> branch) {
+        if (branch == null || isConstraintOnlyAllOfBranch(branch)) {
             return false;
         }
         return getSchemaNameFromRef(branch) == null && !branch.containsKey("$ref");
@@ -510,11 +608,19 @@ public final class JerseySchemaUtils {
 
         List<Map<String, Object>> refSource = preferEarlierRefs ? earlierAllOf : laterAllOf;
         List<Map<String, Object>> refBranches = dedupeRefBranchesByTarget(extractRefBranches(refSource));
-        if (refBranches.isEmpty() && !preferEarlierRefs) {
+        if (refBranches.isEmpty() && preferEarlierRefs) {
             refBranches = dedupeRefBranchesByTarget(extractRefBranches(earlierAllOf));
         }
-        for (Map<String, Object> branch : refBranches) {
-            merged.add(new LinkedHashMap<>(branch));
+        if (refBranches.isEmpty() && !preferEarlierRefs) {
+            for (Map<String, Object> branch : laterAllOf) {
+                if (isResolvedSchemaAllOfBranch(branch)) {
+                    merged.add(new LinkedHashMap<>(branch));
+                }
+            }
+        } else {
+            for (Map<String, Object> branch : refBranches) {
+                merged.add(new LinkedHashMap<>(branch));
+            }
         }
         return merged;
     }

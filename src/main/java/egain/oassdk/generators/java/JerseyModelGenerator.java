@@ -224,9 +224,7 @@ class JerseyModelGenerator {
         } else {
             if (schema.containsKey("allOf")) {
                 List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
-                for (Map<String, Object> subSchema : allOfSchemas) {
-                    JerseySchemaUtils.mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
-                }
+                JerseySchemaUtils.mergeAllOfBranchesIntoProperties(allOfSchemas, allProperties, allRequired, spec);
             } else if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
                 List<Map<String, Object>> schemas = Util.asStringObjectMapList(
                         schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
@@ -885,11 +883,7 @@ class JerseyModelGenerator {
         List<String> allRequired = new ArrayList<>();
         if (innerSchema.containsKey("allOf")) {
             List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(innerSchema.get("allOf"));
-            if (allOfSchemas != null) {
-                for (Map<String, Object> subSchema : allOfSchemas) {
-                    if (subSchema != null) JerseySchemaUtils.mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
-                }
-            }
+            JerseySchemaUtils.mergeAllOfBranchesIntoProperties(allOfSchemas, allProperties, allRequired, spec);
         } else if (innerSchema.containsKey("oneOf") || innerSchema.containsKey("anyOf")) {
             List<Map<String, Object>> schemasList = Util.asStringObjectMapList(
                     innerSchema.containsKey("oneOf") ? innerSchema.get("oneOf") : innerSchema.get("anyOf"));
