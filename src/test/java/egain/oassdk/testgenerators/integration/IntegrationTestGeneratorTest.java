@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -144,6 +145,23 @@ public class IntegrationTestGeneratorTest {
     }
 
     @Test
+    public void testGenerate_composedSchemaPost(@TempDir Path tempDir) throws Exception {
+        generator.generate(buildComposedSchemaPostSpec(), tempDir.toString(), testConfig, "junit5");
+
+        Path javaFile = tempDir.resolve("integration/com/example/api/FoldersIntegrationTest.java");
+        assertTrue(Files.exists(javaFile));
+        String content = Files.readString(javaFile);
+        assertTrue(content.contains("_MissingRequiredFields"));
+        assertTrue(content.contains("_InvalidBodyField_"));
+        assertTrue(content.contains("_OneOfXor_"));
+        assertTrue(content.contains("_Success_Department") || content.contains("_Success_Parent"),
+                "expected oneOf variant success tests");
+        assertTrue(content.contains("_EmptyBody"));
+        int authTokenCount = content.split("private String getAuthToken\\(\\)").length - 1;
+        assertEquals(1, authTokenCount, "should emit exactly one getAuthToken()");
+    }
+
+    @Test
     public void testGenerate_WithServers(@TempDir Path tempDir) throws GenerationException {
         // Arrange
         Map<String, Object> specWithServers = new HashMap<>(spec);
@@ -227,6 +245,66 @@ public class IntegrationTestGeneratorTest {
         spec.put("openapi", "3.0.0");
         spec.put("info", Map.of("title", "Rich API", "version", "1.0.0"));
         spec.put("paths", Map.of("/items", Map.of("post", post)));
+        spec.put("components", components);
+        return spec;
+    }
+
+    private Map<String, Object> buildComposedSchemaPostSpec() {
+        Map<String, Object> folderProps = new LinkedHashMap<>();
+        folderProps.put("name", Map.of("type", "string", "minLength", 1));
+        folderProps.put("description", Map.of("type", "string"));
+
+        Map<String, Object> overlay = new LinkedHashMap<>();
+        overlay.put("type", "object");
+        overlay.put("required", List.of("name"));
+        Map<String, Object> overlayProps = new LinkedHashMap<>();
+        overlayProps.put("name", Map.of("type", "string", "minLength", 1));
+        overlayProps.put("department", Map.of("type", "object", "required", List.of("id"),
+                "properties", Map.of("id", Map.of("type", "string"))));
+        overlayProps.put("parent", Map.of("type", "object", "required", List.of("id"),
+                "properties", Map.of("id", Map.of("type", "string"))));
+        overlay.put("properties", overlayProps);
+        overlay.put("oneOf", List.of(
+                Map.of("required", List.of("department"), "properties", Map.of(
+                        "department", Map.of("type", "object", "required", List.of("id"),
+                                "properties", Map.of("id", Map.of("type", "string"))))),
+                Map.of("required", List.of("parent"), "properties", Map.of(
+                        "parent", Map.of("type", "object", "required", List.of("id"),
+                                "properties", Map.of("id", Map.of("type", "string")))))
+        ));
+
+        Map<String, Object> createFolder = new LinkedHashMap<>();
+        createFolder.put("allOf", List.of(overlay, Map.of("$ref", "#/components/schemas/Folder")));
+
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("Folder", Map.of("type", "object", "properties", folderProps));
+        schemas.put("createFolder", createFolder);
+        schemas.put("Error", Map.of("type", "object", "properties", Map.of("message", Map.of("type", "string"))));
+
+        Map<String, Object> components = new HashMap<>();
+        components.put("schemas", schemas);
+        components.put("securitySchemes", Map.of("bearerAuth", Map.of(
+                "type", "http", "scheme", "bearer")));
+
+        Map<String, Object> post = new HashMap<>();
+        post.put("operationId", "createFolder");
+        post.put("summary", "Create Folder");
+        post.put("tags", List.of("folders"));
+        post.put("security", List.of(Map.of("bearerAuth", List.of())));
+        post.put("requestBody", Map.of(
+                "required", true,
+                "content", Map.of("application/json", Map.of(
+                        "schema", Map.of("$ref", "#/components/schemas/createFolder")))));
+        post.put("responses", Map.of(
+                "201", Map.of("description", "Created"),
+                "400", Map.of("description", "Bad Request",
+                        "content", Map.of("application/json", Map.of(
+                                "schema", Map.of("$ref", "#/components/schemas/Error"))))));
+
+        Map<String, Object> spec = new HashMap<>();
+        spec.put("openapi", "3.0.0");
+        spec.put("info", Map.of("title", "Folders API", "version", "1.0.0"));
+        spec.put("paths", Map.of("/folders", Map.of("post", post)));
         spec.put("components", components);
         return spec;
     }

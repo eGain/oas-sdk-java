@@ -263,6 +263,43 @@ public class PytestIntegrationTestGenerator implements TestGenerator, Configurab
             sb.append("\n");
         }
 
+        if (jsonBody) {
+            for (IntegrationScenarioSupport.OneOfVariantBody variant :
+                    IntegrationScenarioSupport.buildOneOfVariantBodies(bodySchema, spec)) {
+                String vlabel = toSnakeCase(variant.label());
+                sb.append("    def test_").append(testMethodName).append("_success_variant_").append(vlabel).append("(self):\n");
+                sb.append("        tok = get_token_client_application()\n");
+                sb.append("        if not tok:\n");
+                sb.append("            pytest.skip('Set INTEGRATION_TOKEN_CLIENT_APPLICATION')\n");
+                appendPythonPathUrlSetup(sb, path, pathParams, queryParams);
+                sb.append("        headers = {'Accept': 'application/json', 'Authorization': f'Bearer {tok}'}\n");
+                appendPythonRequestInvocation(sb, methodUpper, true,
+                        IntegrationScenarioSupport.escapeForPythonDoubleQuoted(variant.jsonBody()));
+                appendPythonSuccessAssertions(sb, responses);
+                appendPythonSuccessSchemaNotes(sb, responses, spec);
+                sb.append("\n");
+            }
+        }
+
+        if (IntegrationScenarioSupport.emitDeclaredErrorCodes(config)) {
+            for (IntegrationScenarioSupport.DeclaredErrorCase dec :
+                    IntegrationScenarioSupport.buildDeclaredErrorCases(operation, queryParams)) {
+                String suffix = toSnakeCase(dec.label());
+                sb.append("    def test_").append(testMethodName).append("_").append(suffix).append("(self):\n");
+                appendPythonPathUrlSetup(sb, path, pathParams, dec.queryParamsOverride());
+                sb.append("        headers = {'Accept': 'application/json'}\n");
+                if (requiresAuth) {
+                    sb.append("        _tok = get_preferred_auth_token()\n");
+                    sb.append("        if _tok:\n");
+                    sb.append("            headers['Authorization'] = f'Bearer {_tok}'\n");
+                }
+                appendPythonRequestInvocation(sb, methodUpper, jsonBody, bodyPyEscaped);
+                sb.append("        assert response.status_code == ").append(dec.expectedStatus()).append("\n");
+                appendPythonErrorBodyAssert(sb, responses, spec);
+                sb.append("\n");
+            }
+        }
+
         List<IntegrationScenarioSupport.IntegrationParamNegativeCase> paramCases =
                 IntegrationScenarioSupport.buildParamNegativeCases(path, operation, pathParams, queryParams, maxParam);
         for (IntegrationScenarioSupport.IntegrationParamNegativeCase nc : paramCases) {
@@ -297,6 +334,21 @@ public class PytestIntegrationTestGenerator implements TestGenerator, Configurab
         }
 
         if (jsonBody) {
+            if (IntegrationScenarioSupport.isRequestBodyRequired(operation, spec)) {
+                sb.append("    def test_").append(testMethodName).append("_empty_body(self):\n");
+                appendPythonPathUrlSetup(sb, path, pathParams, queryParams);
+                sb.append("        headers = {'Accept': 'application/json'}\n");
+                if (requiresAuth) {
+                    sb.append("        _tok = get_preferred_auth_token()\n");
+                    sb.append("        if _tok:\n");
+                    sb.append("            headers['Authorization'] = f'Bearer {_tok}'\n");
+                }
+                sb.append("        response = requests.request('").append(methodUpper).append("', url, headers=headers, timeout=REQUEST_TIMEOUT)\n");
+                sb.append("        assert response.status_code in (400, 422), f'Expected 400/422, got {response.status_code}'\n");
+                appendPythonErrorBodyAssert(sb, responses, spec);
+                sb.append("\n");
+            }
+
             String wrongRaw = IntegrationScenarioSupport.generateWrongTypesBodyRaw(bodySchema, spec);
             String wrongEsc = IntegrationScenarioSupport.escapeForPythonDoubleQuoted(wrongRaw);
             sb.append("    def test_").append(testMethodName).append("_invalid_types(self):\n");
@@ -312,7 +364,7 @@ public class PytestIntegrationTestGenerator implements TestGenerator, Configurab
             appendPythonErrorBodyAssert(sb, responses, spec);
             sb.append("\n");
 
-            List<String> req = IntegrationScenarioSupport.getRequiredFieldsFromSchema(bodySchema);
+            List<String> req = IntegrationScenarioSupport.getRequiredFieldsFromSchema(bodySchema, spec);
             if (!req.isEmpty()) {
                 String missRaw = IntegrationScenarioSupport.generateMissingRequiredFieldsBodyRaw(bodySchema, spec);
                 String missEsc = IntegrationScenarioSupport.escapeForPythonDoubleQuoted(missRaw);
@@ -344,6 +396,24 @@ public class PytestIntegrationTestGenerator implements TestGenerator, Configurab
                 }
                 appendPythonRequestInvocation(sb, methodUpper, true,
                         IntegrationScenarioSupport.escapeForPythonDoubleQuoted(pf.invalidJsonBody));
+                sb.append("        assert response.status_code in (400, 422), f'Expected 400/422, got {response.status_code}'\n");
+                appendPythonErrorBodyAssert(sb, responses, spec);
+                sb.append("\n");
+            }
+
+            for (IntegrationScenarioSupport.OneOfXorNegativeBody xn :
+                    IntegrationScenarioSupport.buildOneOfXorNegativeBodies(bodySchema, spec)) {
+                String suffix = toSnakeCase(xn.label());
+                sb.append("    def test_").append(testMethodName).append("_oneof_xor_").append(suffix).append("(self):\n");
+                appendPythonPathUrlSetup(sb, path, pathParams, queryParams);
+                sb.append("        headers = {'Accept': 'application/json'}\n");
+                if (requiresAuth) {
+                    sb.append("        _tok = get_preferred_auth_token()\n");
+                    sb.append("        if _tok:\n");
+                    sb.append("            headers['Authorization'] = f'Bearer {_tok}'\n");
+                }
+                appendPythonRequestInvocation(sb, methodUpper, true,
+                        IntegrationScenarioSupport.escapeForPythonDoubleQuoted(xn.jsonBody()));
                 sb.append("        assert response.status_code in (400, 422), f'Expected 400/422, got {response.status_code}'\n");
                 appendPythonErrorBodyAssert(sb, responses, spec);
                 sb.append("\n");

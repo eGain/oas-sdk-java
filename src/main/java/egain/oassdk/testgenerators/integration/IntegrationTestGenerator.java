@@ -162,17 +162,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         sb.append("            .connectTimeout(REQUEST_TIMEOUT)\n");
         sb.append("            .build();\n");
         sb.append("        \n");
-        sb.append("        // Verify server is reachable\n");
-        sb.append("        try {\n");
-        sb.append("            HttpRequest healthCheck = HttpRequest.newBuilder()\n");
-        sb.append("                .uri(URI.create(BASE_URL))\n");
-        sb.append("                .timeout(REQUEST_TIMEOUT)\n");
-        sb.append("                .GET()\n");
-        sb.append("                .build();\n");
-        sb.append("            \n");
-        sb.append("            HttpResponse<String> response = httpClient.send(healthCheck, HttpResponse.BodyHandlers.ofString());\n");
-        sb.append("            System.out.println(\"Server health check: \" + response.statusCode());\n");
-        sb.append("        } catch (Exception e) {\n");
+        sb.append("        if (!IntegrationTestUtils.waitForServer(BASE_URL, REQUEST_TIMEOUT)) {\n");
         sb.append("            System.err.println(\"Warning: Could not reach server at \" + BASE_URL);\n");
         sb.append("            System.err.println(\"Some tests may fail if server is not running.\");\n");
         sb.append("        }\n");
@@ -486,6 +476,74 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("    }\n\n");
         }
 
+        List<IntegrationScenarioSupport.OneOfVariantBody> oneOfVariants =
+                jsonBody ? IntegrationScenarioSupport.buildOneOfVariantBodies(requestBodySchema, spec) : List.of();
+        for (IntegrationScenarioSupport.OneOfVariantBody variant : oneOfVariants) {
+            order++;
+            sb.append("    @Test\n");
+            sb.append("    @Order(").append(order).append(")\n");
+            sb.append("    @DisplayName(\"").append(displayBase).append(" - Success variant: ")
+                    .append(escapeForDisplayName(variant.label())).append("\")\n");
+            sb.append("    void test").append(capitalize(testMethodName)).append("_Success_")
+                    .append(safeMethodSuffix(variant.label())).append("() throws Exception {\n");
+            if (requiresAuth) {
+                sb.append("        String tok = getTokenClientApplication();\n");
+                sb.append("        Assumptions.assumeTrue(tok != null && !tok.isEmpty(), \"Skip: set INTEGRATION_TOKEN_CLIENT_APPLICATION\");\n");
+            }
+            appendJavaPathUriBlocks(sb, path, pathParams, queryParams);
+            sb.append("        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()\n");
+            sb.append("            .uri(uri)\n");
+            sb.append("            .timeout(REQUEST_TIMEOUT)\n");
+            sb.append("            .header(\"Accept\", \"application/json\");\n");
+            if (requiresAuth) {
+                sb.append("        requestBuilder.header(\"Authorization\", \"Bearer \" + tok);\n");
+            }
+            sb.append("        String requestBody = \"").append(IntegrationScenarioSupport.escapeJavaString(variant.jsonBody())).append("\";\n");
+            appendHttpMethodOnRequestBuilder(sb, method, true);
+            sb.append("        HttpRequest request = requestBuilder.build();\n");
+            sb.append("        HttpResponse<String> response = sendRequest(request);\n");
+            sb.append("        assertNotNull(response);\n");
+            appendSuccessStatusAssertions(sb, responses);
+            sb.append("        assertNotNull(response.body());\n");
+            generateResponseSchemaValidation(sb, responses, spec);
+            sb.append("    }\n\n");
+        }
+
+        if (IntegrationScenarioSupport.emitDeclaredErrorCodes(config)) {
+            List<IntegrationScenarioSupport.DeclaredErrorCase> declaredErrors =
+                    IntegrationScenarioSupport.buildDeclaredErrorCases(operation, queryParams);
+            for (IntegrationScenarioSupport.DeclaredErrorCase dec : declaredErrors) {
+                order++;
+                sb.append("    @Test\n");
+                sb.append("    @Order(").append(order).append(")\n");
+                sb.append("    @DisplayName(\"").append(displayBase).append(" - Declared error: ")
+                        .append(escapeForDisplayName(dec.label())).append("\")\n");
+                sb.append("    void test").append(capitalize(testMethodName)).append("_")
+                        .append(safeMethodSuffix(dec.label())).append("() throws Exception {\n");
+                appendJavaPathUriBlocks(sb, path, pathParams, dec.queryParamsOverride());
+                sb.append("        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()\n");
+                sb.append("            .uri(uri)\n");
+                sb.append("            .timeout(REQUEST_TIMEOUT)\n");
+                sb.append("            .header(\"Accept\", \"application/json\");\n");
+                if (requiresAuth) {
+                    sb.append("        String token = getPreferredAuthToken();\n");
+                    sb.append("        if (token != null && !token.isEmpty()) {\n");
+                    sb.append("            requestBuilder.header(\"Authorization\", \"Bearer \" + token);\n");
+                    sb.append("        }\n");
+                }
+                if (jsonBody) {
+                    sb.append("        String requestBody = \"").append(requestBodyEscaped).append("\";\n");
+                }
+                appendHttpMethodOnRequestBuilder(sb, method, jsonBody);
+                sb.append("        HttpRequest request = requestBuilder.build();\n");
+                sb.append("        HttpResponse<String> response = sendRequest(request);\n");
+                sb.append("        assertNotNull(response);\n");
+                sb.append("        assertEquals(").append(dec.expectedStatus()).append(", response.statusCode());\n");
+                generateErrorResponseSchemaValidation(sb, responses, spec);
+                sb.append("    }\n\n");
+            }
+        }
+
         List<IntegrationScenarioSupport.IntegrationParamNegativeCase> paramCases =
                 IntegrationScenarioSupport.buildParamNegativeCases(path, operation, pathParams, queryParams, maxParam);
         for (IntegrationScenarioSupport.IntegrationParamNegativeCase nc : paramCases) {
@@ -544,6 +602,33 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         }
 
         if (jsonBody) {
+            if (IntegrationScenarioSupport.isRequestBodyRequired(operation, spec)) {
+                order++;
+                sb.append("    @Test\n");
+                sb.append("    @Order(").append(order).append(")\n");
+                sb.append("    @DisplayName(\"").append(displayBase).append(" - Missing request body\")\n");
+                sb.append("    void test").append(capitalize(testMethodName)).append("_EmptyBody() throws Exception {\n");
+                appendJavaPathUriBlocks(sb, path, pathParams, queryParams);
+                sb.append("        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()\n");
+                sb.append("            .uri(uri)\n");
+                sb.append("            .timeout(REQUEST_TIMEOUT)\n");
+                sb.append("            .header(\"Accept\", \"application/json\");\n");
+                if (requiresAuth) {
+                    sb.append("        String token = getPreferredAuthToken();\n");
+                    sb.append("        if (token != null && !token.isEmpty()) {\n");
+                    sb.append("            requestBuilder.header(\"Authorization\", \"Bearer \" + token);\n");
+                    sb.append("        }\n");
+                }
+                sb.append("        requestBuilder.method(\"").append(method).append("\", HttpRequest.BodyPublishers.noBody());\n");
+                sb.append("        HttpRequest request = requestBuilder.build();\n");
+                sb.append("        HttpResponse<String> response = sendRequest(request);\n");
+                sb.append("        assertNotNull(response);\n");
+                sb.append("        assertTrue(response.statusCode() == 400 || response.statusCode() == 422,\n");
+                sb.append("            \"Expected 400 or 422 for empty body, got: \" + response.statusCode());\n");
+                generateErrorResponseSchemaValidation(sb, responses, spec);
+                sb.append("    }\n\n");
+            }
+
             String wrongTypesRaw = IntegrationScenarioSupport.generateWrongTypesBodyRaw(requestBodySchema, spec);
             String wrongTypesEsc = IntegrationScenarioSupport.escapeJavaString(wrongTypesRaw);
 
@@ -573,7 +658,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             generateErrorResponseSchemaValidation(sb, responses, spec);
             sb.append("    }\n\n");
 
-            List<String> requiredFields = IntegrationScenarioSupport.getRequiredFieldsFromSchema(requestBodySchema);
+            List<String> requiredFields = IntegrationScenarioSupport.getRequiredFieldsFromSchema(requestBodySchema, spec);
             if (!requiredFields.isEmpty()) {
                 String missingRaw = IntegrationScenarioSupport.generateMissingRequiredFieldsBodyRaw(requestBodySchema, spec);
                 String missingEsc = IntegrationScenarioSupport.escapeJavaString(missingRaw);
@@ -635,6 +720,38 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 generateErrorResponseSchemaValidation(sb, responses, spec);
                 sb.append("    }\n\n");
             }
+
+            List<IntegrationScenarioSupport.OneOfXorNegativeBody> xorNegatives =
+                    IntegrationScenarioSupport.buildOneOfXorNegativeBodies(requestBodySchema, spec);
+            for (IntegrationScenarioSupport.OneOfXorNegativeBody xn : xorNegatives) {
+                order++;
+                sb.append("    @Test\n");
+                sb.append("    @Order(").append(order).append(")\n");
+                sb.append("    @DisplayName(\"").append(displayBase).append(" - oneOf XOR negative: ")
+                        .append(escapeForDisplayName(xn.label())).append("\")\n");
+                sb.append("    void test").append(capitalize(testMethodName)).append("_OneOfXor_")
+                        .append(safeMethodSuffix(xn.label())).append("() throws Exception {\n");
+                appendJavaPathUriBlocks(sb, path, pathParams, queryParams);
+                sb.append("        String requestBody = \"").append(IntegrationScenarioSupport.escapeJavaString(xn.jsonBody())).append("\";\n");
+                sb.append("        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()\n");
+                sb.append("            .uri(uri)\n");
+                sb.append("            .timeout(REQUEST_TIMEOUT)\n");
+                sb.append("            .header(\"Accept\", \"application/json\");\n");
+                if (requiresAuth) {
+                    sb.append("        String token = getPreferredAuthToken();\n");
+                    sb.append("        if (token != null && !token.isEmpty()) {\n");
+                    sb.append("            requestBuilder.header(\"Authorization\", \"Bearer \" + token);\n");
+                    sb.append("        }\n");
+                }
+                appendHttpMethodOnRequestBuilder(sb, method, true);
+                sb.append("        HttpRequest request = requestBuilder.build();\n");
+                sb.append("        HttpResponse<String> response = sendRequest(request);\n");
+                sb.append("        assertNotNull(response);\n");
+                sb.append("        assertTrue(response.statusCode() == 400 || response.statusCode() == 422,\n");
+                sb.append("            \"Expected 400 or 422 for oneOf XOR violation, got: \" + response.statusCode());\n");
+                generateErrorResponseSchemaValidation(sb, responses, spec);
+                sb.append("    }\n\n");
+            }
         }
     }
 
@@ -685,6 +802,10 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             if (resolved != null) {
                 schema = resolved;
             }
+        }
+        Map<String, Object> flattened = IntegrationScenarioSupport.flattenResponseSchema(schema, spec);
+        if (flattened != null) {
+            schema = flattened;
         }
         sb.append("        String responseBody = ").append(bodyExpr).append(";\n");
         sb.append("        assertDoesNotThrow(() -> {\n");
@@ -856,45 +977,98 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
      * Generate IntegrationTestUtils helper class
      */
     private String generateIntegrationTestUtilsClass(String basePackage) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("package ").append(basePackage).append(";\n\n");
-        sb.append("import java.net.http.*;\n");
-        sb.append("import java.net.URI;\n");
-        sb.append("import java.time.Duration;\n");
-        sb.append("import java.util.*;\n\n");
-        sb.append("/**\n");
-        sb.append(" * Utility class for integration tests\n");
-        sb.append(" */\n");
-        sb.append("public class IntegrationTestUtils {\n\n");
-        sb.append("    /**\n");
-        sb.append("     * Wait for server to be ready\n");
-        sb.append("     */\n");
-        sb.append("    public static boolean waitForServer(String baseUrl, Duration timeout) {\n");
-        sb.append("        // TODO: Implement server readiness check\n");
-        sb.append("        return true;\n");
-        sb.append("    }\n\n");
-        sb.append("    /**\n");
-        sb.append("     * Generate test data based on schema\n");
-        sb.append("     */\n");
-        sb.append("    public static Object generateTestData(Map<String, Object> schema) {\n");
-        sb.append("        // TODO: Implement test data generation based on schema\n");
-        sb.append("        return null;\n");
-        sb.append("    }\n\n");
-        sb.append("    /**\n");
-        sb.append("     * Validate response against schema\n");
-        sb.append("     */\n");
-        sb.append("    public static boolean validateResponse(Object response, Map<String, Object> schema) {\n");
-        sb.append("        // TODO: Implement response validation against schema\n");
-        sb.append("        return true;\n");
-        sb.append("    }\n\n");
-        sb.append("    /**\n");
-        sb.append("     * Clean up test data\n");
-        sb.append("     */\n");
-        sb.append("    public static void cleanupTestData(String resourceId) {\n");
-        sb.append("        // TODO: Implement test data cleanup\n");
-        sb.append("    }\n\n");
-        sb.append("}\n");
-        return sb.toString();
+        return """
+                package %s;
+
+                import java.net.http.*;
+                import java.net.URI;
+                import java.time.Duration;
+                import java.util.*;
+
+                /**
+                 * Utility class for integration tests
+                 */
+                public class IntegrationTestUtils {
+
+                    private IntegrationTestUtils() {
+                    }
+
+                    /**
+                     * Poll the server until a GET returns a non-5xx status or timeout elapses.
+                     */
+                    public static boolean waitForServer(String baseUrl, Duration timeout) {
+                        if (baseUrl == null || baseUrl.isBlank()) {
+                            return false;
+                        }
+                        HttpClient client = HttpClient.newBuilder().connectTimeout(timeout).build();
+                        long deadline = System.nanoTime() + timeout.toNanos();
+                        while (System.nanoTime() < deadline) {
+                            try {
+                                HttpRequest req = HttpRequest.newBuilder()
+                                        .uri(URI.create(baseUrl))
+                                        .timeout(Duration.ofSeconds(5))
+                                        .GET()
+                                        .build();
+                                HttpResponse<Void> resp = client.send(req, HttpResponse.BodyHandlers.discarding());
+                                if (resp.statusCode() < 500) {
+                                    System.out.println("Server health check: " + resp.statusCode());
+                                    return true;
+                                }
+                            } catch (Exception ignored) {
+                                // retry
+                            }
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                return false;
+                            }
+                        }
+                        return false;
+                    }
+
+                    /**
+                     * Heuristic JSON validation: object/array parse check plus required top-level field names.
+                     */
+                    public static void assertJsonHasRequiredFields(String body, String... requiredFields) {
+                        if (body == null) {
+                            throw new AssertionError("Response body is null");
+                        }
+                        String trimmed = body.trim();
+                        if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+                            throw new AssertionError("Response should be JSON, got: "
+                                    + trimmed.substring(0, Math.min(50, trimmed.length())));
+                        }
+                        if (requiredFields != null) {
+                            for (String field : requiredFields) {
+                                if (field != null && !field.isBlank() && !trimmed.contains("\\"" + field + "\\"")) {
+                                    throw new AssertionError("Response should contain field '" + field + "'");
+                                }
+                            }
+                        }
+                    }
+
+                    /**
+                     * @deprecated Use {@link #assertJsonHasRequiredFields(String, String...)} instead.
+                     */
+                    @Deprecated
+                    public static boolean validateResponse(Object response, Map<String, Object> schema) {
+                        return true;
+                    }
+
+                    /**
+                     * Optional cleanup hook when INTEGRATION_CLEANUP_ENABLED=true.
+                     */
+                    public static void cleanupTestData(String resourceId) {
+                        if (!"true".equalsIgnoreCase(System.getenv("INTEGRATION_CLEANUP_ENABLED"))) {
+                            return;
+                        }
+                        if (resourceId != null) {
+                            System.out.println("Cleanup requested for resource: " + resourceId);
+                        }
+                    }
+                }
+                """.formatted(basePackage);
     }
 
     /**
@@ -949,6 +1123,10 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 schema = resolved;
             }
         }
+        Map<String, Object> flattened = IntegrationScenarioSupport.flattenResponseSchema(schema, spec);
+        if (flattened != null) {
+            schema = flattened;
+        }
         sb.append("        // Validate response against schema\n");
         appendSchemaAssertionsForBodyVar(sb, schema, spec, "response.body()", false);
     }
@@ -972,12 +1150,16 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             return;
         }
 
-        // Find the primary security scheme
+        // Emit at most one getAuthToken(); collect OAuth token URL from first oauth2 scheme with flows
         boolean generatedGetAuthToken = false;
+        String oauthTokenUrl = resolveFirstOAuthTokenUrl(securitySchemes);
+
         for (Map.Entry<String, Object> entry : securitySchemes.entrySet()) {
             String schemeName = entry.getKey();
             Map<String, Object> scheme = Util.asStringObjectMap(entry.getValue());
-            if (scheme == null) continue;
+            if (scheme == null) {
+                continue;
+            }
 
             String schemeType = (String) scheme.get("type");
             String bearerFormat = (String) scheme.get("bearerFormat");
@@ -985,8 +1167,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             String inField = (String) scheme.get("in");
             String paramName = (String) scheme.get("name");
 
-            if ("http".equals(schemeType) && "bearer".equals(schemeStr)) {
-                // Bearer token auth
+            if ("http".equals(schemeType) && "bearer".equals(schemeStr) && !generatedGetAuthToken) {
                 sb.append("    /**\n");
                 sb.append("     * Helper method to get authentication token (Bearer");
                 if (bearerFormat != null) sb.append(" - ").append(bearerFormat);
@@ -1003,11 +1184,9 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 generatedGetAuthToken = true;
 
             } else if ("apiKey".equals(schemeType)) {
-                // API key auth
                 String envVarName = "API_KEY";
                 sb.append("    /**\n");
-                sb.append("     * Helper method to get API key for authentication\n");
-                sb.append("     * Security scheme: ").append(schemeName).append(" (apiKey in ").append(inField).append(")\n");
+                sb.append("     * API key helpers — scheme: ").append(schemeName).append(" (apiKey in ").append(inField).append(")\n");
                 sb.append("     */\n");
                 if ("header".equals(inField)) {
                     sb.append("    private String getApiKeyHeaderName() {\n");
@@ -1031,48 +1210,21 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                     generatedGetAuthToken = true;
                 }
 
-            } else if ("oauth2".equals(schemeType)) {
-                // OAuth2 auth
-                Map<String, Object> flows = Util.asStringObjectMap(scheme.get("flows"));
+            } else if ("oauth2".equals(schemeType) && !generatedGetAuthToken) {
                 sb.append("    /**\n");
-                sb.append("     * Helper method to retrieve OAuth2 token\n");
-                sb.append("     * Security scheme: ").append(schemeName).append(" (oauth2)\n");
+                sb.append("     * OAuth2 token helper (first configured scheme; use OAUTH2_ACCESS_TOKEN to skip fetch)\n");
                 sb.append("     */\n");
                 sb.append("    private String getAuthToken() {\n");
-                sb.append("        // First, try environment variable for pre-configured token\n");
                 sb.append("        String token = System.getenv(\"OAUTH2_ACCESS_TOKEN\");\n");
                 sb.append("        if (token != null && !token.isEmpty()) {\n");
                 sb.append("            return token;\n");
                 sb.append("        }\n");
-                sb.append("        \n");
-                sb.append("        // OAuth2 token retrieval stub\n");
                 sb.append("        String clientId = System.getenv(\"OAUTH_CLIENT_ID\");\n");
                 sb.append("        String clientSecret = System.getenv(\"OAUTH_CLIENT_SECRET\");\n");
-
-                if (flows != null) {
-                    Map<String, Object> clientCredentials = Util.asStringObjectMap(flows.get("clientCredentials"));
-                    if (clientCredentials != null) {
-                        String tokenUrl = (String) clientCredentials.get("tokenUrl");
-                        sb.append("        String tokenUrl = \"").append(tokenUrl != null ? tokenUrl : "").append("\";\n");
-                    } else {
-                        Map<String, Object> authCode = Util.asStringObjectMap(flows.get("authorizationCode"));
-                        if (authCode != null) {
-                            String tokenUrl = (String) authCode.get("tokenUrl");
-                            sb.append("        String tokenUrl = \"").append(tokenUrl != null ? tokenUrl : "").append("\";\n");
-                        } else {
-                            sb.append("        String tokenUrl = \"\"; // Configure OAuth2 token URL\n");
-                        }
-                    }
-                } else {
-                    sb.append("        String tokenUrl = \"\"; // Configure OAuth2 token URL\n");
-                }
-
-                sb.append("        \n");
+                sb.append("        String tokenUrl = \"").append(oauthTokenUrl != null ? oauthTokenUrl : "").append("\";\n");
                 sb.append("        if (clientId == null || clientSecret == null || tokenUrl.isEmpty()) {\n");
-                sb.append("            System.err.println(\"OAuth2 credentials not configured. Set OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET env vars.\");\n");
                 sb.append("            return null;\n");
                 sb.append("        }\n");
-                sb.append("        \n");
                 sb.append("        try {\n");
                 sb.append("            String credentials = java.util.Base64.getEncoder().encodeToString(\n");
                 sb.append("                (clientId + \":\" + clientSecret).getBytes());\n");
@@ -1085,7 +1237,6 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 sb.append("                .build();\n");
                 sb.append("            HttpResponse<String> tokenResponse = httpClient.send(tokenRequest, HttpResponse.BodyHandlers.ofString());\n");
                 sb.append("            if (tokenResponse.statusCode() == 200) {\n");
-                sb.append("                // Simple extraction of access_token from JSON response\n");
                 sb.append("                String body = tokenResponse.body();\n");
                 sb.append("                int start = body.indexOf(\"\\\"access_token\\\":\\\"\") + 16;\n");
                 sb.append("                int end = body.indexOf('\"', start);\n");
@@ -1093,7 +1244,6 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 sb.append("                    return body.substring(start, end);\n");
                 sb.append("                }\n");
                 sb.append("            }\n");
-                sb.append("            System.err.println(\"Failed to retrieve OAuth2 token: \" + tokenResponse.statusCode());\n");
                 sb.append("        } catch (Exception e) {\n");
                 sb.append("            System.err.println(\"Error retrieving OAuth2 token: \" + e.getMessage());\n");
                 sb.append("        }\n");
@@ -1112,6 +1262,33 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("        return System.getenv(\"API_TOKEN\");\n");
             sb.append("    }\n\n");
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String resolveFirstOAuthTokenUrl(Map<String, Object> securitySchemes) {
+        if (securitySchemes == null) {
+            return "";
+        }
+        for (Object schemeObj : securitySchemes.values()) {
+            Map<String, Object> scheme = Util.asStringObjectMap(schemeObj);
+            if (scheme == null || !"oauth2".equals(scheme.get("type"))) {
+                continue;
+            }
+            Map<String, Object> flows = Util.asStringObjectMap(scheme.get("flows"));
+            if (flows == null) {
+                continue;
+            }
+            for (String flowKey : List.of("clientCredentials", "authorizationCode", "password")) {
+                Map<String, Object> flow = Util.asStringObjectMap(flows.get(flowKey));
+                if (flow != null) {
+                    String tokenUrl = (String) flow.get("tokenUrl");
+                    if (tokenUrl != null && !tokenUrl.isBlank()) {
+                        return tokenUrl;
+                    }
+                }
+            }
+        }
+        return "";
     }
 
     // Helper methods

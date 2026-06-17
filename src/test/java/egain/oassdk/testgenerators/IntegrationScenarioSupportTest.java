@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -170,5 +171,115 @@ public class IntegrationScenarioSupportTest {
             idx += needle.length();
         }
         return count;
+    }
+
+    @Test
+    public void flattenObjectSchemaMergesAllOfRequiredFields() {
+        Map<String, Object> folderProps = new LinkedHashMap<>();
+        folderProps.put("name", Map.of("type", "string"));
+        folderProps.put("description", Map.of("type", "string"));
+
+        Map<String, Object> overlay = new LinkedHashMap<>();
+        overlay.put("type", "object");
+        overlay.put("required", List.of("name"));
+        Map<String, Object> overlayProps = new LinkedHashMap<>();
+        overlayProps.put("name", Map.of("type", "string"));
+        overlayProps.put("department", Map.of("type", "object", "required", List.of("id"),
+                "properties", Map.of("id", Map.of("type", "string"))));
+        overlayProps.put("parent", Map.of("type", "object", "required", List.of("id"),
+                "properties", Map.of("id", Map.of("type", "string"))));
+        overlay.put("properties", overlayProps);
+        overlay.put("oneOf", List.of(
+                Map.of("required", List.of("department"), "properties", Map.of(
+                        "department", Map.of("type", "object", "required", List.of("id"),
+                                "properties", Map.of("id", Map.of("type", "string"))))),
+                Map.of("required", List.of("parent"), "properties", Map.of(
+                        "parent", Map.of("type", "object", "required", List.of("id"),
+                                "properties", Map.of("id", Map.of("type", "string")))))
+        ));
+
+        Map<String, Object> createFolder = new LinkedHashMap<>();
+        createFolder.put("allOf", List.of(overlay, Map.of("$ref", "#/components/schemas/Folder")));
+
+        Map<String, Object> folder = new LinkedHashMap<>();
+        folder.put("type", "object");
+        folder.put("properties", folderProps);
+
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("Folder", folder);
+        schemas.put("createFolder", createFolder);
+        Map<String, Object> spec = specWithSchemas(schemas);
+
+        IntegrationScenarioSupport.FlattenedObjectSchema flat =
+                IntegrationScenarioSupport.flattenObjectSchema(createFolder, spec);
+
+        assertTrue(flat.required().contains("name"), "name should be required");
+        assertTrue(flat.properties().containsKey("name"));
+        assertTrue(flat.properties().containsKey("description"));
+
+        String json = IntegrationScenarioSupport.generateJsonFromSchemaRaw(createFolder, spec);
+        assertTrue(json.contains("\"name\""), "valid body should include name: " + json);
+        assertFalse(json.equals("{}"), "composed schema should not produce empty object");
+
+        List<String> required = IntegrationScenarioSupport.getRequiredFieldsFromSchema(createFolder, spec);
+        assertTrue(required.contains("name"));
+
+        List<IntegrationScenarioSupport.PerFieldInvalidBody> invalid =
+                IntegrationScenarioSupport.buildPerFieldInvalidBodies(createFolder, spec, 10);
+        assertTrue(invalid.size() >= 2, "expected per-field invalid bodies, got: " + invalid.size());
+
+        List<IntegrationScenarioSupport.OneOfVariantBody> variants =
+                IntegrationScenarioSupport.buildOneOfVariantBodies(createFolder, spec);
+        assertEquals(2, variants.size());
+        assertTrue(variants.get(0).jsonBody().contains("department")
+                || variants.get(0).jsonBody().contains("parent"));
+
+        List<IntegrationScenarioSupport.OneOfXorNegativeBody> xorNeg =
+                IntegrationScenarioSupport.buildOneOfXorNegativeBodies(createFolder, spec);
+        assertEquals(2, xorNeg.size());
+    }
+
+    @Test
+    public void getParameterExampleUsesArrayEnumFirstValue() {
+        Map<String, Object> param = new LinkedHashMap<>();
+        param.put("name", "folderAdditionalAttributes");
+        param.put("in", "query");
+        param.put("style", "form");
+        param.put("explode", false);
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "array");
+        schema.put("items", Map.of("type", "string", "enum", List.of("description", "permissions")));
+        param.put("schema", schema);
+
+        assertEquals("description", IntegrationScenarioSupport.getParameterExample(param));
+    }
+
+    @Test
+    public void buildParamNegativeCasesIncludesArrayEnumInvalidItem() {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "array");
+        schema.put("items", Map.of("type", "string", "enum", List.of("description", "permissions")));
+
+        Map<String, Object> param = new LinkedHashMap<>();
+        param.put("name", "folderAdditionalAttributes");
+        param.put("in", "query");
+        param.put("schema", schema);
+
+        Map<String, Object> get = new LinkedHashMap<>();
+        get.put("operationId", "getFolder");
+        get.put("parameters", List.of(param));
+        get.put("responses", Map.of("200", Map.of("description", "OK")));
+
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("paths", Map.of("/folders/{id}", Map.of("get", get)));
+
+        List<IntegrationScenarioSupport.IntegrationParamNegativeCase> cases =
+                IntegrationScenarioSupport.buildParamNegativeCases(
+                        "/folders/{id}", get, Map.of(), Map.of("folderAdditionalAttributes", "description"), 25);
+
+        boolean hasInvalidEnumItem = cases.stream()
+                .anyMatch(c -> c.name.contains("invalid enum item"));
+        assertTrue(hasInvalidEnumItem, "expected array enum invalid item case among: "
+                + cases.stream().map(c -> c.name).toList());
     }
 }

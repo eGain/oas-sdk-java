@@ -15,7 +15,7 @@ import java.util.Map;
  * branches are contextual; this helper is only concerned with XOR discovery, not read-only collection.
  * </p>
  */
-final class JerseySchemaOneOfXor {
+public final class JerseySchemaOneOfXor {
 
     private JerseySchemaOneOfXor() {
     }
@@ -26,7 +26,7 @@ final class JerseySchemaOneOfXor {
      * branch's sole required property is an object schema with {@code required: [id]} and a defined
      * {@code id} property (e.g. {@code createFolder}: {@code department} vs {@code parent}).
      */
-    record SimpleOneOfXorInfo(
+    public record SimpleOneOfXorInfo(
             String sortedJson0,
             String sortedJson1,
             boolean nestedIdRequiredForSorted0,
@@ -37,7 +37,7 @@ final class JerseySchemaOneOfXor {
      * Find {@code oneOf} with exactly two object branches, each with a single {@code required} property name,
      * and the two names differ. Returns {@code [a,b]} in lexicographic order for stable output.
      */
-    static String[] findSimpleOneOfXorPair(
+    public static String[] findSimpleOneOfXorPair(
             Map<String, Object> schema,
             Map<String, Object> spec,
             Map<Object, Boolean> visited,
@@ -50,7 +50,7 @@ final class JerseySchemaOneOfXor {
      * Same discovery as {@link #findSimpleOneOfXorPair}, plus whether each branch requires a nested {@code id}
      * on its sole required object property.
      */
-    static SimpleOneOfXorInfo findSimpleOneOfXorInfo(
+    public static SimpleOneOfXorInfo findSimpleOneOfXorInfo(
             Map<String, Object> schema,
             Map<String, Object> spec,
             Map<Object, Boolean> visited,

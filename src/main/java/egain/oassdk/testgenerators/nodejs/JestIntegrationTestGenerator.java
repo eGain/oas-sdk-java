@@ -263,6 +263,36 @@ public class JestIntegrationTestGenerator implements TestGenerator, Configurable
             sb.append("    });\n\n");
         }
 
+        if (jsonBody) {
+            for (IntegrationScenarioSupport.OneOfVariantBody variant :
+                    IntegrationScenarioSupport.buildOneOfVariantBodies(bodySchema, spec)) {
+                String lab = escapeJsSingleQuoted("success variant: " + variant.label());
+                sb.append("    test('").append(lab).append("', async () => {\n");
+                sb.append("      const tok = getTokenClientApplication();\n");
+                sb.append("      if (!tok) { console.warn('skip: set INTEGRATION_TOKEN_CLIENT_APPLICATION'); return; }\n");
+                appendJsPathUrl(sb, path, pathParams, queryParams);
+                appendJsAxiosRequest(sb, methodUpper, true, true,
+                        IntegrationScenarioSupport.escapeForJsDoubleQuoted(variant.jsonBody()), "tok");
+                appendJsSuccessExpectations(sb, responses);
+                appendJsSuccessJsonAssert(sb, responses, spec);
+                sb.append("    });\n\n");
+            }
+        }
+
+        if (IntegrationScenarioSupport.emitDeclaredErrorCodes(config)) {
+            for (IntegrationScenarioSupport.DeclaredErrorCase dec :
+                    IntegrationScenarioSupport.buildDeclaredErrorCases(operation, queryParams)) {
+                String lab = escapeJsSingleQuoted(dec.label());
+                sb.append("    test('").append(lab).append("', async () => {\n");
+                appendJsPathUrl(sb, path, pathParams, dec.queryParamsOverride());
+                appendJsAxiosRequest(sb, methodUpper, requiresAuth, jsonBody, bodyJs,
+                        requiresAuth ? "getPreferredAuthToken()" : null);
+                sb.append("      expect(response.status).toBe(").append(dec.expectedStatus()).append(");\n");
+                appendJsErrorBodyAssert(sb, responses, spec);
+                sb.append("    });\n\n");
+            }
+        }
+
         List<IntegrationScenarioSupport.IntegrationParamNegativeCase> paramCases =
                 IntegrationScenarioSupport.buildParamNegativeCases(path, operation, pathParams, queryParams, maxParam);
         for (IntegrationScenarioSupport.IntegrationParamNegativeCase nc : paramCases) {
@@ -286,6 +316,26 @@ public class JestIntegrationTestGenerator implements TestGenerator, Configurable
         }
 
         if (jsonBody) {
+            if (IntegrationScenarioSupport.isRequestBodyRequired(operation, spec)) {
+                sb.append("    test('missing request body', async () => {\n");
+                appendJsPathUrl(sb, path, pathParams, queryParams);
+                sb.append("      const headers = { 'Accept': 'application/json' };\n");
+                if (requiresAuth) {
+                    sb.append("      const _t = getPreferredAuthToken();\n");
+                    sb.append("      if (_t) { headers['Authorization'] = `Bearer ${_t}`; }\n");
+                }
+                sb.append("      const response = await axios.request({\n");
+                sb.append("        method: '").append(methodUpper).append("',\n");
+                sb.append("        url,\n");
+                sb.append("        headers,\n");
+                sb.append("        validateStatus: () => true,\n");
+                sb.append("        timeout: REQUEST_TIMEOUT,\n");
+                sb.append("      });\n");
+                sb.append("      expect([400, 422]).toContain(response.status);\n");
+                appendJsErrorBodyAssert(sb, responses, spec);
+                sb.append("    });\n\n");
+            }
+
             String wrongJs = IntegrationScenarioSupport.escapeForJsDoubleQuoted(
                     IntegrationScenarioSupport.generateWrongTypesBodyRaw(bodySchema, spec));
             sb.append("    test('invalid body — wrong types', async () => {\n");
@@ -296,7 +346,7 @@ public class JestIntegrationTestGenerator implements TestGenerator, Configurable
             appendJsErrorBodyAssert(sb, responses, spec);
             sb.append("    });\n\n");
 
-            if (!IntegrationScenarioSupport.getRequiredFieldsFromSchema(bodySchema).isEmpty()) {
+            if (!IntegrationScenarioSupport.getRequiredFieldsFromSchema(bodySchema, spec).isEmpty()) {
                 String missJs = IntegrationScenarioSupport.escapeForJsDoubleQuoted(
                         IntegrationScenarioSupport.generateMissingRequiredFieldsBodyRaw(bodySchema, spec));
                 sb.append("    test('invalid body — missing required fields', async () => {\n");
@@ -316,6 +366,19 @@ public class JestIntegrationTestGenerator implements TestGenerator, Configurable
                 appendJsPathUrl(sb, path, pathParams, queryParams);
                 appendJsAxiosRequest(sb, methodUpper, requiresAuth, true,
                         IntegrationScenarioSupport.escapeForJsDoubleQuoted(pf.invalidJsonBody),
+                        requiresAuth ? "getPreferredAuthToken()" : null);
+                sb.append("      expect([400, 422]).toContain(response.status);\n");
+                appendJsErrorBodyAssert(sb, responses, spec);
+                sb.append("    });\n\n");
+            }
+
+            for (IntegrationScenarioSupport.OneOfXorNegativeBody xn :
+                    IntegrationScenarioSupport.buildOneOfXorNegativeBodies(bodySchema, spec)) {
+                String lab = escapeJsSingleQuoted("oneOf XOR: " + xn.label());
+                sb.append("    test('").append(lab).append("', async () => {\n");
+                appendJsPathUrl(sb, path, pathParams, queryParams);
+                appendJsAxiosRequest(sb, methodUpper, requiresAuth, true,
+                        IntegrationScenarioSupport.escapeForJsDoubleQuoted(xn.jsonBody()),
                         requiresAuth ? "getPreferredAuthToken()" : null);
                 sb.append("      expect([400, 422]).toContain(response.status);\n");
                 appendJsErrorBodyAssert(sb, responses, spec);

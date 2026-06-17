@@ -170,6 +170,15 @@ public final class PostmanNegativeRequestFactory {
                     Map.of(pathName, "!!!invalid!!!"),
                     deepCopyQuery(positiveQueryList),
                     default4xx));
+
+            String tooMany = commaSeparatedPathTooMany(schema);
+            if (tooMany != null) {
+                cases.add(new NegativeCase(
+                        "Path " + pathName + " too many items",
+                        Map.of(pathName, tooMany),
+                        deepCopyQuery(positiveQueryList),
+                        default4xx));
+            }
         }
 
         if ("string".equals(type) && schema.containsKey("minLength") && cases.size() < maxCases) {
@@ -308,7 +317,41 @@ public final class PostmanNegativeRequestFactory {
                     cases.add(new NegativeCase("Query " + paramName + " too few items", Map.of(), q, default4xx));
                 }
             }
+            if (items != null && items.get("enum") instanceof List<?> ev && !ev.isEmpty() && cases.size() < maxCases) {
+                String valid = String.valueOf(ev.get(0));
+                List<Map<String, Object>> q = replaceQueryValue(positiveQueryList, paramName,
+                        valid + ",__invalid_enum_item_oas_sdk__");
+                cases.add(new NegativeCase("Query " + paramName + " invalid enum item", Map.of(), q, default4xx));
+            }
         }
+    }
+
+    /**
+     * When a path string pattern bounds comma-separated repetitions (e.g. {@code {0,74}}), build one ID too many.
+     */
+    private static String commaSeparatedPathTooMany(Map<String, Object> schema) {
+        Object patternObj = schema.get("pattern");
+        if (!(patternObj instanceof String pattern)) {
+            return null;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\{0,(\\d+)\\}").matcher(pattern);
+        if (!m.find()) {
+            return null;
+        }
+        int maxRepeats = Integer.parseInt(m.group(1));
+        int count = maxRepeats + 2;
+        if (count > 80) {
+            return null;
+        }
+        String id = "20150000000203";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < count; i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append(id);
+        }
+        return sb.toString();
     }
 
     private static long toLong(Object o, long dflt) {
