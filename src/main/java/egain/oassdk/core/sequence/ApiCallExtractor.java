@@ -2,6 +2,7 @@ package egain.oassdk.core.sequence;
 
 import egain.oassdk.Util;
 import egain.oassdk.core.Constants;
+import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -298,91 +299,23 @@ public class ApiCallExtractor {
     }
 
     /**
-     * Build a small JSON request-body string for one operation. Reads
-     * {@code application/json} content (or the first content type),
-     * resolves a top-level {@code $ref} against {@code components.schemas},
-     * and emits a single-level JSON object typed by property kind.
-     *
-     * <p>Does not handle nested objects, arrays, {@code allOf}/{@code oneOf},
-     * {@code format}, or {@code required}. For spec shapes where those
-     * matter, the Schemathesis bundle (which handles them rigorously) is
-     * the right tool.
+     * Build a JSON request-body string for one operation using
+     * {@link IntegrationScenarioSupport#generateRequestBodyFromSchemaRaw}.
      *
      * @return JSON string, or {@code null} if the operation has no usable body
      */
     public String buildRequestBodyForOperation(Map<String, Object> operation, Map<String, Object> spec) {
+        if (!operation.containsKey("requestBody")) {
+            return null;
+        }
         Map<String, Object> requestBody = Util.asStringObjectMap(operation.get("requestBody"));
         if (requestBody == null) {
             return null;
         }
-        Map<String, Object> content = Util.asStringObjectMap(requestBody.get("content"));
-        if (content == null) {
+        String json = IntegrationScenarioSupport.generateRequestBodyFromSchemaRaw(operation, spec);
+        if (json == null || json.isBlank()) {
             return null;
         }
-        Map<String, Object> jsonContent = Util.asStringObjectMap(content.get("application/json"));
-        if (jsonContent == null) {
-            for (Object val : content.values()) {
-                jsonContent = Util.asStringObjectMap(val);
-                if (jsonContent != null) {
-                    break;
-                }
-            }
-        }
-        if (jsonContent == null) {
-            return null;
-        }
-        Map<String, Object> schema = Util.asStringObjectMap(jsonContent.get("schema"));
-        if (schema == null) {
-            return null;
-        }
-        if (schema.containsKey("$ref")) {
-            String ref = (String) schema.get("$ref");
-            if (ref != null && ref.startsWith("#/components/schemas/")) {
-                String schemaName = ref.substring("#/components/schemas/".length());
-                Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
-                if (components != null) {
-                    Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
-                    if (schemas != null) {
-                        schema = Util.asStringObjectMap(schemas.get(schemaName));
-                    }
-                }
-            }
-        }
-        if (schema == null) {
-            return null;
-        }
-        return buildMockJsonFromSchema(schema, 0);
-    }
-
-    private String buildMockJsonFromSchema(Map<String, Object> schema, int depth) {
-        if (depth > 5) {
-            return "{}";
-        }
-        Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
-        if (properties == null || properties.isEmpty()) {
-            return "{}";
-        }
-        StringBuilder sb = new StringBuilder("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> prop : properties.entrySet()) {
-            if (!first) {
-                sb.append(", ");
-            }
-            sb.append("\"").append(prop.getKey()).append("\": ");
-            Map<String, Object> propSchema = Util.asStringObjectMap(prop.getValue());
-            String type = propSchema != null ? (String) propSchema.get("type") : null;
-            if (type == null) {
-                type = "string";
-            }
-            switch (type) {
-                case "string" -> sb.append("\"mock_").append(prop.getKey()).append("\"");
-                case "integer", "number" -> sb.append("1");
-                case "boolean" -> sb.append("true");
-                default -> sb.append("\"mock_value\"");
-            }
-            first = false;
-        }
-        sb.append("}");
-        return sb.toString();
+        return json;
     }
 }

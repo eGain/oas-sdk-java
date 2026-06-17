@@ -7,6 +7,7 @@ import egain.oassdk.core.Constants;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.exceptions.GenerationException;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
+import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 import egain.oassdk.testgenerators.TestGenerator;
 
 import java.io.IOException;
@@ -144,7 +145,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
             if (pathItem == null) continue;
 
             // Get operations for this path grouped by tag
-            Map<String, List<Map<String, Object>>> taggedOperations = groupOperationsByTag(pathItem, path);
+            Map<String, List<Map<String, Object>>> taggedOperations = groupOperationsByTag(pathItem, path, spec);
 
             // Merge into the global tag map
             for (Map.Entry<String, List<Map<String, Object>>> tagEntry : taggedOperations.entrySet()) {
@@ -173,7 +174,8 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
     /**
      * Group operations by tag (each operation is a folder: happy path + optional Negative-TCs).
      */
-    private Map<String, List<Map<String, Object>>> groupOperationsByTag(Map<String, Object> pathItem, String path) {
+    private Map<String, List<Map<String, Object>>> groupOperationsByTag(Map<String, Object> pathItem, String path,
+                                                                        Map<String, Object> spec) {
         Map<String, List<Map<String, Object>>> taggedOperations = new HashMap<>();
 
         String[] methods = Constants.HTTP_METHODS;
@@ -185,7 +187,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
                 }
 
                 String tag = getOperationTag(operation);
-                Map<String, Object> opFolder = buildOperationFolder(method, path, operation);
+                Map<String, Object> opFolder = buildOperationFolder(method, path, operation, spec);
                 taggedOperations.computeIfAbsent(tag, k -> new ArrayList<>()).add(opFolder);
             }
         }
@@ -222,7 +224,8 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         return Boolean.TRUE.equals(config.getAdditionalProperties().get("postmanAssertErrorExamples"));
     }
 
-    private Map<String, Object> buildOperationFolder(String method, String path, Map<String, Object> operation) {
+    private Map<String, Object> buildOperationFolder(String method, String path, Map<String, Object> operation,
+                                                     Map<String, Object> spec) {
         String operationId = (String) operation.get("operationId");
         String summary = (String) operation.get("summary");
         String opName = summary != null ? summary : operationId != null ? operationId : method.toUpperCase() + " " + path;
@@ -231,7 +234,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         folder.put("name", opName);
 
         List<Map<String, Object>> children = new ArrayList<>();
-        children.add(buildHappyPathItem(method, path, operation));
+        children.add(buildHappyPathItem(method, path, operation, spec));
 
         if (isPostmanNegativeTestsEnabled()) {
             int maxNeg = postmanNegativeTestsMaxPerOperation();
@@ -244,7 +247,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
                 negFolder.put("name", "Negative-TCs");
                 List<Map<String, Object>> negItems = new ArrayList<>();
                 for (PostmanNegativeRequestFactory.NegativeCase nc : negatives) {
-                    negItems.add(buildNegativeRequestItem(method, path, operation, nc, default4xx));
+                    negItems.add(buildNegativeRequestItem(method, path, operation, nc, default4xx, spec));
                 }
                 negFolder.put("item", negItems);
                 children.add(negFolder);
@@ -255,7 +258,8 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         return folder;
     }
 
-    private Map<String, Object> buildHappyPathItem(String method, String path, Map<String, Object> operation) {
+    private Map<String, Object> buildHappyPathItem(String method, String path, Map<String, Object> operation,
+                                                   Map<String, Object> spec) {
         String description = (String) operation.get("description");
         String escapedDescription = escapeStringForJson(description != null ? description : "");
 
@@ -266,7 +270,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         requestMap.put("method", method.toUpperCase());
         requestMap.put("header", generateHeaders(operation));
         requestMap.put("url", buildHappyPathUrl(path, operation));
-        requestMap.put("body", generateBody(operation));
+        requestMap.put("body", generateBody(operation, spec));
         requestMap.put("description", escapedDescription);
         item.put("request", requestMap);
 
@@ -278,7 +282,8 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
                                                          String path,
                                                          Map<String, Object> operation,
                                                          PostmanNegativeRequestFactory.NegativeCase nc,
-                                                         int default4xx) {
+                                                         int default4xx,
+                                                         Map<String, Object> spec) {
         String description = (String) operation.get("description");
         String escapedDescription = escapeStringForJson(description != null ? description : "");
 
@@ -294,7 +299,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         requestMap.put("method", method.toUpperCase());
         requestMap.put("header", generateHeaders(operation));
         requestMap.put("url", PostmanParameterSupport.buildUrlObject(path, resolvedPath, nc.queryEntries));
-        requestMap.put("body", generateBody(operation));
+        requestMap.put("body", generateBody(operation, spec));
         requestMap.put("description", escapedDescription);
         item.put("request", requestMap);
 
@@ -348,25 +353,13 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
     /**
      * Generate request body
      */
-    private Map<String, Object> generateBody(Map<String, Object> operation) {
+    private Map<String, Object> generateBody(Map<String, Object> operation, Map<String, Object> spec) {
         if (!operation.containsKey("requestBody")) {
             return Map.of("mode", "raw", "raw", "");
         }
 
-        Map<String, Object> requestBody = Util.asStringObjectMap(operation.get("requestBody"));
-        Map<String, Object> content = Util.asStringObjectMap(requestBody.get("content"));
-
-        if (content == null || !content.containsKey("application/json")) {
-            return Map.of("mode", "raw", "raw", "");
-        }
-
-        Map<String, Object> jsonContent = Util.asStringObjectMap(content.get("application/json"));
-        String example = extractExampleFromContent(jsonContent);
-
-        // Jackson will properly escape the string when serializing to JSON
-        // We keep the example as-is (with actual newlines) and let Jackson handle escaping
-        // This ensures the raw field contains properly escaped newlines in the final JSON
-        String safeExample = example != null ? example : "";
+        String bodyJson = IntegrationScenarioSupport.generateRequestBodyFromSchemaRaw(operation, spec);
+        String safeExample = bodyJson != null && !bodyJson.isBlank() ? bodyJson : "";
 
         Map<String, Object> bodyMap = new HashMap<>();
         bodyMap.put("mode", "raw");
@@ -379,48 +372,6 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         bodyMap.put("options", options);
 
         return bodyMap;
-    }
-
-    /**
-     * Extract example from content (checks examples first, then schema example)
-     */
-    @SuppressWarnings("unchecked")
-    private String extractExampleFromContent(Map<String, Object> jsonContent) {
-        if (jsonContent == null) {
-            return "{}";
-        }
-
-        // First, try to get example from examples map
-        if (jsonContent.containsKey("examples")) {
-            Map<String, Object> examples = (Map<String, Object>) jsonContent.get("examples");
-            if (examples != null && !examples.isEmpty()) {
-                // Get the first example's value
-                Object firstExample = examples.values().iterator().next();
-                if (firstExample instanceof Map) {
-                    Map<String, Object> exampleMap = (Map<String, Object>) firstExample;
-                    if (exampleMap.containsKey("value")) {
-                        Object value = exampleMap.get("value");
-                        if (value != null) {
-                            try {
-                                return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(value);
-                            } catch (Exception e) {
-                                // Fallback to string representation
-                                return value.toString();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Try to get example from schema
-        if (jsonContent.containsKey("schema")) {
-            Map<String, Object> schema = (Map<String, Object>) jsonContent.get("schema");
-            return generateExampleFromSchema(schema);
-        }
-
-        // If no example found, generate a simple placeholder
-        return "{\n  \"example\": \"value\"\n}";
     }
 
     private List<Map<String, Object>> wrapTestScript(List<String> lines) {
@@ -825,50 +776,6 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
             return firstTag != null ? firstTag : "Default";
         }
         return "Default";
-    }
-
-    private String generateExampleFromSchema(Map<String, Object> schema) {
-        if (schema == null) {
-            return "{}";
-        }
-
-        // First, try to get example from the schema directly
-        if (schema.containsKey("example")) {
-            Object example = schema.get("example");
-            if (example != null) {
-                try {
-                    return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(example);
-                } catch (Exception e) {
-                    // Fallback to string representation
-                    return example.toString();
-                }
-            }
-        }
-
-        // Try to get from examples map
-        if (schema.containsKey("examples")) {
-            Map<String, Object> examples = Util.asStringObjectMap(schema.get("examples"));
-            if (examples != null && !examples.isEmpty()) {
-                // Get the first example
-                Object firstExample = examples.values().iterator().next();
-                if (firstExample instanceof Map) {
-                    Map<String, Object> exampleMap = Util.asStringObjectMap(firstExample);
-                    if (exampleMap.containsKey("value")) {
-                        Object value = exampleMap.get("value");
-                        if (value != null) {
-                            try {
-                                return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(value);
-                            } catch (Exception e) {
-                                return value.toString();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // If no example found, generate a simple placeholder
-        return "{\n  \"example\": \"value\"\n}";
     }
 
     private String convertToJson(Map<String, Object> data) {

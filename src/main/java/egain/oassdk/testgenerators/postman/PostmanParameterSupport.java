@@ -1,6 +1,7 @@
 package egain.oassdk.testgenerators.postman;
 
 import egain.oassdk.Util;
+import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -76,68 +77,7 @@ final class PostmanParameterSupport {
         if (param == null) {
             return "example";
         }
-        if (param.containsKey("example")) {
-            return String.valueOf(param.get("example"));
-        }
-        Map<String, Object> schema = Util.asStringObjectMap(param.get("schema"));
-        if (schema == null) {
-            return "example";
-        }
-        if (schema.containsKey("example")) {
-            return String.valueOf(schema.get("example"));
-        }
-        String type = schema.get("type") != null ? String.valueOf(schema.get("type")) : "string";
-        if ("string".equals(type)) {
-            if ("uuid".equalsIgnoreCase(String.valueOf(schema.get("format")))) {
-                return "00000000-0000-4000-8000-000000000001";
-            }
-            int minLen = schema.get("minLength") instanceof Number n ? n.intValue() : 1;
-            if (minLen <= 0) {
-                return "a";
-            }
-            return repeatChar('a', minLen);
-        }
-        if ("integer".equals(type) || "number".equals(type)) {
-            if (schema.containsKey("minimum")) {
-                long min = toLong(schema.get("minimum"), 0);
-                boolean excl = Boolean.TRUE.equals(schema.get("exclusiveMinimum"));
-                long v = excl ? min + 1 : min;
-                if (schema.containsKey("maximum")) {
-                    long max = toLong(schema.get("maximum"), Long.MAX_VALUE);
-                    boolean exclMax = Boolean.TRUE.equals(schema.get("exclusiveMaximum"));
-                    long hi = exclMax ? max - 1 : max;
-                    if (v > hi) {
-                        v = hi;
-                    }
-                }
-                return String.valueOf(Math.max(v, min));
-            }
-            if (schema.containsKey("maximum")) {
-                long max = toLong(schema.get("maximum"), 100);
-                boolean exclMax = Boolean.TRUE.equals(schema.get("exclusiveMaximum"));
-                long v = exclMax ? max - 1 : max;
-                return String.valueOf(Math.max(0, v));
-            }
-            return "1";
-        }
-        if ("boolean".equals(type)) {
-            return "false";
-        }
-        if ("array".equals(type)) {
-            return "";
-        }
-        return "example";
-    }
-
-    private static long toLong(Object o, long dflt) {
-        if (o instanceof Number n) {
-            return n.longValue();
-        }
-        try {
-            return Long.parseLong(String.valueOf(o));
-        } catch (NumberFormatException e) {
-            return dflt;
-        }
+        return IntegrationScenarioSupport.getParameterExample(param);
     }
 
     static List<Map<String, Object>> buildPositiveQueryList(Map<String, Object> operation) {

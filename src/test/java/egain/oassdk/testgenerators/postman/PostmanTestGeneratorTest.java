@@ -413,6 +413,102 @@ public class PostmanTestGeneratorTest {
         
         return spec;
     }
+
+    @Test
+    @DisplayName("Composed allOf request body uses IntegrationScenarioSupport synthesis")
+    void testComposedSchemaRequestBody() throws Exception {
+        Map<String, Object> overlay = new LinkedHashMap<>();
+        overlay.put("type", "object");
+        overlay.put("required", List.of("name"));
+        overlay.put("properties", Map.of("name", Map.of("type", "string")));
+
+        Map<String, Object> createFolder = new LinkedHashMap<>();
+        createFolder.put("allOf", List.of(overlay, Map.of("$ref", "#/components/schemas/Folder")));
+
+        Map<String, Object> folder = new LinkedHashMap<>();
+        folder.put("type", "object");
+        folder.put("properties", Map.of("description", Map.of("type", "string")));
+
+        Map<String, Object> post = new LinkedHashMap<>();
+        post.put("operationId", "createFolder");
+        post.put("tags", List.of("Folders"));
+        post.put("requestBody", Map.of("content", Map.of("application/json",
+                Map.of("schema", Map.of("$ref", "#/components/schemas/createFolder")))));
+        post.put("responses", Map.of("201", Map.of("description", "Created")));
+
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("openapi", "3.0.0");
+        spec.put("info", Map.of("title", "Folders", "version", "1.0"));
+        spec.put("components", Map.of("schemas", Map.of("Folder", folder, "createFolder", createFolder)));
+        spec.put("paths", Map.of("/folders", Map.of("post", post)));
+
+        Path tempDir = Files.createTempDirectory("postman-allof");
+        generator.generate(spec, tempDir.toString(), new TestConfig(), null);
+
+        Path collectionFile = findPostmanCollectionFile(tempDir);
+        Map<String, Object> collection = Util.asStringObjectMap(
+                objectMapper.readValue(collectionFile.toFile(), Map.class));
+
+        boolean foundNameInBody = false;
+        for (Map<String, Object> tagFolder : (List<Map<String, Object>>) collection.get("item")) {
+            for (Map<String, Object> node : flattenPostmanItems(tagFolder)) {
+                Map<String, Object> request = (Map<String, Object>) node.get("request");
+                if (request == null) {
+                    continue;
+                }
+                Map<String, Object> body = (Map<String, Object>) request.get("body");
+                if (body == null) {
+                    continue;
+                }
+                String raw = (String) body.get("raw");
+                if (raw != null && raw.contains("\"name\"") && !raw.contains("\"example\": \"value\"")) {
+                    foundNameInBody = true;
+                }
+            }
+        }
+        assertTrue(foundNameInBody, "Happy-path body should include flattened name field");
+
+        deleteDirectory(tempDir);
+    }
+
+    @Test
+    @DisplayName("Array-of-enum query param defaults use first enum value")
+    void testArrayEnumQueryDefault() throws Exception {
+        Map<String, Object> param = new LinkedHashMap<>();
+        param.put("name", "folderAdditionalAttributes");
+        param.put("in", "query");
+        param.put("schema", Map.of(
+                "type", "array",
+                "items", Map.of("type", "string", "enum", List.of("description", "permissions"))));
+
+        Map<String, Object> get = new LinkedHashMap<>();
+        get.put("operationId", "getFolder");
+        get.put("tags", List.of("Folders"));
+        get.put("parameters", List.of(param));
+        get.put("responses", Map.of("200", Map.of("description", "OK")));
+
+        Map<String, Object> spec = new LinkedHashMap<>();
+        spec.put("openapi", "3.0.0");
+        spec.put("info", Map.of("title", "Folders", "version", "1.0"));
+        spec.put("paths", Map.of("/folders/{id}", Map.of("get", get)));
+
+        Path tempDir = Files.createTempDirectory("postman-array-enum");
+        generator.generate(spec, tempDir.toString(), new TestConfig(), null);
+
+        Path envFile = findPostmanEnvironmentFile(tempDir);
+        Map<String, Object> env = Util.asStringObjectMap(objectMapper.readValue(envFile.toFile(), Map.class));
+        List<Map<String, Object>> values = (List<Map<String, Object>>) env.get("values");
+
+        String attrDefault = values.stream()
+                .filter(v -> "folderAdditionalAttributes".equals(v.get("key")))
+                .map(v -> (String) v.get("value"))
+                .findFirst()
+                .orElse(null);
+
+        assertEquals("description", attrDefault);
+
+        deleteDirectory(tempDir);
+    }
     
     /**
      * Depth-first walk of Postman folder items; returns leaf items that may have a {@code request} map.
