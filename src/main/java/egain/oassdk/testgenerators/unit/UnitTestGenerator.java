@@ -5,6 +5,7 @@ import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.Constants;
 import egain.oassdk.core.exceptions.GenerationException;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
+import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 import egain.oassdk.testgenerators.TestGenerator;
 
 import java.io.IOException;
@@ -147,7 +148,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         sb.append("    }\n\n");
 
         for (OperationInfo opInfo : operations) {
-            generateTestMethods(sb, opInfo);
+            generateTestMethods(sb, opInfo, spec);
         }
 
         sb.append("}\n");
@@ -179,7 +180,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         return op.operation.containsKey("requestBody");
     }
 
-    private void generateTestMethods(StringBuilder sb, OperationInfo opInfo) {
+    private void generateTestMethods(StringBuilder sb, OperationInfo opInfo, Map<String, Object> spec) {
         Map<String, Object> operation = opInfo.operation;
         String operationId = (String) operation.get("operationId");
         String summary = (String) operation.get("summary");
@@ -205,7 +206,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                 .append(" - Valid Request\")\n");
         sb.append("    public void test").append(capitalize(testMethodName)).append("_ValidRequest() {\n");
         appendParamMaps(sb, parameters);
-        String bodyLiteral = minimalJsonBodyLiteral(operation);
+        String bodyLiteral = jsonBodyLiteral(operation, spec);
         appendRestAssuredWhenThen(sb, method, path, bodyLiteral, "        .then()\n            .statusCode(" + successMatcher + ");\n");
         sb.append("    }\n\n");
 
@@ -373,7 +374,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                     }
                 }
 
-                String concurrentBody = minimalJsonBodyLiteral(operation);
+                String concurrentBody = jsonBodyLiteral(operation, spec);
                 String helperName = "call" + capitalize(testMethodName) + "Request";
                 appendConcurrentHelper(sb, helperName, method, path, parameters, concurrentBody);
                 appendConcurrentTest(sb, testMethodName, summary, method, path, helperName);
@@ -536,7 +537,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             }
             String name = (String) param.get("name");
             sb.append("        pathParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                    .append(escapeJavaString(getParameterExample(param))).append("\");\n");
+                    .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
         }
         sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
         for (Map<String, Object> param : parameters) {
@@ -545,7 +546,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             }
             String name = (String) param.get("name");
             sb.append("        queryParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                    .append(escapeJavaString(getParameterExample(param))).append("\");\n");
+                    .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
         }
     }
 
@@ -557,7 +558,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             }
             String name = (String) param.get("name");
             sb.append("        pathParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                    .append(escapeJavaString(getParameterExample(param))).append("\");\n");
+                    .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
         }
         sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
         for (Map<String, Object> param : parameters) {
@@ -569,7 +570,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                 continue;
             }
             sb.append("        queryParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                    .append(escapeJavaString(getParameterExample(param))).append("\");\n");
+                    .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
         }
     }
 
@@ -585,7 +586,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                 sb.append("        pathParams.put(\"").append(escapeJavaString(name)).append("\", ").append(invalidVar).append(");\n");
             } else {
                 sb.append("        pathParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                        .append(escapeJavaString(getParameterExample(param))).append("\");\n");
+                        .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
             }
         }
         sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
@@ -598,7 +599,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                 sb.append("        queryParams.put(\"").append(escapeJavaString(name)).append("\", ").append(invalidVar).append(");\n");
             } else {
                 sb.append("        queryParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                        .append(escapeJavaString(getParameterExample(param))).append("\");\n");
+                        .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
             }
         }
     }
@@ -752,57 +753,15 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         sb.append("    }\n\n");
     }
 
-    private String minimalJsonBodyLiteral(Map<String, Object> operation) {
+    private String jsonBodyLiteral(Map<String, Object> operation, Map<String, Object> spec) {
         if (!operation.containsKey("requestBody")) {
             return "\"{}\"";
         }
-        Map<String, Object> requestBody = Util.asStringObjectMap(operation.get("requestBody"));
-        if (requestBody == null) {
+        String raw = IntegrationScenarioSupport.generateRequestBodyFromSchemaRaw(operation, spec);
+        if (raw == null || raw.isBlank()) {
             return "\"{}\"";
         }
-        Map<String, Object> rbContent = Util.asStringObjectMap(requestBody.get("content"));
-        if (rbContent == null) {
-            return "\"{}\"";
-        }
-        Map<String, Object> jsonContent = Util.asStringObjectMap(rbContent.get("application/json"));
-        Map<String, Object> schema = jsonContent != null ? Util.asStringObjectMap(jsonContent.get("schema")) : null;
-        if (schema == null) {
-            return "\"{}\"";
-        }
-        Map<String, Object> props = Util.asStringObjectMap(schema.get("properties"));
-        if (props == null || props.isEmpty()) {
-            return "\"{}\"";
-        }
-        List<String> required = Util.asStringList(schema.get("required"));
-        String firstKey;
-        if (required != null && !required.isEmpty()) {
-            firstKey = required.get(0);
-        } else {
-            firstKey = props.keySet().iterator().next();
-        }
-        Map<String, Object> propSchema = Util.asStringObjectMap(props.get(firstKey));
-        String jsonValueFragment = jsonValueFragmentForSchema(propSchema);
-        return "\"{\\\"" + escapeJavaString(firstKey) + "\\\": " + jsonValueFragment + "}\"";
-    }
-
-    private String jsonValueFragmentForSchema(Map<String, Object> propSchema) {
-        if (propSchema == null) {
-            return "\\\"test\\\"";
-        }
-        String type = (String) propSchema.get("type");
-        if ("integer".equals(type) || "number".equals(type)) {
-            return "1";
-        }
-        if ("boolean".equals(type)) {
-            return "true";
-        }
-        if ("array".equals(type)) {
-            return "[]";
-        }
-        if ("object".equals(type)) {
-            return "{}";
-        }
-        return "\\\"test\\\"";
+        return "\"" + IntegrationScenarioSupport.escapeJavaString(raw) + "\"";
     }
 
     private String hamcrestSuccessStatusMatcher(Map<String, Object> responses) {
@@ -991,27 +950,6 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
     private String getOperationTag(Map<String, Object> operation) {
         List<String> tags = Util.asStringList(operation.get("tags"));
         return tags != null && !tags.isEmpty() ? tags.get(0) : "Default";
-    }
-
-    private String getParameterExample(Map<String, Object> param) {
-        if (param.containsKey("example")) {
-            return String.valueOf(param.get("example"));
-        }
-        if (param.containsKey("schema")) {
-            Map<String, Object> schema = Util.asStringObjectMap(param.get("schema"));
-            if (schema.containsKey("example")) {
-                return String.valueOf(schema.get("example"));
-            }
-            String type = (String) schema.get("type");
-            if ("string".equals(type)) {
-                return "test-value";
-            } else if ("integer".equals(type)) {
-                return "123";
-            } else if ("boolean".equals(type)) {
-                return "true";
-            }
-        }
-        return "example";
     }
 
     private String toClassName(String name) {

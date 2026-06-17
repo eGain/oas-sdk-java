@@ -454,6 +454,59 @@ public class UnitTestGeneratorTest {
         }
     }
     
+    @Test
+    public void testComposedSchemaRequestBodyIsNotEmpty(@TempDir Path tempDir) throws GenerationException, java.io.IOException {
+        Map<String, Object> spec = createSpecWithAllOfRequestBody();
+        testConfig.setTestFramework("junit5");
+
+        generator.generate(spec, tempDir.toString(), testConfig, "junit5");
+
+        Path testFile = tempDir.resolve("unit/com/example/api/FoldersApiTest.java");
+        assertTrue(Files.exists(testFile), "Expected FoldersApiTest.java");
+        String content = Files.readString(testFile);
+        assertTrue(content.contains("_ValidRequest()"), content);
+        assertFalse(content.contains(".body(\"{}\");"),
+                "composed allOf request body should not be empty object literal");
+        assertTrue(content.contains("\\\"name\\\""),
+                "createFolder body should include name field from flattened schema");
+    }
+
+    private Map<String, Object> createSpecWithAllOfRequestBody() {
+        Map<String, Object> folderProps = new java.util.LinkedHashMap<>();
+        folderProps.put("name", Map.of("type", "string"));
+        folderProps.put("description", Map.of("type", "string"));
+
+        Map<String, Object> overlay = new java.util.LinkedHashMap<>();
+        overlay.put("type", "object");
+        overlay.put("required", java.util.List.of("name"));
+        overlay.put("properties", Map.of("name", Map.of("type", "string")));
+
+        Map<String, Object> createFolder = new java.util.LinkedHashMap<>();
+        createFolder.put("allOf", java.util.List.of(overlay, Map.of("$ref", "#/components/schemas/Folder")));
+
+        Map<String, Object> folder = new java.util.LinkedHashMap<>();
+        folder.put("type", "object");
+        folder.put("properties", folderProps);
+
+        Map<String, Object> components = new java.util.LinkedHashMap<>();
+        components.put("schemas", Map.of("Folder", folder, "createFolder", createFolder));
+
+        Map<String, Object> post = new java.util.LinkedHashMap<>();
+        post.put("operationId", "createFolder");
+        post.put("summary", "Create folder");
+        post.put("tags", java.util.List.of("Folders"));
+        post.put("requestBody", Map.of("content", Map.of("application/json",
+                Map.of("schema", Map.of("$ref", "#/components/schemas/createFolder")))));
+        post.put("responses", Map.of("201", Map.of("description", "Created")));
+
+        Map<String, Object> spec = new HashMap<>();
+        spec.put("openapi", "3.0.0");
+        spec.put("info", Map.of("title", "Folders API", "version", "1.0.0"));
+        spec.put("components", components);
+        spec.put("paths", Map.of("/folders", Map.of("post", post)));
+        return spec;
+    }
+
     /**
      * Helper method to create a valid OpenAPI specification
      */
