@@ -4,8 +4,9 @@ import egain.oassdk.Util;
 import egain.oassdk.core.Constants;
 import egain.oassdk.generators.common.OpenApiPathUtils;
 import egain.oassdk.generators.common.PathOperation;
-import egain.oassdk.generators.python.auth.AuthHandlers;
 import egain.oassdk.generators.python.auth.AuthSchemeHandler;
+import egain.oassdk.generators.python.auth.AuthSelector;
+import egain.oassdk.generators.python.auth.AuthWiring;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -90,7 +91,7 @@ public final class FastAPIRouteGenerator {
 
         Set<String> strategyClasses = new LinkedHashSet<>();
         for (PathOperation op : operations) {
-            AuthWiring w = authWiringFor(op.operation());
+            AuthWiring w = authSelector().authWiringFor(op.operation());
             if (w != null) {
                 strategyClasses.add(w.strategyClass());
             }
@@ -170,7 +171,7 @@ public final class FastAPIRouteGenerator {
             }
         }
 
-        AuthWiring auth = authWiringFor(operation);
+        AuthWiring auth = authSelector().authWiringFor(operation);
         if (auth != null) {
             parameterList.add("principal: dict = Depends(" + auth.dependsExpr() + ")");
         }
@@ -204,7 +205,7 @@ public final class FastAPIRouteGenerator {
             }
             for (String method : Constants.HTTP_METHODS) {
                 if (pathItem.containsKey(method)
-                        && authWiringFor(Util.asStringObjectMap(pathItem.get(method))) != null) {
+                        && authSelector().authWiringFor(Util.asStringObjectMap(pathItem.get(method))) != null) {
                     return true;
                 }
             }
@@ -214,7 +215,7 @@ public final class FastAPIRouteGenerator {
 
     public void generateSecurity(String outputDir, String packageName, Map<String, Object> spec) throws IOException {
         String packagePath = packageName != null ? packageName.replace(".", "/") : "api";
-        Set<AuthSchemeHandler> used = usedHandlers(spec);
+        Set<AuthSchemeHandler> used = authSelector().usedHandlers(spec);
 
         StringBuilder c = new StringBuilder();
         c.append("""
@@ -288,111 +289,8 @@ public final class FastAPIRouteGenerator {
         PythonNamingUtils.writeFile(outputDir + "/" + packagePath + "/security.py", c.toString());
     }
 
-    private record AuthWiring(String dependsExpr, String strategyClass) {}
-
-    private static final class AuthSelection {
-        final AuthSchemeHandler handler;
-        final String schemeName;
-        final Map<String, Object> schemeDef;
-        final List<String> scopes;
-
-        AuthSelection(AuthSchemeHandler handler, String schemeName,
-                      Map<String, Object> schemeDef, List<String> scopes) {
-            this.handler = handler;
-            this.schemeName = schemeName;
-            this.schemeDef = schemeDef;
-            this.scopes = scopes;
-        }
-    }
-
-    private AuthWiring authWiringFor(Map<String, Object> operation) {
-        AuthSelection sel = selectAuth(operation);
-        return sel == null ? null
-                : new AuthWiring(sel.handler.dependsExpression(sel.schemeName, sel.schemeDef, sel.scopes),
-                sel.handler.strategyClassName());
-    }
-
-    private AuthSelection selectAuth(Map<String, Object> operation) {
-        if (operation == null || !operation.containsKey("security")) {
-            return null;
-        }
-        List<Map<String, Object>> securityList = Util.asStringObjectMapList(operation.get("security"));
-        if (securityList == null) {
-            return null;
-        }
-        Map<String, Map<String, Object>> securitySchemes = ctx.getSecuritySchemes();
-        for (Map<String, Object> req : securityList) {
-            if (req == null) {
-                continue;
-            }
-            for (Map.Entry<String, Object> entry : req.entrySet()) {
-                String schemeName = entry.getKey();
-                Map<String, Object> schemeDef = securitySchemes.get(schemeName);
-                List<String> scopes = new ArrayList<>();
-                if (entry.getValue() instanceof List<?> scopeList) {
-                    for (Object scope : scopeList) {
-                        if (scope instanceof String s) {
-                            s = s.replace("${SCOPE_PREFIX}", "");
-                            if (!s.isEmpty()) {
-                                scopes.add(s);
-                            }
-                        }
-                    }
-                }
-                for (AuthSchemeHandler handler : AuthHandlers.ALL) {
-                    if (handler.supports(schemeDef)) {
-                        return new AuthSelection(handler, schemeName, schemeDef, scopes);
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private Set<String> usedStrategyClasses(Map<String, Object> spec) {
-        Set<String> classes = new LinkedHashSet<>();
-        Map<String, Object> paths = Util.asStringObjectMap(spec.get("paths"));
-        if (paths == null) {
-            return classes;
-        }
-        for (Object pathItemObj : paths.values()) {
-            Map<String, Object> pathItem = Util.asStringObjectMap(pathItemObj);
-            if (pathItem == null) {
-                continue;
-            }
-            for (String method : Constants.HTTP_METHODS) {
-                if (pathItem.containsKey(method)) {
-                    AuthWiring w = authWiringFor(Util.asStringObjectMap(pathItem.get(method)));
-                    if (w != null) {
-                        classes.add(w.strategyClass());
-                    }
-                }
-            }
-        }
-        return classes;
-    }
-
-    private Set<AuthSchemeHandler> usedHandlers(Map<String, Object> spec) {
-        Set<AuthSchemeHandler> handlers = new LinkedHashSet<>();
-        Map<String, Object> paths = Util.asStringObjectMap(spec.get("paths"));
-        if (paths == null) {
-            return handlers;
-        }
-        for (Object pathItemObj : paths.values()) {
-            Map<String, Object> pathItem = Util.asStringObjectMap(pathItemObj);
-            if (pathItem == null) {
-                continue;
-            }
-            for (String method : Constants.HTTP_METHODS) {
-                if (pathItem.containsKey(method)) {
-                    AuthSelection sel = selectAuth(Util.asStringObjectMap(pathItem.get(method)));
-                    if (sel != null) {
-                        handlers.add(sel.handler);
-                    }
-                }
-            }
-        }
-        return handlers;
+    private AuthSelector authSelector() {
+        return new AuthSelector(ctx.getSecuritySchemes());
     }
 
     private String getParameterAnnotation(String in, String name) {
