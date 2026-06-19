@@ -5,7 +5,6 @@ import egain.oassdk.Util;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.generators.java.JerseySchemaOneOfXor;
 import egain.oassdk.generators.java.JerseySchemaUtils;
-import egain.oassdk.testgenerators.postman.PostmanNegativeRequestFactory;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -369,7 +368,7 @@ public final class IntegrationScenarioSupport {
                     return "550e8400-e29b-41d4-a716-446655440000";
                 }
                 if (fieldName != null) {
-                    String lower = fieldName.toLowerCase();
+                    String lower = fieldName.toLowerCase(Locale.ROOT);
                     if (lower.contains("name")) {
                         return "Test Name";
                     }
@@ -394,10 +393,10 @@ public final class IntegrationScenarioSupport {
                 }
                 return "test-string";
             case "integer":
-                if (fieldName != null && fieldName.toLowerCase().contains("age")) {
+                if (fieldName != null && fieldName.toLowerCase(Locale.ROOT).contains("age")) {
                     return "25";
                 }
-                if (fieldName != null && fieldName.toLowerCase().contains("count")) {
+                if (fieldName != null && fieldName.toLowerCase(Locale.ROOT).contains("count")) {
                     return "10";
                 }
                 return "1";
@@ -490,11 +489,11 @@ public final class IntegrationScenarioSupport {
         return buildObjectJson(flat.properties(), flat.required(), spec, visitedRefs);
     }
 
-    private static String buildOneOfBranchBody(FlattenedObjectSchema flat,
-                                               Map<String, Object> spec,
-                                               Set<String> visitedRefs,
-                                               String branchField,
-                                               boolean nestedIdRequired) {
+    static String buildOneOfBranchBody(FlattenedObjectSchema flat,
+                                       Map<String, Object> spec,
+                                       Set<String> visitedRefs,
+                                       String branchField,
+                                       boolean nestedIdRequired) {
         StringBuilder json = new StringBuilder("{");
         boolean first = true;
         for (String req : flat.required()) {
@@ -525,11 +524,11 @@ public final class IntegrationScenarioSupport {
         return json.toString();
     }
 
-    private static void appendPropertyValueForField(StringBuilder json,
-                                                    String fieldName,
-                                                    Object propSchemaObj,
-                                                    Map<String, Object> spec,
-                                                    Set<String> visitedRefs) {
+    static void appendPropertyValueForField(StringBuilder json,
+                                            String fieldName,
+                                            Object propSchemaObj,
+                                            Map<String, Object> spec,
+                                            Set<String> visitedRefs) {
         Map<String, Object> propSchema = Util.asStringObjectMap(propSchemaObj);
         if (propSchema == null) {
             json.append("\"\"");
@@ -695,112 +694,11 @@ public final class IntegrationScenarioSupport {
     }
 
     public static String generateMissingRequiredFieldsBodyRaw(Map<String, Object> schema, Map<String, Object> spec) {
-        if (schema == null || schema.isEmpty()) {
-            return "{}";
-        }
-        FlattenedObjectSchema flat = flattenObjectSchema(schema, spec);
-        Map<String, Object> properties = flat.properties();
-        List<String> requiredFields = flat.required();
-        if (properties == null || properties.isEmpty()) {
-            return "{}";
-        }
-
-        StringBuilder json = new StringBuilder("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : properties.entrySet()) {
-            String fieldName = entry.getKey();
-            if (requiredFields.contains(fieldName)) {
-                continue;
-            }
-            Map<String, Object> propSchema = Util.asStringObjectMap(entry.getValue());
-            if (propSchema != null) {
-                Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
-                if (effective != null) {
-                    propSchema = effective;
-                }
-                if (Boolean.TRUE.equals(propSchema.get("readOnly"))) {
-                    continue;
-                }
-            }
-            if (!first) {
-                json.append(", ");
-            }
-            first = false;
-
-            String propType = propSchema != null ? (String) propSchema.get("type") : "string";
-            String propFormat = propSchema != null ? (String) propSchema.get("format") : null;
-
-            json.append('"').append(escapeJsonString(fieldName)).append("\": ");
-            if ("integer".equals(propType) || "number".equals(propType)) {
-                json.append(generateMockValue(fieldName, propType, propFormat));
-            } else if ("boolean".equals(propType)) {
-                json.append(generateMockValue(fieldName, propType, propFormat));
-            } else if ("object".equals(propType) || (propSchema != null && propSchema.containsKey("properties"))) {
-                json.append(generateJsonFromSchemaRaw(propSchema, spec));
-            } else {
-                json.append('"').append(escapeJsonString(generateMockValue(fieldName, propType, propFormat))).append('"');
-            }
-        }
-        json.append("}");
-        return json.toString();
+        return NegativeScenarioBuilder.generateMissingRequiredFieldsBodyRaw(schema, spec);
     }
 
     public static String generateWrongTypesBodyRaw(Map<String, Object> schema, Map<String, Object> spec) {
-        if (schema == null || schema.isEmpty()) {
-            return "{\"invalidField\": \"not-a-number\"}";
-        }
-        FlattenedObjectSchema flat = flattenObjectSchema(schema, spec);
-        Map<String, Object> properties = flat.properties();
-        if (properties == null || properties.isEmpty()) {
-            return "{\"invalidField\": \"not-a-number\"}";
-        }
-
-        StringBuilder json = new StringBuilder("{");
-        boolean first = true;
-        int count = 0;
-        for (Map.Entry<String, Object> entry : properties.entrySet()) {
-            if (count >= 5) {
-                break;
-            }
-            String fieldName = entry.getKey();
-            Map<String, Object> propSchema = Util.asStringObjectMap(entry.getValue());
-            if (propSchema != null) {
-                Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
-                if (effective != null) {
-                    propSchema = effective;
-                }
-                if (Boolean.TRUE.equals(propSchema.get("readOnly"))) {
-                    continue;
-                }
-            }
-            if (!first) {
-                json.append(", ");
-            }
-            first = false;
-            count++;
-
-            String propType = propSchema != null ? (String) propSchema.get("type") : "string";
-
-            json.append('"').append(escapeJsonString(fieldName)).append("\": ");
-            json.append(wrongTypeJsonFragment(propType));
-        }
-        json.append("}");
-        return json.toString();
-    }
-
-    private static String wrongTypeJsonFragment(String propType) {
-        if ("string".equals(propType)) {
-            return "12345";
-        } else if ("integer".equals(propType) || "number".equals(propType)) {
-            return "\"not-a-number\"";
-        } else if ("boolean".equals(propType)) {
-            return "\"not-a-boolean\"";
-        } else if ("array".equals(propType)) {
-            return "\"not-an-array\"";
-        } else if ("object".equals(propType)) {
-            return "\"not-an-object\"";
-        }
-        return "null";
+        return NegativeScenarioBuilder.generateWrongTypesBodyRaw(schema, spec);
     }
 
     /**
@@ -809,271 +707,29 @@ public final class IntegrationScenarioSupport {
     public static List<PerFieldInvalidBody> buildPerFieldInvalidBodies(Map<String, Object> schema,
                                                                        Map<String, Object> spec,
                                                                        int maxFields) {
-        List<PerFieldInvalidBody> out = new ArrayList<>();
-        if (schema == null || maxFields <= 0) {
-            return out;
-        }
-        FlattenedObjectSchema flat = flattenObjectSchema(schema, spec);
-        Map<String, Object> properties = flat.properties();
-        if (properties == null || properties.isEmpty()) {
-            return out;
-        }
-
-        for (Map.Entry<String, Object> entry : properties.entrySet()) {
-            if (out.size() >= maxFields) {
-                break;
-            }
-            String fieldName = entry.getKey();
-            Map<String, Object> propSchema = Util.asStringObjectMap(entry.getValue());
-            if (propSchema != null) {
-                Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
-                if (effective != null) {
-                    propSchema = effective;
-                }
-                if (Boolean.TRUE.equals(propSchema.get("readOnly"))) {
-                    continue;
-                }
-            }
-            if (propSchema == null) {
-                continue;
-            }
-            String invalidFragment = invalidValueJsonFragment(propSchema);
-            String body = generateJsonFromSchemaRawWithFieldOverride(flat, spec, fieldName, invalidFragment);
-            out.add(new PerFieldInvalidBody(fieldName, body));
-        }
-        return out;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static String invalidValueJsonFragment(Map<String, Object> propSchema) {
-        if (propSchema == null) {
-            return "null";
-        }
-        String propType = (String) propSchema.get("type");
-        List<?> enumVals = propSchema.get("enum") instanceof List<?> l ? l : null;
-        if (enumVals != null && !enumVals.isEmpty()) {
-            return "\"__invalid_enum_value_oas_sdk__\"";
-        }
-        if ("string".equals(propType)) {
-            if (propSchema.containsKey("pattern")) {
-                return "\"!!!pattern-violation!!!\"";
-            }
-            if (propSchema.get("minLength") instanceof Number n && n.intValue() > 0) {
-                return "\"\"";
-            }
-            if (propSchema.get("maxLength") instanceof Number n && n.intValue() >= 0) {
-                return "\"" + "x".repeat(n.intValue() + 1) + "\"";
-            }
-            return "12345";
-        }
-        if ("integer".equals(propType) || "number".equals(propType)) {
-            if (propSchema.containsKey("minimum")) {
-                long min = toLong(propSchema.get("minimum"), 0);
-                boolean excl = Boolean.TRUE.equals(propSchema.get("exclusiveMinimum"));
-                long bad = excl ? min : min - 1;
-                return String.valueOf(bad);
-            }
-            if (propSchema.containsKey("maximum")) {
-                long max = toLong(propSchema.get("maximum"), 0);
-                boolean excl = Boolean.TRUE.equals(propSchema.get("exclusiveMaximum"));
-                long bad = excl ? max : max + 1;
-                return String.valueOf(bad);
-            }
-            return "\"not-a-number\"";
-        }
-        if ("boolean".equals(propType)) {
-            return "\"not-a-boolean\"";
-        }
-        if ("array".equals(propType)) {
-            return "\"not-an-array\"";
-        }
-        if ("object".equals(propType)) {
-            return "\"not-an-object\"";
-        }
-        return "null";
-    }
-
-    private static long toLong(Object o, long dflt) {
-        if (o instanceof Number n) {
-            return n.longValue();
-        }
-        try {
-            return Long.parseLong(String.valueOf(o));
-        } catch (NumberFormatException e) {
-            return dflt;
-        }
-    }
-
-    /**
-     * Build object JSON like {@link #generateJsonFromSchemaRaw} but replace one field's value with {@code invalidFragment}
-     * (raw JSON literal fragment, e.g. {@code "bad"} or {@code 123}).
-     */
-    @SuppressWarnings("unchecked")
-    private static String generateJsonFromSchemaRawWithFieldOverride(FlattenedObjectSchema flat,
-                                                                     Map<String, Object> spec,
-                                                                     String overrideField,
-                                                                     String invalidFragment) {
-        Map<String, Object> properties = flat.properties();
-        if (properties == null || properties.isEmpty()) {
-            return "{}";
-        }
-
-        StringBuilder json = new StringBuilder("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : properties.entrySet()) {
-            String fieldName = entry.getKey();
-            Map<String, Object> propSchema = Util.asStringObjectMap(entry.getValue());
-            if (propSchema != null) {
-                Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
-                if (effective != null) {
-                    propSchema = effective;
-                }
-                if (Boolean.TRUE.equals(propSchema.get("readOnly")) && !fieldName.equals(overrideField)) {
-                    continue;
-                }
-            }
-            if (!first) {
-                json.append(", ");
-            }
-            first = false;
-
-            json.append('"').append(escapeJsonString(fieldName)).append("\": ");
-
-            if (fieldName.equals(overrideField)) {
-                json.append(invalidFragment);
-                continue;
-            }
-
-            appendPropertyValueForField(json, fieldName, propSchema, spec, new HashSet<>());
-        }
-        json.append("}");
-        return json.toString();
+        return NegativeScenarioBuilder.buildPerFieldInvalidBodies(schema, spec, maxFields);
     }
 
     /**
      * Build one valid JSON body per simple two-branch oneOf XOR variant.
      */
     public static List<OneOfVariantBody> buildOneOfVariantBodies(Map<String, Object> schema, Map<String, Object> spec) {
-        List<OneOfVariantBody> out = new ArrayList<>();
-        if (schema == null || spec == null) {
-            return out;
-        }
-        FlattenedObjectSchema flat = flattenObjectSchema(schema, spec);
-        JerseySchemaOneOfXor.SimpleOneOfXorInfo xor = JerseySchemaOneOfXor.findSimpleOneOfXorInfo(
-                flat.sourceSchema(), spec, new IdentityHashMap<>(), 0);
-        if (xor == null) {
-            return out;
-        }
-        out.add(new OneOfVariantBody(
-                capitalizeLabel(xor.sortedJson0()),
-                buildOneOfBranchBody(flat, spec, new HashSet<>(), xor.sortedJson0(), xor.nestedIdRequiredForSorted0())));
-        out.add(new OneOfVariantBody(
-                capitalizeLabel(xor.sortedJson1()),
-                buildOneOfBranchBody(flat, spec, new HashSet<>(), xor.sortedJson1(), xor.nestedIdRequiredForSorted1())));
-        return out;
+        return IntegrationScenarioCatalog.buildOneOfVariantBodies(schema, spec);
     }
 
     /**
      * Negative bodies for oneOf XOR: missing both branches and including both branches.
      */
     public static List<OneOfXorNegativeBody> buildOneOfXorNegativeBodies(Map<String, Object> schema, Map<String, Object> spec) {
-        List<OneOfXorNegativeBody> out = new ArrayList<>();
-        if (schema == null || spec == null) {
-            return out;
-        }
-        FlattenedObjectSchema flat = flattenObjectSchema(schema, spec);
-        JerseySchemaOneOfXor.SimpleOneOfXorInfo xor = JerseySchemaOneOfXor.findSimpleOneOfXorInfo(
-                flat.sourceSchema(), spec, new IdentityHashMap<>(), 0);
-        if (xor == null) {
-            return out;
-        }
-
-        StringBuilder missing = new StringBuilder("{");
-        boolean first = true;
-        for (String req : flat.required()) {
-            if (req.equals(xor.sortedJson0()) || req.equals(xor.sortedJson1())) {
-                continue;
-            }
-            if (!flat.properties().containsKey(req)) {
-                continue;
-            }
-            if (!first) {
-                missing.append(", ");
-            }
-            first = false;
-            missing.append('"').append(escapeJsonString(req)).append("\": ");
-            appendPropertyValueForField(missing, req, flat.properties().get(req), spec, new HashSet<>());
-        }
-        missing.append("}");
-        out.add(new OneOfXorNegativeBody("MissingBranches", missing.toString()));
-
-        String branch0 = buildOneOfBranchBody(flat, spec, new HashSet<>(), xor.sortedJson0(), xor.nestedIdRequiredForSorted0());
-        String branch1 = buildOneOfBranchBody(flat, spec, new HashSet<>(), xor.sortedJson1(), xor.nestedIdRequiredForSorted1());
-        String both = mergeJsonObjects(branch0, branch1);
-        out.add(new OneOfXorNegativeBody("BothBranches", both));
-        return out;
-    }
-
-    private static String mergeJsonObjects(String json0, String json1) {
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> m0 = OBJECT_MAPPER.readValue(json0, Map.class);
-            @SuppressWarnings("unchecked")
-            Map<String, Object> m1 = OBJECT_MAPPER.readValue(json1, Map.class);
-            Map<String, Object> merged = new LinkedHashMap<>(m0);
-            merged.putAll(m1);
-            return OBJECT_MAPPER.writeValueAsString(merged);
-        } catch (Exception e) {
-            return json0;
-        }
-    }
-
-    private static String capitalizeLabel(String name) {
-        if (name == null || name.isEmpty()) {
-            return "Variant";
-        }
-        return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1);
+        return IntegrationScenarioCatalog.buildOneOfXorNegativeBodies(schema, spec);
     }
 
     /**
      * Heuristic declared-error tests (e.g. 412 when a query param is absent).
      */
-    @SuppressWarnings("unchecked")
     public static List<DeclaredErrorCase> buildDeclaredErrorCases(Map<String, Object> operation,
                                                                   Map<String, String> baseQueryParams) {
-        List<DeclaredErrorCase> out = new ArrayList<>();
-        if (operation == null) {
-            return out;
-        }
-        Map<String, Object> responses = Util.asStringObjectMap(operation.get("responses"));
-        if (responses == null || !responses.containsKey("412")) {
-            return out;
-        }
-        Map<String, Object> resp412 = Util.asStringObjectMap(responses.get("412"));
-        String description = resp412 != null ? String.valueOf(resp412.getOrDefault("description", "")) : "";
-        if (description.isBlank()) {
-            return out;
-        }
-        List<Map<String, Object>> parameters = operation.containsKey("parameters")
-                ? Util.asStringObjectMapList(operation.get("parameters"))
-                : List.of();
-        for (Map<String, Object> param : parameters) {
-            if (!"query".equals(param.get("in"))) {
-                continue;
-            }
-            String paramName = (String) param.get("name");
-            if (paramName == null || !description.toLowerCase(Locale.ROOT).contains(paramName.toLowerCase(Locale.ROOT))) {
-                continue;
-            }
-            Map<String, String> query = new LinkedHashMap<>();
-            if (baseQueryParams != null) {
-                query.putAll(baseQueryParams);
-            }
-            query.remove(paramName);
-            out.add(new DeclaredErrorCase("PreconditionFailed_" + paramName, query, 412));
-            break;
-        }
-        return out;
+        return IntegrationScenarioCatalog.buildDeclaredErrorCases(operation, baseQueryParams);
     }
 
     /**
@@ -1090,7 +746,7 @@ public final class IntegrationScenarioSupport {
         return flattenedToObjectSchema(flat);
     }
 
-    public static List<Map<String, Object>> toPostmanQueryList(Map<String, String> queryParams) {
+    static List<Map<String, Object>> toPostmanQueryList(Map<String, String> queryParams) {
         List<Map<String, Object>> list = new ArrayList<>();
         if (queryParams == null) {
             return list;
@@ -1104,7 +760,7 @@ public final class IntegrationScenarioSupport {
         return list;
     }
 
-    public static Map<String, String> queryListToMap(List<Map<String, Object>> entries) {
+    static Map<String, String> queryListToMap(List<Map<String, Object>> entries) {
         Map<String, String> m = new LinkedHashMap<>();
         if (entries == null) {
             return m;
@@ -1124,41 +780,15 @@ public final class IntegrationScenarioSupport {
     }
 
     /**
-     * Parameter-level negative cases aligned with {@link PostmanNegativeRequestFactory}.
+     * Parameter-level negative cases aligned with {@link egain.oassdk.testgenerators.postman.PostmanNegativeRequestFactory}.
      */
     public static List<IntegrationParamNegativeCase> buildParamNegativeCases(String openApiPath,
                                                                              Map<String, Object> operation,
                                                                              Map<String, String> basePathParams,
                                                                              Map<String, String> baseQueryParams,
                                                                              int maxCases) {
-        List<IntegrationParamNegativeCase> out = new ArrayList<>();
-        if (maxCases <= 0 || operation == null) {
-            return out;
-        }
-        Map<String, String> basePath = basePathParams != null ? new LinkedHashMap<>(basePathParams) : new LinkedHashMap<>();
-        Map<String, String> baseQuery = baseQueryParams != null ? new LinkedHashMap<>(baseQueryParams) : new LinkedHashMap<>();
-        List<Map<String, Object>> positive = toPostmanQueryList(baseQuery);
-
-        List<PostmanNegativeRequestFactory.NegativeCase> raw = PostmanNegativeRequestFactory.buildCases(
-                openApiPath, operation, positive, maxCases, 400);
-
-        for (PostmanNegativeRequestFactory.NegativeCase nc : raw) {
-            Map<String, String> path = new LinkedHashMap<>(basePath);
-            if (nc.pathLiterals != null) {
-                path.putAll(nc.pathLiterals);
-            }
-            Map<String, String> query = queryListToMap(
-                    nc.queryEntries != null ? nc.queryEntries : List.of());
-            List<Integer> statuses = new ArrayList<>();
-            if (nc.expectedStatusOverride != null) {
-                statuses.add(nc.expectedStatusOverride);
-            } else {
-                statuses.add(400);
-                statuses.add(422);
-            }
-            out.add(new IntegrationParamNegativeCase(nc.name, path, query, statuses));
-        }
-        return out;
+        return NegativeScenarioBuilder.buildParamNegativeCases(
+                openApiPath, operation, basePathParams, baseQueryParams, maxCases);
     }
 
     public static final class PerFieldInvalidBody {
@@ -1188,53 +818,13 @@ public final class IntegrationScenarioSupport {
         }
     }
 
-    @SuppressWarnings("unchecked")
     public static Map<String, Object> resolveResponseSchema(String statusCode,
                                                             Map<String, Object> responses,
                                                             Map<String, Object> spec) {
-        if (responses == null || !responses.containsKey(statusCode)) {
-            return null;
-        }
-        Map<String, Object> responseObj = Util.asStringObjectMap(responses.get(statusCode));
-        if (responseObj == null) {
-            return null;
-        }
-        if (responseObj.containsKey("$ref")) {
-            responseObj = resolveRef((String) responseObj.get("$ref"), spec);
-            if (responseObj == null) {
-                return null;
-            }
-        }
-        Map<String, Object> content = Util.asStringObjectMap(responseObj.get("content"));
-        if (content == null) {
-            return null;
-        }
-        Map<String, Object> mediaType = Util.asStringObjectMap(content.get("application/json"));
-        if (mediaType == null) {
-            for (Object v : content.values()) {
-                mediaType = Util.asStringObjectMap(v);
-                if (mediaType != null) {
-                    break;
-                }
-            }
-        }
-        if (mediaType == null) {
-            return null;
-        }
-        Map<String, Object> schema = Util.asStringObjectMap(mediaType.get("schema"));
-        if (schema == null) {
-            return null;
-        }
-        if (schema.containsKey("$ref")) {
-            Map<String, Object> resolved = resolveRef((String) schema.get("$ref"), spec);
-            if (resolved != null) {
-                schema = resolved;
-            }
-        }
-        return schema;
+        return IntegrationScenarioCatalog.resolveResponseSchema(statusCode, responses, spec);
     }
 
     public static List<String> standardErrorStatusCodes() {
-        return List.of("400", "401", "403", "404", "422");
+        return IntegrationScenarioCatalog.standardErrorStatusCodes();
     }
 }
