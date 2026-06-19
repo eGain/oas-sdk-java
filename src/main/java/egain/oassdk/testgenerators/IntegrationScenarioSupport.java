@@ -3,8 +3,8 @@ package egain.oassdk.testgenerators;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import egain.oassdk.Util;
 import egain.oassdk.config.TestConfig;
-import egain.oassdk.generators.java.JerseySchemaOneOfXor;
-import egain.oassdk.generators.java.JerseySchemaUtils;
+import egain.oassdk.generators.common.OpenApiOneOfXor;
+import egain.oassdk.generators.common.OpenApiSchemaUtils;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -82,7 +82,7 @@ public final class IntegrationScenarioSupport {
         }
         Map<String, Object> properties = new LinkedHashMap<>();
         List<String> required = new ArrayList<>();
-        JerseySchemaUtils.mergeSchemaProperties(node, properties, required, spec);
+        OpenApiSchemaUtils.mergeSchemaProperties(node, properties, required, spec);
         return new FlattenedObjectSchema(properties, required, node);
     }
 
@@ -481,7 +481,7 @@ public final class IntegrationScenarioSupport {
     private static String generateJsonFromFlattened(FlattenedObjectSchema flat,
                                                     Map<String, Object> spec,
                                                     Set<String> visitedRefs) {
-        JerseySchemaOneOfXor.SimpleOneOfXorInfo xor = JerseySchemaOneOfXor.findSimpleOneOfXorInfo(
+        OpenApiOneOfXor.SimpleOneOfXorInfo xor = OpenApiOneOfXor.findSimpleOneOfXorInfo(
                 flat.sourceSchema(), spec, new IdentityHashMap<>(), 0);
         if (xor != null) {
             return buildOneOfBranchBody(flat, spec, visitedRefs, xor.sortedJson1(), xor.nestedIdRequiredForSorted1());
@@ -534,7 +534,7 @@ public final class IntegrationScenarioSupport {
             json.append("\"\"");
             return;
         }
-        Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
+        Map<String, Object> effective = OpenApiSchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
         if (effective != null) {
             propSchema = effective;
         }
@@ -554,7 +554,7 @@ public final class IntegrationScenarioSupport {
             if (propSchema == null) {
                 continue;
             }
-            Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
+            Map<String, Object> effective = OpenApiSchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
             if (effective != null) {
                 propSchema = effective;
             }
@@ -596,7 +596,7 @@ public final class IntegrationScenarioSupport {
             visitedRefs.add(propRef);
         }
         try {
-            Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
+            Map<String, Object> effective = OpenApiSchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
             if (effective != null) {
                 propSchema = effective;
             }

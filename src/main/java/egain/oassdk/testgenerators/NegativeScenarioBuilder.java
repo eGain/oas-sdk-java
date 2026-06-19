@@ -1,7 +1,7 @@
 package egain.oassdk.testgenerators;
 
 import egain.oassdk.Util;
-import egain.oassdk.generators.java.JerseySchemaUtils;
+import egain.oassdk.generators.common.OpenApiSchemaUtils;
 import egain.oassdk.testgenerators.postman.PostmanNegativeRequestFactory;
 
 import java.util.ArrayList;
@@ -38,7 +38,7 @@ final class NegativeScenarioBuilder {
             }
             Map<String, Object> propSchema = Util.asStringObjectMap(entry.getValue());
             if (propSchema != null) {
-                Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
+                Map<String, Object> effective = OpenApiSchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
                 if (effective != null) {
                     propSchema = effective;
                 }
@@ -90,7 +90,7 @@ final class NegativeScenarioBuilder {
             String fieldName = entry.getKey();
             Map<String, Object> propSchema = Util.asStringObjectMap(entry.getValue());
             if (propSchema != null) {
-                Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
+                Map<String, Object> effective = OpenApiSchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
                 if (effective != null) {
                     propSchema = effective;
                 }
@@ -133,7 +133,7 @@ final class NegativeScenarioBuilder {
             String fieldName = entry.getKey();
             Map<String, Object> propSchema = Util.asStringObjectMap(entry.getValue());
             if (propSchema != null) {
-                Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
+                Map<String, Object> effective = OpenApiSchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
                 if (effective != null) {
                     propSchema = effective;
                 }
@@ -277,7 +277,7 @@ final class NegativeScenarioBuilder {
             String fieldName = entry.getKey();
             Map<String, Object> propSchema = Util.asStringObjectMap(entry.getValue());
             if (propSchema != null) {
-                Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
+                Map<String, Object> effective = OpenApiSchemaUtils.resolveCompositionToEffectiveSchema(propSchema, spec);
                 if (effective != null) {
                     propSchema = effective;
                 }

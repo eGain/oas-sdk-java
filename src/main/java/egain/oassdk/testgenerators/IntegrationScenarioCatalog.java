@@ -2,7 +2,7 @@ package egain.oassdk.testgenerators;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import egain.oassdk.Util;
-import egain.oassdk.generators.java.JerseySchemaOneOfXor;
+import egain.oassdk.generators.common.OpenApiOneOfXor;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -29,7 +29,7 @@ final class IntegrationScenarioCatalog {
             return out;
         }
         IntegrationScenarioSupport.FlattenedObjectSchema flat = IntegrationScenarioSupport.flattenObjectSchema(schema, spec);
-        JerseySchemaOneOfXor.SimpleOneOfXorInfo xor = JerseySchemaOneOfXor.findSimpleOneOfXorInfo(
+        OpenApiOneOfXor.SimpleOneOfXorInfo xor = OpenApiOneOfXor.findSimpleOneOfXorInfo(
                 flat.sourceSchema(), spec, new IdentityHashMap<>(), 0);
         if (xor == null) {
             return out;
@@ -52,7 +52,7 @@ final class IntegrationScenarioCatalog {
             return out;
         }
         IntegrationScenarioSupport.FlattenedObjectSchema flat = IntegrationScenarioSupport.flattenObjectSchema(schema, spec);
-        JerseySchemaOneOfXor.SimpleOneOfXorInfo xor = JerseySchemaOneOfXor.findSimpleOneOfXorInfo(
+        OpenApiOneOfXor.SimpleOneOfXorInfo xor = OpenApiOneOfXor.findSimpleOneOfXorInfo(
                 flat.sourceSchema(), spec, new IdentityHashMap<>(), 0);
         if (xor == null) {
             return out;
