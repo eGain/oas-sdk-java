@@ -5,6 +5,7 @@ import egain.oassdk.Util;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.Constants;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.TestGenerator;
 
@@ -40,7 +41,7 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
             Files.createDirectories(outputPath);
 
             // Extract API information
-            String apiTitle = getAPITitle(spec);
+            String apiTitle = TestSpecUtils.getApiTitle(spec);
 
             // Generate mock data for all schemas
             generateMockDataForSchemas(spec, outputPath.toString(), apiTitle);
@@ -675,11 +676,6 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
     }
 
     // Helper methods
-
-    private String getAPITitle(Map<String, Object> spec) {
-        Map<String, Object> info = Util.asStringObjectMap(spec.get("info"));
-        return info != null ? (String) info.get("title") : "API";
-    }
 
     @Override
     public String getName() {

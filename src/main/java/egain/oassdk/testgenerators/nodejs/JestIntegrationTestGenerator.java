@@ -4,6 +4,7 @@ import egain.oassdk.Util;
 import egain.oassdk.core.Constants;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 import egain.oassdk.testgenerators.TestGenerator;
@@ -34,10 +35,10 @@ public class JestIntegrationTestGenerator implements TestGenerator, Configurable
             Files.createDirectories(outputPath);
 
             // Extract API information
-            String apiTitle = getAPITitle(spec);
+            String apiTitle = TestSpecUtils.getApiTitle(spec);
 
             // Get base URL from servers
-            String baseUrl = getBaseUrl(spec);
+            String baseUrl = TestSpecUtils.getBaseUrl(spec);
 
             // Generate test files for each endpoint
             generateTestFiles(spec, outputPath.toString(), apiTitle, baseUrl);
@@ -598,24 +599,6 @@ public class JestIntegrationTestGenerator implements TestGenerator, Configurable
     }
 
     // Helper methods
-    private String getAPITitle(Map<String, Object> spec) {
-        Map<String, Object> info = Util.asStringObjectMap(spec.get("info"));
-        return info != null ? (String) info.get("title") : "API";
-    }
-
-    private String getBaseUrl(Map<String, Object> spec) {
-        if (spec.containsKey("servers")) {
-            List<Map<String, Object>> servers = Util.asStringObjectMapList(spec.get("servers"));
-            if (servers != null && !servers.isEmpty()) {
-                String url = (String) servers.get(0).get("url");
-                if (url != null) {
-                    return url;
-                }
-            }
-        }
-        return "http://localhost:8080";
-    }
-
     private String getOperationTag(Map<String, Object> operation) {
         List<String> tags = Util.asStringList(operation.get("tags"));
         return tags != null && !tags.isEmpty() ? tags.get(0) : "Default";

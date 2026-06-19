@@ -3,6 +3,7 @@ package egain.oassdk.testgenerators.nfr;
 import egain.oassdk.Util;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.TestGenerator;
 
@@ -32,8 +33,8 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
             Files.createDirectories(outputPath);
 
             // Extract API information
-            String apiTitle = getAPITitle(spec);
-            String baseUrl = getBaseUrl(spec);
+            String apiTitle = TestSpecUtils.getApiTitle(spec);
+            String baseUrl = TestSpecUtils.getBaseUrl(spec);
             String basePackage = "com.example.api";
             if (config != null && config.getAdditionalProperties() != null) {
                 Object packageNameObj = config.getAdditionalProperties().get("packageName");
@@ -321,25 +322,6 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
             return "";
         }
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
-    }
-
-    // Helper methods
-    private String getAPITitle(Map<String, Object> spec) {
-        Map<String, Object> info = Util.asStringObjectMap(spec.get("info"));
-        return info != null ? (String) info.get("title") : "API";
-    }
-
-    private String getBaseUrl(Map<String, Object> spec) {
-        if (spec.containsKey("servers")) {
-            List<Map<String, Object>> servers = Util.asStringObjectMapList(spec.get("servers"));
-            if (servers != null && !servers.isEmpty()) {
-                String url = (String) servers.get(0).get("url");
-                if (url != null) {
-                    return url;
-                }
-            }
-        }
-        return "http://localhost:8080";
     }
 
     private String sanitizePath(String path) {

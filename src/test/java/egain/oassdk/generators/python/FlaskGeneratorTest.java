@@ -4,6 +4,7 @@ import egain.oassdk.config.GeneratorConfig;
 import egain.oassdk.core.exceptions.GenerationException;
 import egain.oassdk.generators.CodeGenerator;
 import egain.oassdk.generators.ConfigurableGenerator;
+import egain.oassdk.testgenerators.common.OpenApiTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
@@ -22,13 +23,7 @@ public class FlaskGeneratorTest {
     public void setUp() {
         generator = new FlaskGenerator();
         
-        // Create minimal OpenAPI spec
-        openApiSpec = new HashMap<>();
-        Map<String, Object> info = new HashMap<>();
-        info.put("title", "Test API");
-        info.put("version", "1.0.0");
-        openApiSpec.put("info", info);
-        openApiSpec.put("paths", new HashMap<>());
+        openApiSpec = OpenApiTestFixtures.minimalSpec();
     }
     
     @Test
