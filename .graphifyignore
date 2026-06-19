@@ -1,0 +1,12 @@
+# Exclude docs and non-code assets from semantic extraction (code-only graph; no LLM API key required)
+*.md
+*.mdx
+*.yaml
+*.yml
+*.html
+*.txt
+*.rst
+*.ftl
+*.xml
+LICENSE
+CHANGELOG.md

@@ -23,3 +23,6 @@ logs/
 dependency-reduced-pom.xml
 /generated
 .claude/settings.local.json
+
+# Graphify local cost tracking (team shares graphify-out/ otherwise)
+graphify-out/cost.json
