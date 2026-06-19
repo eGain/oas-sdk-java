@@ -14,184 +14,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Unit tests for JerseySchemaUtils static utility methods.
+ * Unit tests for JerseySchemaUtils schema merge and composition helpers.
  */
-class JerseySchemaUtilsTest {
-
-    // -----------------------------------------------------------------------
-    //  isSchemaFlagTrue
-    // -----------------------------------------------------------------------
-
-    @Test
-    @DisplayName("isSchemaFlagTrue returns true for Boolean TRUE value")
-    void isSchemaFlagTrue_booleanTrue() {
-        Map<String, Object> schema = Map.of("readOnly", Boolean.TRUE);
-        assertTrue(JerseySchemaUtils.isSchemaFlagTrue(schema, "readOnly"));
-    }
-
-    @Test
-    @DisplayName("isSchemaFlagTrue returns true for string 'true'")
-    void isSchemaFlagTrue_stringTrue() {
-        Map<String, Object> schema = Map.of("readOnly", "true");
-        assertTrue(JerseySchemaUtils.isSchemaFlagTrue(schema, "readOnly"));
-    }
-
-    @Test
-    @DisplayName("isSchemaFlagTrue returns false for Boolean FALSE value")
-    void isSchemaFlagTrue_booleanFalse() {
-        Map<String, Object> schema = Map.of("readOnly", Boolean.FALSE);
-        assertFalse(JerseySchemaUtils.isSchemaFlagTrue(schema, "readOnly"));
-    }
-
-    @Test
-    @DisplayName("isSchemaFlagTrue returns false when key is absent")
-    void isSchemaFlagTrue_absent() {
-        Map<String, Object> schema = Map.of("type", "string");
-        assertFalse(JerseySchemaUtils.isSchemaFlagTrue(schema, "readOnly"));
-    }
-
-    @Test
-    @DisplayName("isSchemaFlagTrue returns false for null schema")
-    void isSchemaFlagTrue_nullSchema() {
-        assertFalse(JerseySchemaUtils.isSchemaFlagTrue(null, "readOnly"));
-    }
-
-    // -----------------------------------------------------------------------
-    //  getSchemaNameFromRef
-    // -----------------------------------------------------------------------
-
-    @Test
-    @DisplayName("getSchemaNameFromRef extracts name from $ref")
-    void getSchemaNameFromRef_dollarRef() {
-        Map<String, Object> schema = Map.of("$ref", "#/components/schemas/User");
-        assertEquals("User", JerseySchemaUtils.getSchemaNameFromRef(schema));
-    }
-
-    @Test
-    @DisplayName("getSchemaNameFromRef extracts name from x-resolved-ref")
-    void getSchemaNameFromRef_resolvedRef() {
-        Map<String, Object> schema = Map.of("x-resolved-ref", "#/components/schemas/UserView");
-        assertEquals("UserView", JerseySchemaUtils.getSchemaNameFromRef(schema));
-    }
-
-    @Test
-    @DisplayName("getSchemaNameFromRef returns null when no $ref")
-    void getSchemaNameFromRef_noRef() {
-        Map<String, Object> schema = Map.of("type", "string");
-        assertNull(JerseySchemaUtils.getSchemaNameFromRef(schema));
-    }
-
-    @Test
-    @DisplayName("getSchemaNameFromRef returns null for null schema")
-    void getSchemaNameFromRef_nullSchema() {
-        assertNull(JerseySchemaUtils.getSchemaNameFromRef(null));
-    }
-
-    @Test
-    @DisplayName("getSchemaNameFromRef returns null for non-component ref")
-    void getSchemaNameFromRef_nonComponentRef() {
-        Map<String, Object> schema = Map.of("$ref", "#/definitions/User");
-        assertNull(JerseySchemaUtils.getSchemaNameFromRef(schema));
-    }
-
-    // -----------------------------------------------------------------------
-    //  deriveSchemaNameFromExternalRef
-    // -----------------------------------------------------------------------
-
-    @Test
-    @DisplayName("deriveSchemaNameFromExternalRef extracts name from yaml file ref")
-    void deriveSchemaNameFromExternalRef_yaml() {
-        assertEquals("User", JerseySchemaUtils.deriveSchemaNameFromExternalRef("./User.yaml"));
-    }
-
-    @Test
-    @DisplayName("deriveSchemaNameFromExternalRef handles path with directories")
-    void deriveSchemaNameFromExternalRef_withPath() {
-        assertEquals("User", JerseySchemaUtils.deriveSchemaNameFromExternalRef("models/v3/User.yaml"));
-    }
-
-    @Test
-    @DisplayName("deriveSchemaNameFromExternalRef handles yml extension")
-    void deriveSchemaNameFromExternalRef_yml() {
-        assertEquals("Order", JerseySchemaUtils.deriveSchemaNameFromExternalRef("Order.yml"));
-    }
-
-    @Test
-    @DisplayName("deriveSchemaNameFromExternalRef handles json extension")
-    void deriveSchemaNameFromExternalRef_json() {
-        assertEquals("Product", JerseySchemaUtils.deriveSchemaNameFromExternalRef("Product.json"));
-    }
-
-    @Test
-    @DisplayName("deriveSchemaNameFromExternalRef returns null for null input")
-    void deriveSchemaNameFromExternalRef_null() {
-        assertNull(JerseySchemaUtils.deriveSchemaNameFromExternalRef(null));
-    }
-
-    @Test
-    @DisplayName("deriveSchemaNameFromExternalRef returns null for empty input")
-    void deriveSchemaNameFromExternalRef_empty() {
-        assertNull(JerseySchemaUtils.deriveSchemaNameFromExternalRef(""));
-    }
-
-    // -----------------------------------------------------------------------
-    //  resolveRefInSchema
-    // -----------------------------------------------------------------------
-
-    @Test
-    @DisplayName("resolveRefInSchema resolves valid $ref to component schema")
-    void resolveRefInSchema_valid() {
-        Map<String, Object> userSchema = new LinkedHashMap<>();
-        userSchema.put("type", "object");
-        userSchema.put("properties", Map.of("name", Map.of("type", "string")));
-
-        // Build spec with mutable maps so Util.asStringObjectMap returns the original objects
-        Map<String, Object> schemas = new LinkedHashMap<>();
-        schemas.put("User", userSchema);
-        Map<String, Object> components = new LinkedHashMap<>();
-        components.put("schemas", schemas);
-        Map<String, Object> spec = new LinkedHashMap<>();
-        spec.put("components", components);
-
-        Map<String, Object> refSchema = new LinkedHashMap<>();
-        refSchema.put("$ref", "#/components/schemas/User");
-
-        Map<String, Object> resolved = JerseySchemaUtils.resolveRefInSchema(refSchema, spec);
-        assertEquals("object", resolved.get("type"));
-        assertNotNull(resolved.get("properties"));
-    }
-
-    @Test
-    @DisplayName("resolveRefInSchema returns original when $ref target not found")
-    void resolveRefInSchema_notFound() {
-        Map<String, Object> spec = new LinkedHashMap<>();
-        spec.put("components", Map.of("schemas", Map.of()));
-
-        Map<String, Object> refSchema = new LinkedHashMap<>();
-        refSchema.put("$ref", "#/components/schemas/Missing");
-
-        Map<String, Object> resolved = JerseySchemaUtils.resolveRefInSchema(refSchema, spec);
-        assertSame(refSchema, resolved);
-    }
-
-    @Test
-    @DisplayName("resolveRefInSchema returns original when spec is null")
-    void resolveRefInSchema_nullSpec() {
-        Map<String, Object> refSchema = Map.of("$ref", "#/components/schemas/User");
-        assertSame(refSchema, JerseySchemaUtils.resolveRefInSchema(refSchema, null));
-    }
-
-    @Test
-    @DisplayName("resolveRefInSchema returns original when no $ref")
-    void resolveRefInSchema_noRef() {
-        Map<String, Object> schema = Map.of("type", "string");
-        Map<String, Object> spec = Map.of();
-        assertSame(schema, JerseySchemaUtils.resolveRefInSchema(schema, spec));
-    }
-
-    // -----------------------------------------------------------------------
-    //  resolveCompositionToEffectiveSchema
-    // -----------------------------------------------------------------------
+class JerseySchemaUtilsMergeTest {
 
     @Test
     @DisplayName("resolveCompositionToEffectiveSchema merges allOf schemas")
@@ -233,10 +58,6 @@ class JerseySchemaUtilsTest {
         Map<String, Object> schema = Map.of("type", "string");
         assertSame(schema, JerseySchemaUtils.resolveCompositionToEffectiveSchema(schema, null));
     }
-
-    // -----------------------------------------------------------------------
-    //  mergeSchemaProperties
-    // -----------------------------------------------------------------------
 
     @Test
     @DisplayName("mergeSchemaProperties merges direct properties")
@@ -564,26 +385,6 @@ class JerseySchemaUtilsTest {
     }
 
     @Test
-    @DisplayName("findComponentSchemaName matches registered schema by object identity")
-    void findComponentSchemaName_byIdentity() {
-        Map<String, Object> identity = new LinkedHashMap<>();
-        identity.put("allOf", List.of(
-                Map.of("properties", Map.of("id", Map.of("type", "string", "readOnly", false))),
-                Map.of("$ref", "#/components/schemas/BasicUser")));
-        Map<String, Object> schemas = new LinkedHashMap<>();
-        schemas.put("Identity", identity);
-        schemas.put("BasicUser", Map.of("type", "object"));
-        Map<String, Object> spec = Map.of("components", Map.of("schemas", schemas));
-
-        assertEquals("Identity", JerseySchemaUtils.findComponentSchemaName(identity, spec));
-        assertEquals("BasicUser", JerseySchemaUtils.findComponentSchemaName(
-                Map.of("$ref", "#/components/schemas/BasicUser"), spec));
-        Map<String, Object> inlinedIdentity = new LinkedHashMap<>(identity);
-        inlinedIdentity.put("x-resolved-ref", "#/components/schemas/Identity");
-        assertEquals("Identity", JerseySchemaUtils.findComponentSchemaName(inlinedIdentity, spec));
-    }
-
-    @Test
     @DisplayName("mergeSchemaProperties Identity overlay readOnly false wins over BasicUser id readOnly true")
     void mergeSchemaProperties_identityOverlayIdWinsOverBasicUser() {
         Map<String, Object> basicUserId = new LinkedHashMap<>();
@@ -702,10 +503,6 @@ class JerseySchemaUtilsTest {
         assertFalse(JerseySchemaUtils.isSchemaFlagTrue(idSchema, "readOnly"));
         assertEquals("^[1-9]\\d*$", idSchema.get("pattern"));
     }
-
-    // -----------------------------------------------------------------------
-    //  isSchemaReference
-    // -----------------------------------------------------------------------
 
     @Test
     @DisplayName("mergeSchemaProperties bundled Folder.yaml editFolder permissions resolves to EditFolderPermissionsEntry")
@@ -839,25 +636,5 @@ class JerseySchemaUtilsTest {
             }
         }
         return false;
-    }
-
-    @Test
-    @DisplayName("isSchemaReference matches by schema name")
-    void isSchemaReference_matches() {
-        Map<String, Object> schema = Map.of("$ref", "#/components/schemas/User");
-        assertTrue(JerseySchemaUtils.isSchemaReference(schema, "User"));
-    }
-
-    @Test
-    @DisplayName("isSchemaReference returns false for different name")
-    void isSchemaReference_different() {
-        Map<String, Object> schema = Map.of("$ref", "#/components/schemas/User");
-        assertFalse(JerseySchemaUtils.isSchemaReference(schema, "Order"));
-    }
-
-    @Test
-    @DisplayName("isSchemaReference returns false for null schema")
-    void isSchemaReference_null() {
-        assertFalse(JerseySchemaUtils.isSchemaReference(null, "User"));
     }
 }
