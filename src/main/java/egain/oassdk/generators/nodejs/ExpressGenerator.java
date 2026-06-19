@@ -17,7 +17,13 @@ import java.net.URISyntaxException;
 import java.util.*;
 
 /**
- * Express.js code generator with full feature parity
+ * Express.js code generator with full feature parity.
+ *
+ * <p><b>Architecture note:</b> {@link #generate} already orchestrates route, model, middleware,
+ * validator, and build emission via private methods (~970 lines). Future refactors should
+ * extract {@code ExpressRouteGenerator}, {@code ExpressModelGenerator}, and
+ * {@code ExpressBuildGenerator} sub-classes mirroring the Jersey generator layout to reduce
+ * bridge-node coupling reported by the codebase graph.
  */
 public class ExpressGenerator implements CodeGenerator, ConfigurableGenerator {
 

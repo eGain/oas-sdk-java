@@ -3,7 +3,11 @@ package egain.oassdk.testgenerators;
 import egain.oassdk.config.TestConfig;
 
 /**
- * Interface for test generators that can be configured
+ * Interface for test generators that can be configured.
+ *
+ * <p>Factory wiring seam: {@link egain.oassdk.testgenerators.TestGeneratorFactory} detects
+ * {@code ConfigurableTestGenerator} implementations and calls {@link #setConfig(TestConfig)}
+ * before {@link egain.oassdk.testgenerators.TestGenerator#generate}.
  */
 public interface ConfigurableTestGenerator {
 

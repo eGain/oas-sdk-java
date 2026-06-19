@@ -1,7 +1,11 @@
 package egain.oassdk.core.exceptions;
 
 /**
- * Base exception for OAS SDK
+ * Base exception for OAS SDK.
+ *
+ * <p>High cross-module usage is intentional: generators, parsers, CLI, DevSDK, and generated
+ * Jersey runtime resources under {@code src/main/resources/runtime/} share this hierarchy for
+ * consistent error propagation.
  */
 public class OASSDKException extends Exception {
 
