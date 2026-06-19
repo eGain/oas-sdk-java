@@ -6,6 +6,7 @@ import egain.oassdk.Util;
 import egain.oassdk.core.Constants;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 import egain.oassdk.testgenerators.TestGenerator;
@@ -93,7 +94,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
      * Generate Postman collection
      */
     private void generatePostmanCollection(Map<String, Object> spec, String outputDir) throws IOException {
-        String apiTitle = getAPITitle(spec);
+        String apiTitle = TestSpecUtils.getApiTitle(spec);
         String apiVersion = getAPIVersion(spec);
         String apiDescription = getAPIDescription(spec);
 
@@ -632,7 +633,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
      * Generate environment file
      */
     private void generateEnvironmentFile(Map<String, Object> spec, String outputDir) throws IOException {
-        String apiTitle = getAPITitle(spec);
+        String apiTitle = TestSpecUtils.getApiTitle(spec);
         String safeTitle = apiTitle != null ? apiTitle : "API";
 
         Map<String, Object> environment = new HashMap<>();
@@ -649,7 +650,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
      * Generate test scripts
      */
     private void generateTestScripts(Map<String, Object> spec, String outputDir) throws IOException {
-        String apiTitle = getAPITitle(spec);
+        String apiTitle = TestSpecUtils.getApiTitle(spec);
         String safeTitle = apiTitle != null ? apiTitle : "API";
 
         // Generate Newman test script
@@ -730,18 +731,6 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
     /**
      * Helper methods
      */
-    private String getAPITitle(Map<String, Object> spec) {
-        if (spec == null) {
-            return "API";
-        }
-        Map<String, Object> info = Util.asStringObjectMap(spec.get("info"));
-        if (info == null) {
-            return "API";
-        }
-        Object title = info.get("title");
-        return title != null ? title.toString() : "API";
-    }
-
     private String getAPIVersion(Map<String, Object> spec) {
         if (spec == null) {
             return "1.0.0";

@@ -5,6 +5,7 @@ import egain.oassdk.config.GeneratorConfig;
 import egain.oassdk.config.SLAConfig;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.exceptions.OASSDKException;
+import egain.oassdk.generators.GeneratorFactory;
 import egain.oassdk.testgenerators.schemathesis.SchemathesisTestGenerator;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -364,6 +365,27 @@ public class OASSDKCLI implements Callable<Integer> {
         }
     }
 
+    @Command(name = "generators", description = "List supported code generators")
+    public static class GeneratorsCommand implements Callable<Integer> {
+
+        @Override
+        public Integer call() {
+            GeneratorFactory factory = new GeneratorFactory();
+            logger.info("Implemented generators:");
+            for (String combo : factory.getImplementedCombinations()) {
+                logger.info("  " + combo);
+            }
+            String[] stubs = factory.getStubCombinations();
+            if (stubs.length > 0) {
+                logger.info("\nStub generators (registered, not yet implemented):");
+                for (String combo : stubs) {
+                    logger.info("  " + combo + " (stub)");
+                }
+            }
+            return 0;
+        }
+    }
+
     @Command(name = "info", description = "Show information about OpenAPI specification")
     public static class InfoCommand implements Callable<Integer> {
 
@@ -415,6 +437,7 @@ public class OASSDKCLI implements Callable<Integer> {
                 .addSubcommand("sla", new SLACommand())
                 .addSubcommand("all", new AllCommand())
                 .addSubcommand("validate", new ValidateCommand())
+                .addSubcommand("generators", new GeneratorsCommand())
                 .addSubcommand("info", new InfoCommand())
                 .execute(args);
         System.exit(exitCode);

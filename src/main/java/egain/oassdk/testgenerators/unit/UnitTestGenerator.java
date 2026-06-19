@@ -4,6 +4,7 @@ import egain.oassdk.Util;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.Constants;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 import egain.oassdk.testgenerators.TestGenerator;
@@ -100,7 +101,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
     }
 
     private String generateTestClass(String basePackage, String className, String tag, List<OperationInfo> operations, Map<String, Object> spec) {
-        String baseUrl = getBaseUrl(spec);
+        String baseUrl = TestSpecUtils.getBaseUrl(spec);
         int concurrentThreads = resolveConcurrentThreads();
         boolean needsConcurrent = operations.stream().anyMatch(this::hasRequestBodyForConcurrency);
 
@@ -794,19 +795,6 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         }
         sb.append(")");
         return sb.toString();
-    }
-
-    private String getBaseUrl(Map<String, Object> spec) {
-        if (spec != null && spec.containsKey("servers")) {
-            List<Map<String, Object>> servers = Util.asStringObjectMapList(spec.get("servers"));
-            if (servers != null && !servers.isEmpty()) {
-                String url = (String) servers.get(0).get("url");
-                if (url != null) {
-                    return url;
-                }
-            }
-        }
-        return "http://localhost:8080";
     }
 
     private static String escapeJavaString(String s) {

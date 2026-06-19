@@ -4,6 +4,7 @@ import egain.oassdk.Util;
 import egain.oassdk.core.Constants;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.TestGenerator;
 
@@ -32,7 +33,7 @@ public class PytestUnitTestGenerator implements TestGenerator, ConfigurableTestG
             Files.createDirectories(outputPath);
 
             // Extract API information
-            String apiTitle = getAPITitle(spec);
+            String apiTitle = TestSpecUtils.getApiTitle(spec);
 
             // Generate test modules for each endpoint
             generateTestModules(spec, outputPath.toString(), apiTitle);
@@ -312,11 +313,6 @@ public class PytestUnitTestGenerator implements TestGenerator, ConfigurableTestG
     }
 
     // Helper methods
-    private String getAPITitle(Map<String, Object> spec) {
-        Map<String, Object> info = Util.asStringObjectMap(spec.get("info"));
-        return info != null ? (String) info.get("title") : "API";
-    }
-
     private String getOperationTag(Map<String, Object> operation) {
         List<String> tags = Util.asStringList(operation.get("tags"));
         return tags != null && !tags.isEmpty() ? tags.get(0) : "Default";

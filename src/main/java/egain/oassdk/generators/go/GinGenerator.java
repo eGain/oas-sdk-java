@@ -43,6 +43,11 @@ public class GinGenerator implements CodeGenerator, ConfigurableGenerator {
     }
 
     @Override
+    public boolean isImplemented() {
+        return false;
+    }
+
+    @Override
     public void setConfig(GeneratorConfig config) {
         this.config = config;
     }

@@ -60,4 +60,14 @@ public interface CodeGenerator {
      * @return Framework name
      */
     String getFramework();
+
+    /**
+     * Whether this generator produces code today. Stub generators return {@code false} and remain
+     * discoverable via {@link GeneratorFactory} but are rejected by {@code generate} / {@code all}.
+     *
+     * @return {@code true} when {@link #generate} is fully implemented
+     */
+    default boolean isImplemented() {
+        return true;
+    }
 }

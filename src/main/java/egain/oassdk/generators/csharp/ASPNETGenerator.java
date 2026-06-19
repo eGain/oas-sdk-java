@@ -43,6 +43,11 @@ public class ASPNETGenerator implements CodeGenerator, ConfigurableGenerator {
     }
 
     @Override
+    public boolean isImplemented() {
+        return false;
+    }
+
+    @Override
     public void setConfig(GeneratorConfig config) {
         this.config = config;
     }

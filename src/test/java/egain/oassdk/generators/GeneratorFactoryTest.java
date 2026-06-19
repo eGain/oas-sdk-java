@@ -143,9 +143,30 @@ public class GeneratorFactoryTest {
     }
     
     @Test
-    public void testIsSupportedCaseInsensitive() {
-        assertTrue(factory.isSupported("JAVA", "JERSEY"));
-        assertTrue(factory.isSupported("Python", "FastAPI"));
+    public void testImplementedAndStubCombinations() {
+        String[] implemented = factory.getImplementedCombinations();
+        String[] stubs = factory.getStubCombinations();
+
+        assertEquals(4, implemented.length);
+        assertEquals(2, stubs.length);
+        assertTrue(java.util.Arrays.asList(implemented).contains("java-jersey"));
+        assertFalse(java.util.Arrays.asList(implemented).contains("go-gin"));
+        assertTrue(java.util.Arrays.asList(stubs).contains("go-gin"));
+        assertTrue(java.util.Arrays.asList(stubs).contains("csharp-aspnet"));
+    }
+
+    @Test
+    public void testEnsureImplementedRejectsStub() {
+        CodeGenerator gin = factory.getGenerator("go", "gin");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> factory.ensureImplemented(gin, "go", "gin"));
+        assertTrue(ex.getMessage().contains("not yet implemented"));
+    }
+
+    @Test
+    public void testGetSupportedCombinationsExcludingStubs() {
+        String[] withoutStubs = factory.getSupportedCombinations(false);
+        assertEquals(4, withoutStubs.length);
     }
 }
 

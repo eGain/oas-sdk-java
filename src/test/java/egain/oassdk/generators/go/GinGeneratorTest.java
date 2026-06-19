@@ -75,6 +75,11 @@ public class GinGeneratorTest {
     }
     
     @Test
+    public void testIsNotImplemented() {
+        assertFalse(generator.isImplemented());
+    }
+
+    @Test
     public void testGenerateThrowsNotImplementedException() {
         GeneratorConfig config = new GeneratorConfig();
         

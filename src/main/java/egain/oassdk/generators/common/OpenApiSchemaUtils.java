@@ -1,0 +1,997 @@
+package egain.oassdk.generators.common;
+
+import egain.oassdk.Util;
+
+import java.util.Locale;
+
+import java.util.*;
+
+/**
+ * Language-agnostic OpenAPI schema inspection and resolution utilities.
+ * All methods are static and operate on raw schema maps.
+ */
+public final class OpenApiSchemaUtils {
+
+    /** Max depth when resolving allOf/oneOf/anyOf to prevent infinite recursion */
+    public static final int MAX_COMPOSITION_RESOLVE_DEPTH = 10;
+
+    /** Max recursion depth for mergeSchemaProperties to prevent StackOverflow on large specs. */
+    public static final int MAX_MERGE_SCHEMA_DEPTH = 15;
+
+    /** Schema constraint keys back-filled from an earlier allOf branch when a later overlay omits them. */
+    private static final String[] COMPOSITION_CONSTRAINT_KEYS = {
+            "type", "format", "pattern", "minLength", "maxLength", "minItems", "maxItems", "enum", "description"
+    };
+
+    private OpenApiSchemaUtils() {
+        // utility class - no instances
+    }
+
+    // ---------------------------------------------------------------------------
+    //  Composition resolution
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Resolve allOf/oneOf/anyOf to a single effective schema for type/validation/XSD.
+     * allOf: merged schema from all branches; oneOf/anyOf: first branch (Java has no union type).
+     * Resolves $ref in sub-schemas when spec is non-null.
+     *
+     * @param schema the schema that may contain allOf, oneOf, or anyOf
+     * @param spec   the full OpenAPI spec (nullable); when non-null, $ref in composition are resolved
+     * @return effective schema map, or the original schema if no composition or depth exceeded
+     */
+    public static Map<String, Object> resolveCompositionToEffectiveSchema(Map<String, Object> schema, Map<String, Object> spec) {
+        return resolveCompositionToEffectiveSchema(schema, spec, 0);
+    }
+
+    public static Map<String, Object> resolveCompositionToEffectiveSchema(Map<String, Object> schema, Map<String, Object> spec, int depth) {
+        if (schema == null || depth > MAX_COMPOSITION_RESOLVE_DEPTH) {
+            return schema;
+        }
+        if (schema.containsKey("allOf")) {
+            List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
+            if (allOfSchemas == null || allOfSchemas.isEmpty()) {
+                return schema;
+            }
+            String singleRefSchemaName = null;
+            int refCount = 0;
+            Map<String, Object> merged = new LinkedHashMap<>();
+            List<Map<String, Object>> refBranches = new ArrayList<>();
+            List<Map<String, Object>> overlayBranches = new ArrayList<>();
+            partitionAllOfBranches(allOfSchemas, refBranches, overlayBranches);
+            List<Map<String, Object>> mergeOrder = new ArrayList<>(refBranches.size() + overlayBranches.size());
+            mergeOrder.addAll(refBranches);
+            mergeOrder.addAll(overlayBranches);
+            for (Map<String, Object> sub : mergeOrder) {
+                if (sub == null) continue;
+                String refName = getSchemaNameFromRef(sub);
+                if (refName == null) {
+                    String ref = (String) sub.get("x-resolved-ref");
+                    if (ref == null) ref = (String) sub.get("$ref");
+                    if (ref != null && ref.contains("components/schemas/")) {
+                        refName = ref.substring(ref.lastIndexOf("/") + 1);
+                    }
+                }
+                if (refName != null) {
+                    refCount++;
+                    if (singleRefSchemaName == null) singleRefSchemaName = refName;
+                }
+                Map<String, Object> resolved = resolveRefInSchema(sub, spec);
+                resolved = resolveCompositionToEffectiveSchema(resolved, spec, depth + 1);
+                if (resolved != null) {
+                    mergeIntoEffectiveSchema(merged, resolved);
+                }
+            }
+            if (singleRefSchemaName != null && !merged.isEmpty()) {
+                Set<String> distinctRefNames = new LinkedHashSet<>();
+                for (Map<String, Object> sub : allOfSchemas) {
+                    if (sub == null) continue;
+                    String refName = getSchemaNameFromRef(sub);
+                    if (refName == null) {
+                        String ref = (String) sub.get("x-resolved-ref");
+                        if (ref == null) ref = (String) sub.get("$ref");
+                        if (ref != null && ref.contains("components/schemas/")) {
+                            refName = ref.substring(ref.lastIndexOf("/") + 1);
+                        }
+                    }
+                    if (refName != null) {
+                        distinctRefNames.add(refName);
+                    }
+                }
+                if ((refCount == 1 || distinctRefNames.size() == 1)
+                        && !allOfHasPropertyOverlayBranches(allOfSchemas)) {
+                    merged.put("x-java-type-ref", singleRefSchemaName);
+                }
+            }
+            return merged.isEmpty() ? schema : merged;
+        }
+        if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+            List<Map<String, Object>> schemas = Util.asStringObjectMapList(
+                    schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
+            if (schemas != null && !schemas.isEmpty()) {
+                Map<String, Object> first = schemas.get(0);
+                if (first != null) {
+                    first = resolveRefInSchema(first, spec);
+                    return resolveCompositionToEffectiveSchema(first, spec, depth + 1);
+                }
+            }
+            return schema;
+        }
+        return schema;
+    }
+
+    // ---------------------------------------------------------------------------
+    //  $ref resolution
+    // ---------------------------------------------------------------------------
+
+    /** Resolve $ref in a schema using spec (components/schemas). Returns resolved map or original if no ref/spec. */
+    public static Map<String, Object> resolveRefInSchema(Map<String, Object> schema, Map<String, Object> spec) {
+        if (schema == null || spec == null || !schema.containsKey("$ref")) {
+            return schema;
+        }
+        String ref = (String) schema.get("$ref");
+        if (ref == null || !ref.contains("components/schemas/")) {
+            return schema;
+        }
+        String schemaName = ref.contains("#/components/schemas/")
+                ? ref.substring(ref.lastIndexOf("/") + 1)
+                : (ref.contains("#") ? ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length()) : ref);
+        if (schemaName.contains("/")) {
+            schemaName = schemaName.substring(schemaName.lastIndexOf("/") + 1);
+        }
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        if (components == null) return schema;
+        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+        if (schemas == null || !schemas.containsKey(schemaName)) return schema;
+        Map<String, Object> resolved = Util.asStringObjectMap(schemas.get(schemaName));
+        return resolved != null ? resolved : schema;
+    }
+
+    // ---------------------------------------------------------------------------
+    //  Schema merging
+    // ---------------------------------------------------------------------------
+
+    /** Merge one schema into the effective merged map (type, format, pattern, constraints, properties, required). */
+    public static void mergeIntoEffectiveSchema(Map<String, Object> merged, Map<String, Object> from) {
+        if (from == null) return;
+        for (String key : new String[]{"type", "format", "pattern", "minLength", "maxLength", "minItems", "maxItems", "enum", "writeOnly", "readOnly"}) {
+            if (from.containsKey(key) && !merged.containsKey(key)) {
+                merged.put(key, from.get(key));
+            }
+        }
+        if (from.containsKey("properties")) {
+            Map<String, Object> fromProps = Util.asStringObjectMap(from.get("properties"));
+            if (fromProps != null && !fromProps.isEmpty()) {
+                Map<String, Object> mergedProps = Util.asStringObjectMap(merged.get("properties"));
+                if (mergedProps == null) {
+                    mergedProps = new LinkedHashMap<>();
+                    merged.put("properties", mergedProps);
+                }
+                mergedProps.putAll(fromProps);
+            }
+        }
+        if (from.containsKey("required")) {
+            List<String> fromReq = Util.asStringList(from.get("required"));
+            if (fromReq != null && !fromReq.isEmpty()) {
+                List<String> mergedReq = Util.asStringList(merged.get("required"));
+                if (mergedReq == null) {
+                    mergedReq = new ArrayList<>();
+                    merged.put("required", mergedReq);
+                }
+                for (String r : fromReq) {
+                    if (!mergedReq.contains(r)) mergedReq.add(r);
+                }
+            }
+        }
+        if (from.containsKey("items") && !merged.containsKey("items")) {
+            merged.put("items", from.get("items"));
+        }
+    }
+
+    /**
+     * Merge two JSON-Schema property definition maps as sequential {@code allOf} branches would:
+     * {@code earlier} is merged first, then {@code later}. When {@code later} is a constraint or nested
+     * overlay (e.g. {@code readOnly: true} or {@code properties.user.readOnly}) and {@code earlier}
+     * carries the component type ({@code $ref}, array {@code items}, etc.), the base type is preserved
+     * and {@code later} is applied on top. Otherwise {@code later} defines the type and {@code earlier}
+     * constraints are back-filled.
+     */
+    public static Map<String, Object> mergePropertyDefinitionsForComposition(Map<String, Object> earlier,
+                                                                        Map<String, Object> later) {
+        if (later == null || later.isEmpty()) {
+            return earlier != null ? new LinkedHashMap<>(earlier) : new LinkedHashMap<>();
+        }
+        if (earlier == null || earlier.isEmpty()) {
+            return new LinkedHashMap<>(later);
+        }
+        Map<String, Object> out;
+        if (!definesOwnPropertyType(later) && definesOwnPropertyType(earlier)) {
+            out = new LinkedHashMap<>(earlier);
+            applyPropertyOverlayOnBase(out, earlier, later);
+        } else {
+            out = new LinkedHashMap<>(later);
+            mergeEarlierIntoLaterPropertyBase(out, earlier, later);
+        }
+        return out;
+    }
+
+    /**
+     * True when a property schema carries its own type identity ({@code $ref}, array {@code items},
+     * property-level {@code allOf} with a schema body, or a fully typed inline object/array).
+     */
+    public static boolean definesOwnPropertyType(Map<String, Object> schema) {
+        if (schema == null || schema.isEmpty()) {
+            return false;
+        }
+        if (schema.containsKey("$ref") || getSchemaNameFromRef(schema) != null) {
+            return true;
+        }
+        if (schema.containsKey("items")) {
+            return true;
+        }
+        if (schema.containsKey("allOf")) {
+            List<Map<String, Object>> allOf = Util.asStringObjectMapList(schema.get("allOf"));
+            if (allOf != null) {
+                for (Map<String, Object> branch : allOf) {
+                    if (branch == null) {
+                        continue;
+                    }
+                    if (isAllOfRefBranch(branch) || isResolvedSchemaAllOfBranch(branch)) {
+                        return true;
+                    }
+                    if (branch.containsKey("items") || "array".equals(branch.get("type"))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        if ("array".equals(schema.get("type")) && schema.containsKey("items")) {
+            return true;
+        }
+        return schema.containsKey("type");
+    }
+
+    /** Apply a constraint/nested overlay ({@code later}) onto a typed base ({@code out} copied from {@code earlier}). */
+    private static void applyPropertyOverlayOnBase(Map<String, Object> out,
+                                                   Map<String, Object> earlier,
+                                                   Map<String, Object> later) {
+        List<Map<String, Object>> earlierAllOf = Util.asStringObjectMapList(earlier.get("allOf"));
+        List<Map<String, Object>> laterAllOf = Util.asStringObjectMapList(later.get("allOf"));
+        if (earlierAllOf != null && !earlierAllOf.isEmpty()
+                && laterAllOf != null && !laterAllOf.isEmpty()) {
+            List<Map<String, Object>> mergedAllOf = mergePropertyLevelAllOf(earlierAllOf, laterAllOf, earlier, later);
+            if (!mergedAllOf.isEmpty()) {
+                out.put("allOf", mergedAllOf);
+            }
+        }
+        for (String key : COMPOSITION_CONSTRAINT_KEYS) {
+            if (later.containsKey(key)) {
+                out.put(key, later.get(key));
+            }
+        }
+        if (later.containsKey("readOnly")) {
+            out.put("readOnly", later.get("readOnly"));
+        } else if (isSchemaFlagTrue(earlier, "readOnly")) {
+            out.put("readOnly", true);
+        }
+        if (later.containsKey("writeOnly")) {
+            out.put("writeOnly", later.get("writeOnly"));
+        } else if (isSchemaFlagTrue(earlier, "writeOnly")) {
+            out.put("writeOnly", true);
+        }
+        Map<String, Object> laterProps = Util.asStringObjectMap(later.get("properties"));
+        if (laterProps == null || laterProps.isEmpty()) {
+            return;
+        }
+        Map<String, Object> baseProps = Util.asStringObjectMap(out.get("properties"));
+        if (baseProps == null) {
+            baseProps = new LinkedHashMap<>();
+            out.put("properties", baseProps);
+        }
+        for (Map.Entry<String, Object> pe : laterProps.entrySet()) {
+            String pk = pe.getKey();
+            Map<String, Object> overlaySub = Util.asStringObjectMap(pe.getValue());
+            Map<String, Object> baseSub = Util.asStringObjectMap(baseProps.get(pk));
+            if (baseSub != null && overlaySub != null) {
+                baseProps.put(pk, mergePropertyDefinitionsForComposition(baseSub, overlaySub));
+            } else {
+                baseProps.put(pk, pe.getValue());
+            }
+        }
+    }
+
+    /** Merge {@code earlier} constraints into a {@code later}-typed property base ({@code out}). */
+    private static void mergeEarlierIntoLaterPropertyBase(Map<String, Object> out,
+                                                          Map<String, Object> earlier,
+                                                          Map<String, Object> later) {
+        List<Map<String, Object>> earlierAllOf = Util.asStringObjectMapList(earlier.get("allOf"));
+        List<Map<String, Object>> laterAllOf = Util.asStringObjectMapList(later.get("allOf"));
+        if (earlierAllOf != null && !earlierAllOf.isEmpty()
+                && laterAllOf != null && !laterAllOf.isEmpty()) {
+            List<Map<String, Object>> mergedAllOf = mergePropertyLevelAllOf(earlierAllOf, laterAllOf, earlier, later);
+            if (!mergedAllOf.isEmpty()) {
+                out.put("allOf", mergedAllOf);
+            }
+        }
+        for (String key : COMPOSITION_CONSTRAINT_KEYS) {
+            if (!out.containsKey(key) && earlier.containsKey(key)) {
+                out.put(key, earlier.get(key));
+            }
+        }
+        if (!later.containsKey("readOnly") && isSchemaFlagTrue(earlier, "readOnly")) {
+            out.put("readOnly", true);
+        }
+        if (!later.containsKey("writeOnly") && isSchemaFlagTrue(earlier, "writeOnly")) {
+            out.put("writeOnly", true);
+        }
+        Map<String, Object> laterProps = Util.asStringObjectMap(later.get("properties"));
+        Map<String, Object> earlierProps = Util.asStringObjectMap(earlier.get("properties"));
+        if (earlierProps != null && !earlierProps.isEmpty()) {
+            Map<String, Object> mergedProps = new LinkedHashMap<>();
+            if (laterProps != null) {
+                mergedProps.putAll(laterProps);
+            }
+            for (Map.Entry<String, Object> pe : earlierProps.entrySet()) {
+                String pk = pe.getKey();
+                Map<String, Object> eSub = Util.asStringObjectMap(pe.getValue());
+                if (!mergedProps.containsKey(pk)) {
+                    mergedProps.put(pk, pe.getValue());
+                } else {
+                    Map<String, Object> lSub = Util.asStringObjectMap(mergedProps.get(pk));
+                    if (eSub != null && lSub != null) {
+                        mergedProps.put(pk, mergePropertyDefinitionsForComposition(eSub, lSub));
+                    } else {
+                        mergedProps.put(pk, pe.getValue());
+                    }
+                }
+            }
+            out.put("properties", mergedProps);
+        }
+    }
+
+    /**
+     * Merge a schema {@code properties} map into {@code allProperties}, deep-merging when a property
+     * name already exists so readOnly/writeOnly overlays are not dropped.
+     */
+    public static void mergePropertiesIntoAll(Map<String, Object> allProperties,
+                                               Map<String, Object> properties) {
+        if (properties == null) {
+            return;
+        }
+        for (Map.Entry<String, Object> e : properties.entrySet()) {
+            String name = e.getKey();
+            Object incomingObj = e.getValue();
+            Map<String, Object> incoming = Util.asStringObjectMap(incomingObj);
+            if (!allProperties.containsKey(name)) {
+                allProperties.put(name, incomingObj);
+                continue;
+            }
+            Object existingObj = allProperties.get(name);
+            Map<String, Object> existing = Util.asStringObjectMap(existingObj);
+            if (existing == null || incoming == null) {
+                allProperties.put(name, incomingObj);
+            } else {
+                allProperties.put(name, mergePropertyDefinitionsForComposition(existing, incoming));
+            }
+        }
+    }
+
+    /**
+     * Merge schema properties into the allProperties map.
+     */
+    public static void mergeSchemaProperties(Map<String, Object> schema, Map<String, Object> allProperties,
+                                       List<String> allRequired, Map<String, Object> spec) {
+        mergeSchemaProperties(schema, allProperties, allRequired, spec, new IdentityHashMap<>(), 0);
+    }
+
+    /**
+     * Merge schema properties with cycle detection to prevent infinite recursion.
+     */
+    public static void mergeSchemaProperties(Map<String, Object> schema, Map<String, Object> allProperties,
+                                       List<String> allRequired, Map<String, Object> spec,
+                                       Map<Object, Boolean> visited) {
+        mergeSchemaProperties(schema, allProperties, allRequired, spec, visited, 0);
+    }
+
+    /**
+     * Merge schema properties with cycle detection and depth limit to prevent StackOverflow.
+     */
+    public static void mergeSchemaProperties(Map<String, Object> schema, Map<String, Object> allProperties,
+                                       List<String> allRequired, Map<String, Object> spec,
+                                       Map<Object, Boolean> visited, int depth) {
+        if (schema == null) return;
+        if (depth > MAX_MERGE_SCHEMA_DEPTH) {
+            java.util.logging.Logger.getLogger(OpenApiSchemaUtils.class.getName())
+                    .warning("Recursion depth limit reached in mergeSchemaProperties: " + depth);
+            return;
+        }
+
+        // Cycle detection - prevent infinite recursion
+        if (visited.containsKey(schema)) {
+            return;
+        }
+        visited.put(schema, Boolean.TRUE);
+
+        // Handle $ref
+        // IMPORTANT: Check for properties FIRST, even if $ref exists.
+        // When the parser resolves external file $refs, it replaces the map content,
+        // so the schema should have properties directly. However, the $ref key might
+        // still be present. If properties exist, use them and ignore $ref.
+        if (schema.containsKey("properties")) {
+            // Schema has properties - use them directly (even if $ref also exists)
+            Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+            mergePropertiesIntoAll(allProperties, properties);
+            // Merge required fields
+            if (schema.containsKey("required")) {
+                List<String> required = Util.asStringList(schema.get("required"));
+                if (required != null) {
+                    for (String field : required) {
+                        if (!allRequired.contains(field)) {
+                            allRequired.add(field);
+                        }
+                    }
+                }
+            }
+            // Properties found - return (unless there's allOf/oneOf/anyOf to handle)
+            if (!schema.containsKey("allOf") && !schema.containsKey("oneOf") && !schema.containsKey("anyOf")) {
+                return;
+            }
+        }
+
+        // Only handle $ref if no properties were found
+        if (schema.containsKey("$ref") && !schema.containsKey("properties")) {
+            String ref = (String) schema.get("$ref");
+            if (ref != null) {
+                if (ref.startsWith("#/components/schemas/")) {
+                    // Internal schema reference
+                    String schemaName = ref.substring(ref.lastIndexOf("/") + 1);
+                    Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+                    if (components != null) {
+                        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+                        if (schemas != null && schemas.containsKey(schemaName)) {
+                            Map<String, Object> referencedSchema = Util.asStringObjectMap(schemas.get(schemaName));
+                            if (referencedSchema != null) {
+                                mergeSchemaProperties(referencedSchema, allProperties, allRequired, spec, visited, depth + 1);
+                            }
+                        }
+                    }
+                } else if (ref.contains("#/components/schemas/")) {
+                    // External file with schema path
+                    String schemaPath = ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length());
+                    String schemaName = schemaPath.contains("/") ? schemaPath.substring(schemaPath.lastIndexOf("/") + 1) : schemaPath;
+                    Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+                    if (components != null) {
+                        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+                        if (schemas != null && schemas.containsKey(schemaName)) {
+                            Map<String, Object> referencedSchema = Util.asStringObjectMap(schemas.get(schemaName));
+                            if (referencedSchema != null) {
+                                mergeSchemaProperties(referencedSchema, allProperties, allRequired, spec, visited, depth + 1);
+                            }
+                        }
+                    }
+                } else {
+                    // External file reference without schema path (e.g., ../../../models/v4/User.yaml)
+                    // The parser should have resolved this by replacing $ref with the file content.
+                }
+                return;
+            }
+        }
+
+        // Merge direct properties (this handles schemas that were resolved and have properties)
+        if (schema.containsKey("properties")) {
+            Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+            mergePropertiesIntoAll(allProperties, properties);
+            // Merge required fields
+            if (schema.containsKey("required")) {
+                List<String> required = Util.asStringList(schema.get("required"));
+                if (required != null) {
+                    for (String field : required) {
+                        if (!allRequired.contains(field)) {
+                            allRequired.add(field);
+                        }
+                    }
+                }
+            }
+            // If schema has properties, we've merged them, so we can return
+            // (unless it also has allOf/oneOf/anyOf which should be handled)
+            if (!schema.containsKey("allOf") && !schema.containsKey("oneOf") && !schema.containsKey("anyOf")) {
+                return;
+            }
+        }
+
+        // Handle allOf — $ref base branches first, then overlay branches (e.g. auth_v4 Identity)
+        if (schema.containsKey("allOf")) {
+            List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
+            mergeAllOfBranchesIntoProperties(allOfSchemas, allProperties, allRequired, spec, visited, depth + 1);
+            return;
+        }
+
+        // Handle oneOf/anyOf
+        if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+            List<Map<String, Object>> schemas = Util.asStringObjectMapList(
+                    schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
+            if (schemas != null) {
+                for (Map<String, Object> subSchema : schemas) {
+                    if (subSchema != null) {
+                        mergeSchemaProperties(subSchema, allProperties, allRequired, spec, visited, depth + 1);
+                    }
+                }
+            }
+            return;
+        }
+
+        // Merge direct properties
+        if (schema.containsKey("properties")) {
+            Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+            mergePropertiesIntoAll(allProperties, properties);
+        }
+
+        // Merge required fields
+        if (schema.containsKey("required")) {
+            List<String> required = Util.asStringList(schema.get("required"));
+            if (required != null) {
+                for (String field : required) {
+                    if (!allRequired.contains(field)) {
+                        allRequired.add(field);
+                    }
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    //  Schema-level allOf branch ordering (ref base, then overlay)
+    // ---------------------------------------------------------------------------
+
+    /**
+     * True when an {@code allOf} branch is a component {@code $ref} base. Includes bare
+     * {@code $ref} branches and parser-resolved refs that still carry {@code x-resolved-ref}
+     * alongside inlined {@code properties}.
+     */
+    public static boolean isAllOfRefBranch(Map<String, Object> branch) {
+        if (branch == null) {
+            return false;
+        }
+        if (branch.containsKey("allOf") || branch.containsKey("oneOf") || branch.containsKey("anyOf")) {
+            return false;
+        }
+        if (getSchemaNameFromRef(branch) != null) {
+            return true;
+        }
+        return branch.containsKey("$ref") && !branch.containsKey("properties");
+    }
+
+    /**
+     * True when any {@code allOf} overlay branch carries a semantic property overlay
+     * (e.g. Identity {@code id: { type: string, readOnly: false }}). Constraint-only overlays
+     * ({@code readOnly: true} without redefining type) do not count — those still alias to the base ref.
+     */
+    public static boolean allOfHasPropertyOverlayBranches(List<Map<String, Object>> allOfSchemas) {
+        if (allOfSchemas == null) {
+            return false;
+        }
+        List<Map<String, Object>> refBranches = new ArrayList<>();
+        List<Map<String, Object>> overlayBranches = new ArrayList<>();
+        partitionAllOfBranches(allOfSchemas, refBranches, overlayBranches);
+        for (Map<String, Object> branch : overlayBranches) {
+            Map<String, Object> props = Util.asStringObjectMap(branch.get("properties"));
+            if (props != null && !props.isEmpty() && overlayPropertiesAreSemantic(props)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** True when any property in an overlay {@code properties} map redefines type or overrides readOnly to false. */
+    private static boolean overlayPropertiesAreSemantic(Map<String, Object> props) {
+        for (Object val : props.values()) {
+            if (isSemanticPropertyOverlay(Util.asStringObjectMap(val))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True when a property overlay schema carries semantic identity ({@code type}, {@code $ref}, etc.)
+     * or explicitly sets {@code readOnly: false} to override a read-only base field.
+     */
+    private static boolean isSemanticPropertyOverlay(Map<String, Object> propSchema) {
+        if (propSchema == null || propSchema.isEmpty()) {
+            return false;
+        }
+        if (propSchema.containsKey("type") || propSchema.containsKey("$ref")
+                || propSchema.containsKey("items") || propSchema.containsKey("allOf")
+                || propSchema.containsKey("oneOf") || propSchema.containsKey("anyOf")) {
+            return true;
+        }
+        if (Boolean.FALSE.equals(propSchema.get("readOnly"))) {
+            return true;
+        }
+        Map<String, Object> nested = Util.asStringObjectMap(propSchema.get("properties"));
+        return nested != null && !nested.isEmpty() && overlayPropertiesAreSemantic(nested);
+    }
+
+    /**
+     * Name of the {@code components.schemas} entry for {@code schema}, when it is a registered component.
+     * Matches by object identity (parser-inlined refs) or bare internal {@code $ref}.
+     */
+    public static String findComponentSchemaName(Map<String, Object> schema, Map<String, Object> spec) {
+        if (schema == null || spec == null) {
+            return null;
+        }
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        Map<String, Object> schemas = components != null ? Util.asStringObjectMap(components.get("schemas")) : null;
+        if (schemas == null) {
+            return null;
+        }
+        for (Map.Entry<String, Object> entry : schemas.entrySet()) {
+            if (entry.getValue() == schema) {
+                return entry.getKey();
+            }
+        }
+        String refName = getSchemaNameFromRef(schema);
+        if (refName != null && schemas.containsKey(refName)) {
+            return refName;
+        }
+        return null;
+    }
+
+    /**
+     * Split {@code allOf} branches into ref bases and overlays, preserving listed order within each group.
+     */
+    public static void partitionAllOfBranches(List<Map<String, Object>> allOfSchemas,
+                                       List<Map<String, Object>> refBranches,
+                                       List<Map<String, Object>> overlayBranches) {
+        if (allOfSchemas == null) {
+            return;
+        }
+        for (Map<String, Object> branch : allOfSchemas) {
+            if (branch == null) {
+                continue;
+            }
+            if (isAllOfRefBranch(branch)) {
+                refBranches.add(branch);
+            } else {
+                overlayBranches.add(branch);
+            }
+        }
+    }
+
+    /**
+     * Merge {@code allOf} branches into property maps: all {@code $ref} bases first, then overlays on top.
+     */
+    public static void mergeAllOfBranchesIntoProperties(List<Map<String, Object>> allOfSchemas,
+                                                        Map<String, Object> allProperties,
+                                                        List<String> allRequired,
+                                                        Map<String, Object> spec) {
+        mergeAllOfBranchesIntoProperties(allOfSchemas, allProperties, allRequired, spec, new IdentityHashMap<>(), 0);
+    }
+
+    /**
+     * Merge {@code allOf} branches with cycle detection and depth limit.
+     */
+    public static void mergeAllOfBranchesIntoProperties(List<Map<String, Object>> allOfSchemas,
+                                                        Map<String, Object> allProperties,
+                                                        List<String> allRequired,
+                                                        Map<String, Object> spec,
+                                                        Map<Object, Boolean> visited,
+                                                        int depth) {
+        if (allOfSchemas == null || allOfSchemas.isEmpty()) {
+            return;
+        }
+        List<Map<String, Object>> refBranches = new ArrayList<>();
+        List<Map<String, Object>> overlayBranches = new ArrayList<>();
+        partitionAllOfBranches(allOfSchemas, refBranches, overlayBranches);
+        for (Map<String, Object> subSchema : refBranches) {
+            mergeSchemaProperties(subSchema, allProperties, allRequired, spec, visited, depth);
+        }
+        for (Map<String, Object> subSchema : overlayBranches) {
+            mergeSchemaProperties(subSchema, allProperties, allRequired, spec, visited, depth);
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    //  Property-level allOf merge helpers
+    // ---------------------------------------------------------------------------
+
+    /** True when an allOf branch carries only inline constraints (no component $ref or schema body). */
+    private static boolean isConstraintOnlyAllOfBranch(Map<String, Object> branch) {
+        if (branch == null) {
+            return false;
+        }
+        if (getSchemaNameFromRef(branch) != null || branch.containsKey("$ref")) {
+            return false;
+        }
+        return !branch.containsKey("type") && !branch.containsKey("items") && !branch.containsKey("properties")
+                && !branch.containsKey("allOf") && !branch.containsKey("oneOf") && !branch.containsKey("anyOf");
+    }
+
+    /** True when an allOf branch is a parser-inlined schema body (type/items/properties) rather than a bare $ref. */
+    private static boolean isResolvedSchemaAllOfBranch(Map<String, Object> branch) {
+        if (branch == null || isConstraintOnlyAllOfBranch(branch)) {
+            return false;
+        }
+        return getSchemaNameFromRef(branch) == null && !branch.containsKey("$ref");
+    }
+
+    private static boolean allOfBranchesContainFlag(List<Map<String, Object>> branches, String flag) {
+        if (branches == null) {
+            return false;
+        }
+        for (Map<String, Object> branch : branches) {
+            if (branch != null && isSchemaFlagTrue(branch, flag)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Map<String, Object>> extractRefBranches(List<Map<String, Object>> branches) {
+        List<Map<String, Object>> refs = new ArrayList<>();
+        if (branches == null) {
+            return refs;
+        }
+        for (Map<String, Object> branch : branches) {
+            if (branch != null && (branch.containsKey("$ref") || getSchemaNameFromRef(branch) != null)) {
+                refs.add(branch);
+            }
+        }
+        return refs;
+    }
+
+    private static List<Map<String, Object>> dedupeRefBranchesByTarget(List<Map<String, Object>> refBranches) {
+        List<Map<String, Object>> deduped = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (Map<String, Object> branch : refBranches) {
+            String name = getSchemaNameFromRef(branch);
+            if (name == null) {
+                deduped.add(branch);
+                continue;
+            }
+            if (!seen.contains(name)) {
+                seen.add(name);
+                deduped.add(branch);
+            }
+        }
+        return deduped;
+    }
+
+    /**
+     * Merge two property-level {@code allOf} lists when both sides use composition.
+     * Constraint-only branches from both sides are kept; {@code $ref} branches are chosen from
+     * {@code later} unless {@code earlier} is a write-only overlay merged under a read-only base
+     * (editFolder permissions pattern).
+     */
+    private static List<Map<String, Object>> mergePropertyLevelAllOf(List<Map<String, Object>> earlierAllOf,
+                                                                     List<Map<String, Object>> laterAllOf,
+                                                                     Map<String, Object> earlier,
+                                                                     Map<String, Object> later) {
+        List<Map<String, Object>> merged = new ArrayList<>();
+        for (Map<String, Object> branch : earlierAllOf) {
+            if (isConstraintOnlyAllOfBranch(branch)) {
+                merged.add(new LinkedHashMap<>(branch));
+            }
+        }
+        for (Map<String, Object> branch : laterAllOf) {
+            if (isConstraintOnlyAllOfBranch(branch)) {
+                merged.add(new LinkedHashMap<>(branch));
+            }
+        }
+        boolean earlierWrite = allOfBranchesContainFlag(earlierAllOf, "writeOnly")
+                || isSchemaFlagTrue(earlier, "writeOnly");
+        boolean laterRead = allOfBranchesContainFlag(laterAllOf, "readOnly")
+                || isSchemaFlagTrue(later, "readOnly");
+        boolean laterWrite = allOfBranchesContainFlag(laterAllOf, "writeOnly")
+                || isSchemaFlagTrue(later, "writeOnly");
+        boolean preferEarlierRefs = earlierWrite && laterRead && !laterWrite;
+
+        List<Map<String, Object>> refSource = preferEarlierRefs ? earlierAllOf : laterAllOf;
+        List<Map<String, Object>> refBranches = dedupeRefBranchesByTarget(extractRefBranches(refSource));
+        if (refBranches.isEmpty() && preferEarlierRefs) {
+            refBranches = dedupeRefBranchesByTarget(extractRefBranches(earlierAllOf));
+        }
+        if (refBranches.isEmpty() && !preferEarlierRefs) {
+            for (Map<String, Object> branch : laterAllOf) {
+                if (isResolvedSchemaAllOfBranch(branch)) {
+                    merged.add(new LinkedHashMap<>(branch));
+                }
+            }
+        } else {
+            for (Map<String, Object> branch : refBranches) {
+                merged.add(new LinkedHashMap<>(branch));
+            }
+        }
+        return merged;
+    }
+
+    // ---------------------------------------------------------------------------
+    //  Schema flag / name helpers
+    // ---------------------------------------------------------------------------
+
+    /** Return true if the schema has the given key set to a truthy value (e.g. readOnly, writeOnly). */
+    public static boolean isSchemaFlagTrue(Map<String, Object> schema, String key) {
+        if (schema == null || !schema.containsKey(key)) return false;
+        Object v = schema.get(key);
+        if (v instanceof Boolean) return Boolean.TRUE.equals(v);
+        if (v instanceof String) return "true".equalsIgnoreCase((String) v);
+        return false;
+    }
+
+    /**
+     * Extract component schema name from x-resolved-ref or $ref (e.g. "#/components/schemas/UserView" -> "UserView").
+     */
+    public static String getSchemaNameFromRef(Map<String, Object> schema) {
+        if (schema == null) return null;
+        String ref = (String) schema.get("x-resolved-ref");
+        if (ref == null) ref = (String) schema.get("$ref");
+        if (ref == null || !ref.contains("#/components/schemas/")) return null;
+        return ref.substring(ref.lastIndexOf("/") + 1);
+    }
+
+    /**
+     * Derive schema name from external file $ref (e.g. "./User.yaml" or "models/v3/User.yaml" -> "User").
+     * Used when array items have unresolved external $ref so we can resolve to List&lt;User&gt; if that schema exists.
+     */
+    public static String deriveSchemaNameFromExternalRef(String ref) {
+        if (ref == null || ref.isEmpty()) return null;
+        String path = ref.contains("#") ? ref.split("#", 2)[0] : ref;
+        path = path.replace('\\', '/');
+        int lastSlash = path.lastIndexOf('/');
+        String segment = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+        if (segment.isEmpty()) return null;
+        if (segment.endsWith(".yaml")) return segment.substring(0, segment.length() - 5);
+        if (segment.endsWith(".yml")) return segment.substring(0, segment.length() - 4);
+        if (segment.endsWith(".json")) return segment.substring(0, segment.length() - 5);
+        return segment;
+    }
+
+    // ---------------------------------------------------------------------------
+    //  Object-with-single-array-of-ref detection
+    // ---------------------------------------------------------------------------
+
+    /** Holder for (innerPropertyName, itemTypeName) when schema is object with single array of ref. */
+    public static final class ObjectWithSingleArrayInfo {
+        public final String innerPropertyName;
+        public final String itemTypeName;
+
+        ObjectWithSingleArrayInfo(String innerPropertyName, String itemTypeName) {
+            this.innerPropertyName = innerPropertyName;
+            this.itemTypeName = itemTypeName;
+        }
+    }
+
+    /**
+     * True if the schema is an object with exactly one property that is an array of a $ref.
+     * Used to generate a wrapper inner class instead of flattening to List.
+     */
+    public static boolean isObjectWithSingleArrayOfRef(Map<String, Object> schema, Map<String, Object> spec) {
+        return getObjectWithSingleArrayInfo(schema, spec) != null;
+    }
+
+    /**
+     * If the schema is an object with exactly one property that is an array of a $ref,
+     * return (innerPropertyName, itemTypeName) e.g. ("tagCategory", "TagCategory"). Otherwise null.
+     */
+    public static ObjectWithSingleArrayInfo getObjectWithSingleArrayInfo(Map<String, Object> schema, Map<String, Object> spec) {
+        if (schema == null || spec == null) return null;
+        Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+        if (properties == null || properties.size() != 1) return null;
+        Map.Entry<String, Object> single = properties.entrySet().iterator().next();
+        Map<String, Object> nested = Util.asStringObjectMap(single.getValue());
+        if (nested == null || !"array".equals(nested.get("type"))) return null;
+        Object itemsObj = nested.get("items");
+        if (itemsObj == null || !(itemsObj instanceof Map)) return null;
+        Map<String, Object> items = Util.asStringObjectMap(itemsObj);
+        if (items == null) return null;
+        String itemSchemaName = getSchemaNameFromRef(items);
+        if (itemSchemaName == null && items.containsKey("$ref")) {
+            String ref = (String) items.get("$ref");
+            if (ref != null && ref.startsWith("#/components/schemas/")) {
+                itemSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+            }
+        }
+        if (itemSchemaName == null && items.containsKey("$ref")) {
+            String ref = (String) items.get("$ref");
+            if (ref != null && (ref.endsWith(".yaml") || ref.endsWith(".yml") || ref.endsWith(".json"))) {
+                String externalSchemaName = deriveSchemaNameFromExternalRef(ref);
+                if (externalSchemaName != null) {
+                    Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+                    Map<String, Object> schemas = components != null ? Util.asStringObjectMap(components.get("schemas")) : null;
+                    if (schemas != null && schemas.containsKey(externalSchemaName)) {
+                        itemSchemaName = externalSchemaName;
+                    }
+                }
+            }
+        }
+        if (itemSchemaName == null || itemSchemaName.isEmpty()) return null;
+        return new ObjectWithSingleArrayInfo(single.getKey(), toJavaClassName(itemSchemaName));
+    }
+
+    /**
+     * Inner class name for an object-with-single-array property (e.g. accessTags -> AccessTags).
+     */
+    public static String getWrapperClassName(String propertyName) {
+        return capitalizeModelFieldName(toModelFieldName(propertyName));
+    }
+
+    /** Convert schema name to PascalCase Java class name. */
+    public static String toJavaClassName(String schemaName) {
+        if (schemaName == null || schemaName.isEmpty()) {
+            return "Unknown";
+        }
+        StringBuilder result = new StringBuilder();
+        boolean capitalizeNext = true;
+        for (char c : schemaName.toCharArray()) {
+            if (Character.isLetterOrDigit(c)) {
+                if (capitalizeNext) {
+                    result.append(Character.toUpperCase(c));
+                    capitalizeNext = false;
+                } else {
+                    result.append(c);
+                }
+            } else if (c == '-' || c == '_' || c == ' ' || c == '.') {
+                capitalizeNext = true;
+            }
+        }
+        if (result.isEmpty() || !Character.isLetter(result.charAt(0))) {
+            return "Schema" + result;
+        }
+        return result.toString();
+    }
+
+    /** Convert snake_case to camelCase (matches Jersey model field naming). */
+    private static String toCamelCase(String snakeCase) {
+        if (snakeCase == null || snakeCase.isEmpty()) {
+            return snakeCase;
+        }
+        String[] parts = snakeCase.split("_");
+        StringBuilder result = new StringBuilder(parts[0]);
+        for (int i = 1; i < parts.length; i++) {
+            result.append(capitalize(parts[i]));
+        }
+        return result.toString();
+    }
+
+    private static String capitalize(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.substring(0, 1).toUpperCase(Locale.ROOT) + str.substring(1);
+    }
+
+    private static String toModelFieldName(String propertyName) {
+        String camel = toCamelCase(propertyName);
+        return camel;
+    }
+
+    private static String capitalizeModelFieldName(String javaFieldName) {
+        if (javaFieldName == null || javaFieldName.isEmpty()) {
+            return javaFieldName;
+        }
+        String base = javaFieldName.startsWith("_") ? javaFieldName.substring(1) : javaFieldName;
+        return capitalize(base);
+    }
+
+    /**
+     * If the schema is an object with exactly one property that is an array of a $ref,
+     * return the Java type as List&lt;ResolvedRefType&gt;. Otherwise return null.
+     */
+    public static String getListTypeForObjectWithSingleArrayOfRef(Map<String, Object> schema, Map<String, Object> spec) {
+        ObjectWithSingleArrayInfo info = getObjectWithSingleArrayInfo(schema, spec);
+        return info == null ? null : "List<" + info.itemTypeName + ">";
+    }
+
+    /**
+     * Check if a schema object references the given schema name.
+     */
+    public static boolean isSchemaReference(Map<String, Object> schema, String schemaName) {
+        if (schema == null) return false;
+        String ref = (String) schema.get("$ref");
+        if (ref != null && ref.startsWith("#/components/schemas/")) {
+            String refSchemaName = ref.substring(ref.lastIndexOf("/") + 1);
+            return refSchemaName.equals(schemaName);
+        }
+        return false;
+    }
+}

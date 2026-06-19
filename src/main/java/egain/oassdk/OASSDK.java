@@ -367,6 +367,7 @@ public class OASSDK implements AutoCloseable {
 
             // Get generator
             var generator = generatorFactory.getGenerator(language, framework);
+            generatorFactory.ensureImplemented(generator, language, framework);
 
             // Apply filters from config if available
             applyConfigFilters();

@@ -4,6 +4,7 @@ import egain.oassdk.Util;
 import egain.oassdk.core.Constants;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.TestGenerator;
 
@@ -32,7 +33,7 @@ public class JestUnitTestGenerator implements TestGenerator, ConfigurableTestGen
             Files.createDirectories(outputPath);
 
             // Extract API information
-            String apiTitle = getAPITitle(spec);
+            String apiTitle = TestSpecUtils.getApiTitle(spec);
 
             // Generate test files for each endpoint
             generateTestFiles(spec, outputPath.toString(), apiTitle);
@@ -285,11 +286,6 @@ public class JestUnitTestGenerator implements TestGenerator, ConfigurableTestGen
     }
 
     // Helper methods
-    private String getAPITitle(Map<String, Object> spec) {
-        Map<String, Object> info = Util.asStringObjectMap(spec.get("info"));
-        return info != null ? (String) info.get("title") : "API";
-    }
-
     private String getOperationTag(Map<String, Object> operation) {
         if (operation.get("tags") instanceof List<?> tags && !tags.isEmpty()) {
             return String.valueOf(tags.get(0));
