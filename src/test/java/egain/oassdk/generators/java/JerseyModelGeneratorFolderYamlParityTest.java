@@ -200,6 +200,66 @@ class JerseyModelGeneratorFolderYamlParityTest {
         assertTrue(identity.contains("public void setId("), "Identity.id should have a public setter");
     }
 
+    @Test
+    @DisplayName("Inline IdentityPayload oneOf branches generate User/Group inner classes not Object")
+    void identityPayloadInlineOneOfGeneratesInnerOverlayClasses() throws OASSDKException, IOException {
+        Path specPath = Path.of("src/test/resources/identity_payload_inline_oneof_bundle/knowledge/models/contentmgr/v4/Permission.yaml")
+                .toAbsolutePath();
+        Path bundleRoot = Path.of("src/test/resources/identity_payload_inline_oneof_bundle").toAbsolutePath();
+        Path outputDir = tempOutputDir.resolve("inline-identity-payload");
+
+        GeneratorConfig config = GeneratorConfig.builder()
+                .modelsOnly(true)
+                .packageName("com.egain.bindings.ws.model.xsds.common.v4.content")
+                .outputDir(outputDir.toString())
+                .searchPaths(List.of(bundleRoot.toString()))
+                .build();
+
+        try (OASSDK sdk = new OASSDK(config, null, null)) {
+            sdk.loadSpec(specPath.toString());
+            sdk.generateApplication("java", "jersey", config.getPackageName(), outputDir.toString());
+        }
+
+        Path identityPayloadJava;
+        try (Stream<Path> walk = Files.walk(outputDir)) {
+            identityPayloadJava = walk
+                    .filter(p -> p.getFileName().toString().equals("IdentityPayload.java"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("IdentityPayload.java not found under " + outputDir));
+        }
+
+        String payload = Files.readString(identityPayloadJava, StandardCharsets.UTF_8);
+        assertTrue(payload.contains("private IdentityPayload.User user")
+                        || payload.contains("private User user"),
+                "IdentityPayload.user should be inner class User, not Object");
+        assertTrue(payload.contains("private IdentityPayload.Group group")
+                        || payload.contains("private Group group"),
+                "IdentityPayload.group should be inner class Group, not Object");
+        assertFalse(payload.contains("private Object user"),
+                "IdentityPayload must not emit Object for inline allOf user property");
+        assertFalse(payload.contains("private Object group"),
+                "IdentityPayload must not emit Object for inline allOf group property");
+        assertTrue(payload.contains("isValidRequiredMutuallyExclusive()"),
+                "IdentityPayload should retain oneOf XOR validation");
+
+        int userClassIdx = payload.indexOf("public static class User");
+        assertTrue(userClassIdx > 0, "IdentityPayload should contain static inner class User");
+        String userInnerClass = payload.substring(userClassIdx, Math.min(payload.length(), userClassIdx + 2500));
+        assertTrue(userInnerClass.contains("private String id;"),
+                "Inner User should declare id as String");
+        int idFieldIdx = userInnerClass.indexOf("private String id;");
+        String idFieldBlock = userInnerClass.substring(Math.max(0, idFieldIdx - 200), idFieldIdx + 30);
+        assertFalse(idFieldBlock.contains("JsonProperty.Access.READ_ONLY"),
+                "Inner User.id overlay readOnly:false must not emit READ_ONLY on id");
+        int userNameFieldIdx = userInnerClass.indexOf("private String userName;");
+        assertTrue(userNameFieldIdx > 0, "Inner User should include BasicUser userName field");
+        String userNameBlock = userInnerClass.substring(Math.max(0, userNameFieldIdx - 200), userNameFieldIdx + 20);
+        assertTrue(userNameBlock.contains("JsonProperty.Access.READ_ONLY"),
+                "Inner User.userName from BasicUser should remain READ_ONLY");
+        assertTrue(userInnerClass.contains("public void setId("),
+                "Inner User.id should have a public setter");
+    }
+
     private static String readResource(String classpathPath) throws IOException {
         try (InputStream in = JerseyModelGeneratorFolderYamlParityTest.class.getResourceAsStream(classpathPath)) {
             Objects.requireNonNull(in, "Missing classpath resource: " + classpathPath);

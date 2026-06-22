@@ -679,9 +679,6 @@ public final class JerseyTypeUtils {
         if (fieldSchema == null || spec == null) return false;
         // Do not create inner class for $ref: use separate model class (x-resolved-ref set when parser resolves $ref)
         if (JerseySchemaUtils.getSchemaNameFromRef(fieldSchema) != null) return false;
-        if (!"object".equals(fieldSchema.get("type"))) return false;
-        Map<String, Object> props = Util.asStringObjectMap(fieldSchema.get("properties"));
-        if (props == null || props.isEmpty()) return false;
         if (fieldSchema.containsKey("$ref")) return false;
         // Not a top-level schema: schema must not be the same object as any component schema
         Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
@@ -693,6 +690,21 @@ public final class JerseyTypeUtils {
                 }
             }
         }
+        // Inline allOf overlay (e.g. IdentityPayload oneOf branch user/group with BasicUser ref + readOnly:false on id)
+        if (fieldSchema.containsKey("allOf")) {
+            if (JerseySchemaUtils.findComponentSchemaName(fieldSchema, spec) != null) {
+                return false;
+            }
+            List<Map<String, Object>> allOf = Util.asStringObjectMapList(fieldSchema.get("allOf"));
+            if (allOf != null && !allOf.isEmpty()
+                    && JerseySchemaUtils.allOfHasPropertyOverlayBranches(allOf)) {
+                return true;
+            }
+            // Fall through: envelope may still have type + properties alongside ref-only allOf
+        }
+        if (!"object".equals(fieldSchema.get("type"))) return false;
+        Map<String, Object> props = Util.asStringObjectMap(fieldSchema.get("properties"));
+        if (props == null || props.isEmpty()) return false;
         return true;
     }
 

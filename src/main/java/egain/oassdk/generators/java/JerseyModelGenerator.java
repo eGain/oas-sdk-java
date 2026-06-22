@@ -422,24 +422,12 @@ class JerseyModelGenerator {
             }
 
             // Add @JsonProperty for name mapping and/or readOnly/writeOnly access
-            boolean isOneOfXorField = xorExclusiveJsonNames.contains(fieldName);
-            boolean readOnly = JerseySchemaUtils.isSchemaFlagTrue(fieldSchema, "readOnly") && !isOneOfXorField;
-            boolean writeOnly = JerseySchemaUtils.isSchemaFlagTrue(fieldSchema, "writeOnly");
-            if (readOnly && writeOnly) writeOnly = false;
-            String accessStr = null;
-            if (readOnly) accessStr = "READ_ONLY";
-            else if (writeOnly) accessStr = "WRITE_ONLY";
-            boolean needName = !fieldName.equals(javaFieldName);
-            if (needName || accessStr != null) {
-                content.append("@JsonProperty(");
-                if (needName) content.append("value = \"").append(fieldName).append("\"");
-                if (needName && accessStr != null) content.append(", ");
-                if (accessStr != null) content.append("access = JsonProperty.Access.").append(accessStr);
-                content.append(")\n    ");
-            }
+            appendJsonPropertyAccessAnnotation(content, "    ", fieldName, javaFieldName, fieldSchema,
+                    xorExclusiveJsonNames.contains(fieldName));
 
             // Add validation annotations based on schema constraints
-            boolean effectiveFieldRequired = allRequired.contains(fieldName) && !isOneOfXorField;
+            boolean effectiveFieldRequired = allRequired.contains(fieldName)
+                    && !xorExclusiveJsonNames.contains(fieldName);
             String validationAnnotations = typeUtils.generateValidationAnnotations(fieldSchema, effectiveFieldRequired);
             if (!validationAnnotations.isEmpty()) {
                 content.append(validationAnnotations);
@@ -876,6 +864,45 @@ class JerseyModelGenerator {
     // ---------------------------------------------------------------------------
 
     /**
+     * Emit {@code @JsonProperty} when JSON name differs from the Java field or when {@code readOnly}/{@code writeOnly}
+     * access must be reflected in Jackson annotations.
+     */
+    private static void appendJsonPropertyAccessAnnotation(
+            StringBuilder content,
+            String indent,
+            String fieldName,
+            String javaFieldName,
+            Map<String, Object> fieldSchema,
+            boolean skipReadOnly) {
+        boolean readOnly = JerseySchemaUtils.isSchemaFlagTrue(fieldSchema, "readOnly") && !skipReadOnly;
+        boolean writeOnly = JerseySchemaUtils.isSchemaFlagTrue(fieldSchema, "writeOnly");
+        if (readOnly && writeOnly) {
+            writeOnly = false;
+        }
+        String accessStr = null;
+        if (readOnly) {
+            accessStr = "READ_ONLY";
+        } else if (writeOnly) {
+            accessStr = "WRITE_ONLY";
+        }
+        boolean needName = !fieldName.equals(javaFieldName);
+        if (!needName && accessStr == null) {
+            return;
+        }
+        content.append(indent).append("@JsonProperty(");
+        if (needName) {
+            content.append("value = \"").append(fieldName).append("\"");
+        }
+        if (needName && accessStr != null) {
+            content.append(", ");
+        }
+        if (accessStr != null) {
+            content.append("access = JsonProperty.Access.").append(accessStr);
+        }
+        content.append(")\n").append(indent);
+    }
+
+    /**
      * Append a static inner class for an inline object property.
      */
     void appendInnerClassForInlineObject(StringBuilder content, String enclosingClassName, String propertyName, Map<String, Object> innerSchema, Map<String, Object> spec) {
@@ -884,6 +911,18 @@ class JerseyModelGenerator {
         if (innerSchema.containsKey("allOf")) {
             List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(innerSchema.get("allOf"));
             JerseySchemaUtils.mergeAllOfBranchesIntoProperties(allOfSchemas, allProperties, allRequired, spec);
+            List<String> envelopeRequired = Util.asStringList(innerSchema.get("required"));
+            if (envelopeRequired != null) {
+                for (String r : envelopeRequired) {
+                    if (!allRequired.contains(r)) {
+                        allRequired.add(r);
+                    }
+                }
+            }
+            Map<String, Object> envelopeProps = Util.asStringObjectMap(innerSchema.get("properties"));
+            if (envelopeProps != null && !envelopeProps.isEmpty()) {
+                JerseySchemaUtils.mergePropertiesIntoAll(allProperties, envelopeProps);
+            }
         } else if (innerSchema.containsKey("oneOf") || innerSchema.containsKey("anyOf")) {
             List<Map<String, Object>> schemasList = Util.asStringObjectMapList(
                     innerSchema.containsKey("oneOf") ? innerSchema.get("oneOf") : innerSchema.get("anyOf"));
@@ -933,6 +972,7 @@ class JerseyModelGenerator {
             content.append("@XmlElement(name = \"").append(fieldName).append("\"");
             if (allRequired.contains(fieldName)) content.append(", required = true");
             content.append(")\n").append(indentBody);
+            appendJsonPropertyAccessAnnotation(content, indentBody, fieldName, javaFieldName, fieldSchema, false);
             String validationAnnotations = typeUtils.generateValidationAnnotations(fieldSchema, allRequired.contains(fieldName));
             if (!validationAnnotations.isEmpty()) {
                 content.append(validationAnnotations.replace("\n    ", "\n" + indentBody));

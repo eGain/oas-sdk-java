@@ -207,6 +207,67 @@ class JerseyTypeUtilsTest {
     }
 
     @Test
+    @DisplayName("isInlineObjectProperty is true for unregistered inline allOf overlay with BasicUser ref")
+    void isInlineObjectProperty_inlineAllOfOverlay_returnsTrue() {
+        Map<String, Object> userSchema = new LinkedHashMap<>();
+        userSchema.put("type", "object");
+        userSchema.put("required", List.of("id"));
+        userSchema.put("allOf", List.of(
+                Map.of("properties", Map.of("id", Map.of("readOnly", false))),
+                Map.of("$ref", "#/components/schemas/BasicUser")));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "BasicUser", Map.of("type", "object", "properties", Map.of("id", Map.of("type", "string"))))));
+
+        assertTrue(createTypeUtils(spec).isInlineObjectProperty(userSchema, spec));
+    }
+
+    @Test
+    @DisplayName("isInlineObjectProperty is true for type object + properties + ref-only allOf")
+    void isInlineObjectProperty_envelopePropertiesWithRefOnlyAllOf_returnsTrue() {
+        Map<String, Object> inlineSchema = new LinkedHashMap<>();
+        inlineSchema.put("type", "object");
+        inlineSchema.put("properties", Map.of("extraField", Map.of("type", "string")));
+        inlineSchema.put("allOf", List.of(Map.of("$ref", "#/components/schemas/Base")));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "Base", Map.of("type", "object", "properties", Map.of("id", Map.of("type", "string"))))));
+
+        assertTrue(createTypeUtils(spec).isInlineObjectProperty(inlineSchema, spec));
+    }
+
+    @Test
+    @DisplayName("isInlineObjectProperty is false for $ref to registered Identity component")
+    void isInlineObjectProperty_refToIdentity_returnsFalse() {
+        Map<String, Object> identity = new LinkedHashMap<>();
+        identity.put("allOf", List.of(
+                Map.of("properties", Map.of("id", Map.of("type", "string", "readOnly", false))),
+                Map.of("$ref", "#/components/schemas/BasicUser")));
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("Identity", identity);
+        schemas.put("BasicUser", Map.of("type", "object"));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", schemas));
+
+        assertFalse(createTypeUtils(spec).isInlineObjectProperty(
+                Map.of("$ref", "#/components/schemas/Identity"), spec));
+    }
+
+    @Test
+    @DisplayName("getFieldTypeForModelProperty returns IdentityPayload.User for inline allOf overlay property")
+    void getFieldTypeForModelProperty_inlineAllOfOverlay_returnsInnerClassType() {
+        Map<String, Object> userSchema = new LinkedHashMap<>();
+        userSchema.put("type", "object");
+        userSchema.put("required", List.of("id"));
+        userSchema.put("allOf", List.of(
+                Map.of("properties", Map.of("id", Map.of("readOnly", false))),
+                Map.of("$ref", "#/components/schemas/BasicUser")));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "BasicUser", Map.of("type", "object"))));
+
+        JerseyTypeUtils typeUtils = createTypeUtils(spec);
+        assertEquals("IdentityPayload.User",
+                typeUtils.getFieldTypeForModelProperty("IdentityPayload", "user", userSchema, false, spec));
+    }
+
+    @Test
     @DisplayName("getJavaType returns XMLGregorianCalendar for date format")
     void getJavaType_date() {
         Map<String, Object> schema = Map.of("type", "string", "format", "date");
