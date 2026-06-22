@@ -45,6 +45,7 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
 
             // Generate mock data for all schemas
             generateMockDataForSchemas(spec, outputPath.toString(), apiTitle);
+            generateOperationRequestBodies(spec, outputPath.resolve("operations").toString());
 
             // Generate mock data generator utility class
             generateMockDataGeneratorClass(outputPath.toString());
@@ -518,6 +519,43 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
             return listToJson((List<?>) mockData, 0);
         }
         return "{}";
+    }
+
+    private void generateOperationRequestBodies(Map<String, Object> spec, String outputDir) throws IOException {
+        Files.createDirectories(Paths.get(outputDir));
+        Map<String, Object> paths = Util.asStringObjectMap(spec.get("paths"));
+        if (paths == null) {
+            return;
+        }
+        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+            Map<String, Object> pathItem = Util.asStringObjectMap(pathEntry.getValue());
+            if (pathItem == null) {
+                continue;
+            }
+            for (String method : List.of("get", "post", "put", "patch", "delete")) {
+                if (!pathItem.containsKey(method)) {
+                    continue;
+                }
+                Map<String, Object> operation = Util.asStringObjectMap(pathItem.get(method));
+                if (operation == null || !operation.containsKey("requestBody")) {
+                    continue;
+                }
+                String opId = (String) operation.get("operationId");
+                if (opId == null || opId.isBlank()) {
+                    opId = method + pathEntry.getKey().replaceAll("[^a-zA-Z0-9]", "_");
+                }
+                String json = generateRequestBodyJsonForWrite(operation, spec);
+                Files.writeString(Paths.get(outputDir, opId + "_request.json"), json);
+            }
+        }
+    }
+
+    private String generateRequestBodyJsonForWrite(Map<String, Object> operation, Map<String, Object> spec) {
+        String json = generateRequestBodyJson(operation, spec);
+        if (json == null || json.isBlank()) {
+            return "{}";
+        }
+        return json;
     }
 
     /**

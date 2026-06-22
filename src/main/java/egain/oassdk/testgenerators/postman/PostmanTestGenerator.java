@@ -119,6 +119,13 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         List<Map<String, Object>> variables = generateVariables(spec);
         collection.put("variable", variables);
 
+        Map<String, Object> auth = new LinkedHashMap<>();
+        auth.put("type", "bearer");
+        List<Map<String, Object>> bearer = new ArrayList<>();
+        bearer.add(Map.of("key", "token", "value", "{{auth_token}}", "type", "string"));
+        auth.put("bearer", bearer);
+        collection.put("auth", auth);
+
         // Convert to JSON
         String json = convertToJson(collection);
 
@@ -572,6 +579,10 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         }
 
         variables.add(variableEntry("base_url", baseUrl));
+        variables.add(variableEntry("auth_token", ""));
+        variables.add(variableEntry("departmentId", ""));
+        variables.add(variableEntry("filter_parent", ""));
+        variables.add(variableEntry("folderID", ""));
         for (Map.Entry<String, String> e : paramDefaults.entrySet()) {
             variables.add(variableEntry(e.getKey(), e.getValue()));
         }

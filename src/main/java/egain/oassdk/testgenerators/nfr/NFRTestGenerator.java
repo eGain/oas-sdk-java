@@ -3,6 +3,9 @@ package egain.oassdk.testgenerators.nfr;
 import egain.oassdk.Util;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestCodegenSupport;
+import egain.oassdk.testgenerators.common.TestMavenSupport;
+import egain.oassdk.testgenerators.common.TestOutputLayout;
 import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.TestGenerator;
@@ -34,7 +37,7 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
 
             // Extract API information
             String apiTitle = TestSpecUtils.getApiTitle(spec);
-            String baseUrl = TestSpecUtils.getBaseUrl(spec);
+            String baseUrl = TestSpecUtils.resolveBaseUrl(spec, config);
             String basePackage = "com.example.api";
             if (config != null && config.getAdditionalProperties() != null) {
                 Object packageNameObj = config.getAdditionalProperties().get("packageName");
@@ -48,6 +51,7 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
 
             // Generate NFR configuration
             generateNFRConfiguration(outputPath.toString(), baseUrl);
+            generatePomXml(outputPath.toString(), basePackage);
 
         } catch (Exception e) {
             throw new GenerationException("Failed to generate NFR tests: " + e.getMessage(), e);
@@ -63,7 +67,7 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
             return;
         }
 
-        String packageDir = outputDir + "/" + basePackage.replace(".", "/");
+        String packageDir = TestOutputLayout.testJavaDir(outputDir, basePackage);
         Files.createDirectories(Paths.get(packageDir));
 
         // Generate comprehensive NFR test class
@@ -89,7 +93,8 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
         sb.append("import io.restassured.http.ContentType;\n");
         sb.append("import io.restassured.response.Response;\n");
         sb.append("import java.util.*;\n");
-        sb.append("import java.util.concurrent.*;\n\n");
+        sb.append("import java.util.concurrent.*;\n");
+        sb.append(TestCodegenSupport.supportImport(basePackage));
 
         // Class declaration
         sb.append("/**\n");
@@ -107,22 +112,15 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
         sb.append("public class ").append(className).append(" {\n\n");
 
         // Constants
-        sb.append("    private static final int MAX_RESPONSE_TIME_MS = 2000; // 2 seconds\n");
-        sb.append("    private static final int CONCURRENT_USERS = 10;\n");
-        sb.append("    private static final int REQUESTS_PER_USER = 10;\n");
-        sb.append("    private static final double MAX_ERROR_RATE = 0.01; // 1%\n\n");
+        sb.append("    private static final int MAX_RESPONSE_TIME_MS = TestEnv.getInt(\"nfr.maxResponseTimeMs\", 2000);\n");
+        sb.append("    private static final int CONCURRENT_USERS = TestEnv.getInt(\"nfr.concurrentUsers\", 10);\n");
+        sb.append("    private static final int REQUESTS_PER_USER = TestEnv.getInt(\"nfr.requestsPerUser\", 10);\n");
+        sb.append("    private static final double MAX_ERROR_RATE = 0.01;\n\n");
 
-        // Setup
-        sb.append("    @BeforeAll\n");
-        sb.append("    static void initRestAssured() {\n");
-        sb.append("        String env = System.getenv(\"API_BASE_URL\");\n");
-        sb.append("        io.restassured.RestAssured.baseURI = (env != null && !env.isEmpty()) ? env : \"")
-                .append(escapeJavaString(baseUrl)).append("\";\n");
-        sb.append("    }\n\n");
+        sb.append(TestCodegenSupport.restAssuredInit()).append("\n");
 
         sb.append("    private static String authToken() {\n");
-        sb.append("        String t = System.getenv(\"API_TOKEN\");\n");
-        sb.append("        return t != null ? t : \"\";\n");
+        sb.append("        return TestAuth.rawToken();\n");
         sb.append("    }\n\n");
 
         // Performance tests
@@ -304,6 +302,14 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
     /**
      * Generate NFR configuration
      */
+    private void generatePomXml(String outputDir, String basePackage) throws IOException {
+        String pom = TestMavenSupport.pomHeader("api-nfr-tests", basePackage)
+                + TestMavenSupport.junitDependency()
+                + TestMavenSupport.restAssuredDependencies()
+                + TestMavenSupport.buildSectionWithTestSupport();
+        Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes());
+    }
+
     private void generateNFRConfiguration(String outputDir, String baseUrl) throws IOException {
         String configContent = "# NFR Test Configuration\n" +
                 "# Generated from OpenAPI specification\n\n" +

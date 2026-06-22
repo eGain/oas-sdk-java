@@ -187,6 +187,13 @@ public final class IntegrationScenarioSupport {
     }
 
     public static String getParameterExample(Map<String, Object> param) {
+        Map<String, Object> schema = param.containsKey("schema")
+                ? Util.asStringObjectMap(param.get("schema")) : null;
+        String raw = extractRawParameterExample(param, schema);
+        return clampParameterValue(raw, schema, param);
+    }
+
+    private static String extractRawParameterExample(Map<String, Object> param, Map<String, Object> schema) {
         if (param.containsKey("example")) {
             return formatParameterExampleValue(param.get("example"), param);
         }
@@ -201,29 +208,101 @@ public final class IntegrationScenarioSupport {
                 }
             }
         }
-        if (param.containsKey("schema")) {
-            Map<String, Object> schema = Util.asStringObjectMap(param.get("schema"));
-            if (schema != null && schema.containsKey("example")) {
-                return formatParameterExampleValue(schema.get("example"), param);
-            }
-            if (schema != null) {
-                String type = (String) schema.get("type");
-                if ("string".equals(type)) {
-                    List<?> enumVals = schema.get("enum") instanceof List<?> l ? l : null;
-                    if (enumVals != null && !enumVals.isEmpty()) {
-                        return String.valueOf(enumVals.get(0));
-                    }
-                    return "test-value";
-                } else if ("integer".equals(type) || "number".equals(type)) {
-                    return "123";
-                } else if ("boolean".equals(type)) {
-                    return "true";
-                } else if ("array".equals(type)) {
-                    return arrayParameterExample(schema, param);
+        if (schema != null && schema.containsKey("example")) {
+            return formatParameterExampleValue(schema.get("example"), param);
+        }
+        if (schema != null) {
+            String type = (String) schema.get("type");
+            if ("string".equals(type)) {
+                List<?> enumVals = schema.get("enum") instanceof List<?> l ? l : null;
+                if (enumVals != null && !enumVals.isEmpty()) {
+                    return String.valueOf(enumVals.get(0));
                 }
+                return "test-value";
+            } else if ("integer".equals(type) || "number".equals(type)) {
+                return defaultNumericExample(schema);
+            } else if ("boolean".equals(type)) {
+                return "true";
+            } else if ("array".equals(type)) {
+                return arrayParameterExample(schema, param);
             }
         }
         return "example";
+    }
+
+    private static String defaultNumericExample(Map<String, Object> schema) {
+        Object min = schema.get("minimum");
+        if (min instanceof Number n) {
+            return String.valueOf(n.longValue());
+        }
+        Object def = schema.get("default");
+        if (def instanceof Number n) {
+            return String.valueOf(n.longValue());
+        }
+        Object max = schema.get("maximum");
+        if (max instanceof Number n && n.longValue() > 0) {
+            return "1";
+        }
+        return "1";
+    }
+
+    static String clampParameterValue(String raw, Map<String, Object> schema, Map<String, Object> param) {
+        if (schema == null || raw == null || raw.isBlank()) {
+            return raw;
+        }
+        String type = (String) schema.get("type");
+        if (!"integer".equals(type) && !"number".equals(type)) {
+            return raw;
+        }
+        try {
+            long v = Long.parseLong(raw.trim());
+            Object min = schema.get("minimum");
+            if (min instanceof Number n) {
+                v = Math.max(v, n.longValue());
+            }
+            Object max = schema.get("maximum");
+            if (max instanceof Number n) {
+                v = Math.min(v, n.longValue());
+            }
+            return String.valueOf(v);
+        } catch (NumberFormatException e) {
+            return defaultNumericExample(schema);
+        }
+    }
+
+    /**
+     * Build query params for success-path tests; omits {@code $order} when {@code $sort} absent.
+     */
+    public static Map<String, String> buildSuccessQueryParams(List<Map<String, Object>> parameters,
+                                                              Map<String, Object> spec) {
+        Map<String, String> result = new LinkedHashMap<>();
+        if (parameters == null) {
+            return result;
+        }
+        boolean hasSort = false;
+        for (Map<String, Object> param : parameters) {
+            if ("query".equals(param.get("in"))) {
+                String name = String.valueOf(param.get("name"));
+                if ("$sort".equals(name) || "sort".equals(name)) {
+                    hasSort = true;
+                    break;
+                }
+            }
+        }
+        for (Map<String, Object> param : parameters) {
+            if (!"query".equals(param.get("in"))) {
+                continue;
+            }
+            String name = String.valueOf(param.get("name"));
+            if (("$order".equals(name) || "order".equals(name)) && !hasSort) {
+                continue;
+            }
+            if (Boolean.FALSE.equals(param.get("required"))) {
+                // include common optional params with valid examples
+            }
+            result.put(name, getParameterExample(param));
+        }
+        return result;
     }
 
     private static String arrayParameterExample(Map<String, Object> schema, Map<String, Object> param) {

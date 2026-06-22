@@ -4,6 +4,9 @@ import egain.oassdk.Util;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.Constants;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestCodegenSupport;
+import egain.oassdk.testgenerators.common.TestMavenSupport;
+import egain.oassdk.testgenerators.common.TestOutputLayout;
 import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.IntegrationScenarioSupport;
@@ -92,7 +95,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             List<OperationInfo> operations = tagEntry.getValue();
 
             String className = toClassName(tag) + "ApiTest";
-            String packageDir = outputDir + "/" + basePackage.replace(".", "/");
+            String packageDir = TestOutputLayout.testJavaDir(outputDir, basePackage);
             Files.createDirectories(Paths.get(packageDir));
 
             String testClassContent = generateTestClass(basePackage, className, tag, operations, spec);
@@ -122,30 +125,30 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         if (needsConcurrent) {
             sb.append("import java.util.concurrent.*;\n");
         }
-        sb.append("import java.util.*;\n\n");
+        sb.append("import java.util.*;\n");
+        sb.append(TestCodegenSupport.supportImport(basePackage));
 
         sb.append("/**\n");
-        sb.append(" * API tests for ").append(escapeJavadoc(tag)).append(" (generated from OpenAPI).\n");
-        sb.append(" * <p>Requires {@code io.rest-assured:rest-assured} (5.x) and JUnit 5.\n");
-        sb.append(" * Override base URL with env {@code API_BASE_URL}; optional {@code API_TOKEN} for Authorization.\n");
+        sb.append(" * API contract tests for ").append(escapeJavadoc(tag)).append(" (generated from OpenAPI).\n");
+        sb.append(" * <p>Live HTTP tests — configure via test-env.properties / TestEnv.\n");
         sb.append(" */\n");
-        sb.append("@DisplayName(\"").append(escapeJavaString(tag)).append(" API Tests\")\n");
+        sb.append("@DisplayName(\"").append(escapeJavaString(tag)).append(" API Contract Tests\")\n");
+        sb.append("@TestInstance(TestInstance.Lifecycle.PER_CLASS)\n");
         sb.append("public class ").append(className).append(" {\n\n");
 
-        sb.append("    @BeforeAll\n");
-        sb.append("    static void initRestAssured() {\n");
-        sb.append("        String env = System.getenv(\"API_BASE_URL\");\n");
-        sb.append("        io.restassured.RestAssured.baseURI = (env != null && !env.isEmpty()) ? env : \"")
-                .append(escapeJavaString(baseUrl)).append("\";\n");
-        sb.append("    }\n\n");
+        sb.append(TestCodegenSupport.restAssuredInit()).append("\n");
 
         if (needsConcurrent) {
             sb.append("    private static final int CONCURRENT_TEST_THREADS = ").append(concurrentThreads).append(";\n\n");
         }
 
         sb.append("    private static String authToken() {\n");
-        sb.append("        String t = System.getenv(\"API_TOKEN\");\n");
-        sb.append("        return t != null ? t : \"\";\n");
+        sb.append("        return TestAuth.rawToken();\n");
+        sb.append("    }\n\n");
+
+        sb.append("    @AfterEach\n");
+        sb.append("    void tearDown() {\n");
+        sb.append("        // Live resource cleanup: see integration and sequence-java modules\n");
         sb.append("    }\n\n");
 
         for (OperationInfo opInfo : operations) {
@@ -537,17 +540,15 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                 continue;
             }
             String name = (String) param.get("name");
-            sb.append("        pathParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                    .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
+            String example = IntegrationScenarioSupport.getParameterExample(param);
+            sb.append("        pathParams.put(\"").append(escapeJavaString(name)).append("\", ")
+                    .append(TestCodegenSupport.paramValueExpression(name, example)).append(");\n");
         }
         sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
-        for (Map<String, Object> param : parameters) {
-            if (!"query".equals(param.get("in"))) {
-                continue;
-            }
-            String name = (String) param.get("name");
-            sb.append("        queryParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                    .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
+        Map<String, String> successQuery = IntegrationScenarioSupport.buildSuccessQueryParams(parameters, Map.of());
+        for (Map.Entry<String, String> e : successQuery.entrySet()) {
+            sb.append("        queryParams.put(\"").append(escapeJavaString(e.getKey())).append("\", ")
+                    .append(TestCodegenSupport.paramValueExpression(e.getKey(), e.getValue())).append(");\n");
         }
     }
 
@@ -812,10 +813,17 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
     }
 
     private void generateTestUtilities(String outputDir, String basePackage) throws IOException {
-        String packageDir = outputDir + "/" + basePackage.replace(".", "/");
+        String packageDir = TestOutputLayout.testJavaDir(outputDir, basePackage);
         Files.createDirectories(Paths.get(packageDir));
-        String utilsContent = generateTestUtilsClass(basePackage);
-        Files.write(Paths.get(packageDir, "TestUtils.java"), utilsContent.getBytes());
+        Files.write(Paths.get(packageDir, "TestUtils.java"), generateTestUtilsClass(basePackage).getBytes());
+    }
+
+    private void generatePomXml(String outputDir, String basePackage) throws IOException {
+        String pomContent = TestMavenSupport.pomHeader("api-unit-tests", basePackage)
+                + TestMavenSupport.junitDependency()
+                + TestMavenSupport.restAssuredDependencies()
+                + TestMavenSupport.buildSectionWithTestSupport();
+        Files.write(Paths.get(outputDir, "pom.xml"), pomContent.getBytes());
     }
 
     private String generateTestUtilsClass(String basePackage) {
@@ -855,84 +863,6 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         sb.append("    }\n");
         sb.append("}\n");
         return sb.toString();
-    }
-
-    private void generatePomXml(String outputDir, String basePackage) throws IOException {
-        String pomContent = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0"
-                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <groupId>%s</groupId>
-                    <artifactId>api-unit-tests</artifactId>
-                    <version>1.0.0</version>
-                    <packaging>jar</packaging>
-
-                    <properties>
-                        <maven.compiler.source>21</maven.compiler.source>
-                        <maven.compiler.target>21</maven.compiler.target>
-                        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-                        <junit.version>5.12.2</junit.version>
-                        <restassured.version>5.5.2</restassured.version>
-                        <jacoco.version>0.8.13</jacoco.version>
-                    </properties>
-
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.junit.jupiter</groupId>
-                            <artifactId>junit-jupiter</artifactId>
-                            <version>${junit.version}</version>
-                            <scope>test</scope>
-                        </dependency>
-                        <dependency>
-                            <groupId>io.rest-assured</groupId>
-                            <artifactId>rest-assured</artifactId>
-                            <version>${restassured.version}</version>
-                            <scope>test</scope>
-                        </dependency>
-                        <dependency>
-                            <groupId>org.hamcrest</groupId>
-                            <artifactId>hamcrest</artifactId>
-                            <version>3.0</version>
-                            <scope>test</scope>
-                        </dependency>
-                    </dependencies>
-
-                    <build>
-                        <plugins>
-                            <plugin>
-                                <groupId>org.apache.maven.plugins</groupId>
-                                <artifactId>maven-surefire-plugin</artifactId>
-                                <version>3.5.5</version>
-                            </plugin>
-                            <plugin>
-                                <groupId>org.jacoco</groupId>
-                                <artifactId>jacoco-maven-plugin</artifactId>
-                                <version>${jacoco.version}</version>
-                                <executions>
-                                    <execution>
-                                        <id>prepare-agent</id>
-                                        <goals>
-                                            <goal>prepare-agent</goal>
-                                        </goals>
-                                    </execution>
-                                    <execution>
-                                        <id>report</id>
-                                        <phase>test</phase>
-                                        <goals>
-                                            <goal>report</goal>
-                                        </goals>
-                                    </execution>
-                                </executions>
-                            </plugin>
-                        </plugins>
-                    </build>
-                </project>
-                """.formatted(basePackage);
-
-        Files.write(Paths.get(outputDir, "pom.xml"), pomContent.getBytes());
     }
 
     private String getOperationTag(Map<String, Object> operation) {

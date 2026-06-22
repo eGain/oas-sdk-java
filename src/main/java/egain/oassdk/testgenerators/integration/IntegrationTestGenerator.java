@@ -4,6 +4,9 @@ import egain.oassdk.Util;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.Constants;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestCodegenSupport;
+import egain.oassdk.testgenerators.common.TestMavenSupport;
+import egain.oassdk.testgenerators.common.TestOutputLayout;
 import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.IntegrationScenarioSupport;
@@ -49,8 +52,8 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 }
             }
 
-            // Get base URL from servers
-            String baseUrl = TestSpecUtils.getBaseUrl(spec);
+            // Get base URL from servers (default for test-env.properties; runtime uses TestEnv)
+            String baseUrl = TestSpecUtils.resolveBaseUrl(spec, config);
 
             // Generate test classes for each endpoint
             generateTestClasses(spec, outputPath.toString(), basePackage, apiTitle, baseUrl);
@@ -110,7 +113,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             List<OperationInfo> operations = tagEntry.getValue();
 
             String className = toClassName(tag) + "IntegrationTest";
-            String packageDir = outputDir + "/" + basePackage.replace(".", "/");
+            String packageDir = TestOutputLayout.testJavaDir(outputDir, basePackage);
             Files.createDirectories(Paths.get(packageDir));
 
             String testClassContent = generateTestClass(basePackage, className, tag, operations, spec, baseUrl);
@@ -137,7 +140,8 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         sb.append("import java.net.URI;\n");
         sb.append("import java.time.Duration;\n");
         sb.append("import java.util.*;\n");
-        sb.append("import java.util.concurrent.CompletableFuture;\n\n");
+        sb.append("import java.util.concurrent.CompletableFuture;\n");
+        sb.append(TestCodegenSupport.supportImport(basePackage));
 
         // Class declaration
         sb.append("/**\n");
@@ -149,35 +153,32 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         sb.append(" */\n");
         sb.append("@DisplayName(\"").append(tag).append(" Integration Tests\")\n");
         sb.append("@TestMethodOrder(MethodOrderer.OrderAnnotation.class)\n");
+        sb.append("@TestInstance(TestInstance.Lifecycle.PER_CLASS)\n");
         sb.append("public class ").append(className).append(" {\n\n");
 
-        // Constants
-        sb.append("    private static final String BASE_URL = \"").append(baseUrl).append("\";\n");
         sb.append("    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);\n");
         sb.append("    private static HttpClient httpClient;\n\n");
 
-        // Class-level setup
         sb.append("    @BeforeAll\n");
         sb.append("    static void setUpAll() {\n");
-        sb.append("        httpClient = HttpClient.newBuilder()\n");
-        sb.append("            .connectTimeout(REQUEST_TIMEOUT)\n");
-        sb.append("            .build();\n");
-        sb.append("        \n");
-        sb.append("        if (!IntegrationTestUtils.waitForServer(BASE_URL, REQUEST_TIMEOUT)) {\n");
-        sb.append("            System.err.println(\"Warning: Could not reach server at \" + BASE_URL);\n");
-        sb.append("            System.err.println(\"Some tests may fail if server is not running.\");\n");
+        sb.append("        httpClient = TestHttp.client();\n");
+        sb.append("        String url = TestEnv.baseUrl();\n");
+        sb.append("        if (!IntegrationTestUtils.waitForServer(url, REQUEST_TIMEOUT)) {\n");
+        sb.append("            System.err.println(\"Warning: Could not reach server at \" + url);\n");
+        sb.append("        }\n");
+        sb.append("        if (TestEnv.bootstrapEnabled()) {\n");
+        sb.append("            IntegrationTestUtils.bootstrapBaseData(httpClient, REQUEST_TIMEOUT);\n");
         sb.append("        }\n");
         sb.append("    }\n\n");
 
-        // Test setup
         sb.append("    @BeforeEach\n");
         sb.append("    void setUp() {\n");
-        sb.append("        // Setup test data if needed\n");
+        sb.append("        // per-test setup\n");
         sb.append("    }\n\n");
 
         sb.append("    @AfterEach\n");
-        sb.append("    void tearDown() {\n");
-        sb.append("        // Cleanup test data if needed\n");
+        sb.append("    void tearDown() throws Exception {\n");
+        sb.append("        IntegrationTestUtils.cleanupCreatedResources(httpClient, REQUEST_TIMEOUT);\n");
         sb.append("    }\n\n");
 
         // Generate test methods for each operation
@@ -192,7 +193,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         sb.append("     * Helper method to build request URI\n");
         sb.append("     */\n");
         sb.append("    private URI buildUri(String path, Map<String, String> queryParams) {\n");
-        sb.append("        StringBuilder uriBuilder = new StringBuilder(BASE_URL).append(path);\n");
+        sb.append("        StringBuilder uriBuilder = new StringBuilder(TestEnv.baseUrl()).append(path);\n");
         sb.append("        if (queryParams != null && !queryParams.isEmpty()) {\n");
         sb.append("            uriBuilder.append(\"?\");\n");
         sb.append("            boolean first = true;\n");
@@ -226,41 +227,61 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         sb.append("    }\n\n");
 
         generateAuthSetupFromSecuritySchemes(sb, spec);
-        appendMultiContextAuthHelpers(sb);
+        sb.append(TestCodegenSupport.tokenHelpers()).append("\n");
 
         sb.append("}\n");
 
         return sb.toString();
     }
 
+    private void appendCreateGetVerifyBlock(StringBuilder sb, String method, String path,
+                                          OperationInfo opInfo, Map<String, Object> spec,
+                                          boolean requiresAuth) {
+        if (!"POST".equals(method)) {
+            return;
+        }
+        Map<String, Object> responses = Util.asStringObjectMap(opInfo.operation.get("responses"));
+        if (responses == null || !responses.containsKey("201")) {
+            return;
+        }
+        String getPath = findGetByIdPath(spec, path);
+        if (getPath == null) {
+            return;
+        }
+        sb.append("        String createdId = IntegrationTestUtils.extractCreatedId(response);\n");
+        sb.append("        if (createdId != null) {\n");
+        sb.append("            TestContext.trackCreatedId(createdId);\n");
+        sb.append("            IntegrationTestUtils.assertGetMatchesCreate(httpClient, createdId, \"")
+                .append(IntegrationScenarioSupport.escapeJavaString(getPath))
+                .append("\", REQUEST_TIMEOUT, response.body()");
+        if (requiresAuth) {
+            sb.append(", getTokenClientApplication()");
+        } else {
+            sb.append(", null");
+        }
+        sb.append(");\n");
+        sb.append("        }\n");
+    }
+
+    private String findGetByIdPath(Map<String, Object> spec, String collectionPath) {
+        Map<String, Object> paths = Util.asStringObjectMap(spec.get("paths"));
+        if (paths == null) {
+            return null;
+        }
+        String candidate = collectionPath.endsWith("/") ? collectionPath + "{id}" : collectionPath + "/{id}";
+        for (String p : paths.keySet()) {
+            if (p.matches(".*\\{[^}]+}.*") && p.startsWith(collectionPath.replaceAll("/$", ""))) {
+                Map<String, Object> pathItem = Util.asStringObjectMap(paths.get(p));
+                if (pathItem != null && pathItem.containsKey("get")) {
+                    return p;
+                }
+            }
+        }
+        return paths.containsKey(candidate) ? candidate : null;
+    }
+
     private void appendMultiContextAuthHelpers(StringBuilder sb) {
-        sb.append("    /** Client application token: INTEGRATION_TOKEN_CLIENT_APPLICATION; falls back to API_BEARER_TOKEN, API_TOKEN */\n");
-        sb.append("    private String getTokenClientApplication() {\n");
-        sb.append("        String t = System.getenv(\"INTEGRATION_TOKEN_CLIENT_APPLICATION\");\n");
-        sb.append("        if (t == null || t.isEmpty()) {\n");
-        sb.append("            t = System.getenv(\"API_BEARER_TOKEN\");\n");
-        sb.append("        }\n");
-        sb.append("        if (t == null || t.isEmpty()) {\n");
-        sb.append("            t = System.getenv(\"API_TOKEN\");\n");
-        sb.append("        }\n");
-        sb.append("        return t;\n");
-        sb.append("    }\n\n");
-        sb.append("    /** Authenticated customer: INTEGRATION_TOKEN_AUTHENTICATED_CUSTOMER */\n");
-        sb.append("    private String getTokenAuthenticatedCustomer() {\n");
-        sb.append("        return System.getenv(\"INTEGRATION_TOKEN_AUTHENTICATED_CUSTOMER\");\n");
-        sb.append("    }\n\n");
-        sb.append("    /** Prefer customer, then client app, then legacy getAuthToken() */\n");
-        sb.append("    private String getPreferredAuthToken() {\n");
-        sb.append("        String t = getTokenAuthenticatedCustomer();\n");
-        sb.append("        if (t != null && !t.isEmpty()) {\n");
-        sb.append("            return t;\n");
-        sb.append("        }\n");
-        sb.append("        t = getTokenClientApplication();\n");
-        sb.append("        if (t != null && !t.isEmpty()) {\n");
-        sb.append("            return t;\n");
-        sb.append("        }\n");
-        sb.append("        return getAuthToken();\n");
-        sb.append("    }\n\n");
+        // replaced by TestCodegenSupport.tokenHelpers()
     }
 
     private void appendJavaPathUriBlocks(StringBuilder sb, String pathTemplate,
@@ -269,8 +290,8 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("        Map<String, String> pathParams = new HashMap<>();\n");
             for (Map.Entry<String, String> entry : pathParams.entrySet()) {
                 sb.append("        pathParams.put(\"")
-                        .append(entry.getKey()).append("\", \"")
-                        .append(IntegrationScenarioSupport.escapeJavaString(entry.getValue())).append("\");\n");
+                        .append(entry.getKey()).append("\", ")
+                        .append(TestCodegenSupport.paramValueExpression(entry.getKey(), entry.getValue())).append(");\n");
             }
             sb.append("        String path = replacePathParameters(\"").append(pathTemplate).append("\", pathParams);\n");
         } else {
@@ -280,12 +301,12 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
             for (Map.Entry<String, String> entry : queryParams.entrySet()) {
                 sb.append("        queryParams.put(\"")
-                        .append(entry.getKey()).append("\", \"")
-                        .append(IntegrationScenarioSupport.escapeJavaString(entry.getValue())).append("\");\n");
+                        .append(entry.getKey()).append("\", ")
+                        .append(TestCodegenSupport.paramValueExpression(entry.getKey(), entry.getValue())).append(");\n");
             }
             sb.append("        URI uri = buildUri(path, queryParams);\n");
         } else {
-            sb.append("        URI uri = URI.create(BASE_URL + path);\n");
+            sb.append("        URI uri = URI.create(TestEnv.baseUrl() + path);\n");
         }
     }
 
@@ -380,14 +401,12 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 !((List<?>) operation.get("security")).isEmpty();
 
         Map<String, String> pathParams = new HashMap<>();
-        Map<String, String> queryParams = new HashMap<>();
+        Map<String, String> queryParams = IntegrationScenarioSupport.buildSuccessQueryParams(parameters, spec);
         for (Map<String, Object> param : parameters) {
             String paramName = (String) param.get("name");
             String paramIn = (String) param.get("in");
             if ("path".equals(paramIn)) {
                 pathParams.put(paramName, IntegrationScenarioSupport.getParameterExample(param));
-            } else if ("query".equals(paramIn)) {
-                queryParams.put(paramName, IntegrationScenarioSupport.getParameterExample(param));
             }
         }
 
@@ -413,6 +432,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("            .uri(uri)\n");
             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
             sb.append("            .header(\"Accept\", \"application/json\")\n");
+            sb.append("            .header(\"Accept-Language\", TestEnv.acceptLanguage())\n");
             sb.append("            .header(\"Authorization\", \"Bearer \" + tok);\n");
             if (jsonBody) {
                 sb.append("        String requestBody = \"").append(requestBodyEscaped).append("\";\n");
@@ -423,6 +443,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("        assertNotNull(response);\n");
             appendSuccessStatusAssertions(sb, responses);
             sb.append("        assertNotNull(response.body());\n");
+            appendCreateGetVerifyBlock(sb, method, path, opInfo, spec, requiresAuth);
             sb.append("        // Validate response against schema\n");
             generateResponseSchemaValidation(sb, responses, spec);
             sb.append("    }\n\n");
@@ -439,6 +460,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("            .uri(uri)\n");
             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
             sb.append("            .header(\"Accept\", \"application/json\")\n");
+            sb.append("            .header(\"Accept-Language\", TestEnv.acceptLanguage())\n");
             sb.append("            .header(\"Authorization\", \"Bearer \" + tok);\n");
             if (jsonBody) {
                 sb.append("        String requestBody = \"").append(requestBodyEscaped).append("\";\n");
@@ -449,6 +471,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("        assertNotNull(response);\n");
             appendSuccessStatusAssertions(sb, responses);
             sb.append("        assertNotNull(response.body());\n");
+            appendCreateGetVerifyBlock(sb, method, path, opInfo, spec, requiresAuth);
             sb.append("        // Validate response against schema\n");
             generateResponseSchemaValidation(sb, responses, spec);
             sb.append("    }\n\n");
@@ -472,6 +495,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("        assertNotNull(response);\n");
             appendSuccessStatusAssertions(sb, responses);
             sb.append("        assertNotNull(response.body());\n");
+            appendCreateGetVerifyBlock(sb, method, path, opInfo, spec, requiresAuth);
             sb.append("        // Validate response against schema\n");
             generateResponseSchemaValidation(sb, responses, spec);
             sb.append("    }\n\n");
@@ -898,67 +922,9 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
     }
 
     private void generatePomXml(String outputDir, String basePackage) throws IOException {
-        String pomContent = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0"
-                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <groupId>%s</groupId>
-                    <artifactId>api-integration-tests</artifactId>
-                    <version>1.0.0</version>
-                    <packaging>jar</packaging>
-
-                    <properties>
-                        <maven.compiler.source>21</maven.compiler.source>
-                        <maven.compiler.target>21</maven.compiler.target>
-                        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-                        <junit.version>5.12.2</junit.version>
-                        <jacoco.version>0.8.13</jacoco.version>
-                    </properties>
-
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.junit.jupiter</groupId>
-                            <artifactId>junit-jupiter</artifactId>
-                            <version>${junit.version}</version>
-                            <scope>test</scope>
-                        </dependency>
-                    </dependencies>
-
-                    <build>
-                        <plugins>
-                            <plugin>
-                                <groupId>org.apache.maven.plugins</groupId>
-                                <artifactId>maven-surefire-plugin</artifactId>
-                                <version>3.5.5</version>
-                            </plugin>
-                            <plugin>
-                                <groupId>org.jacoco</groupId>
-                                <artifactId>jacoco-maven-plugin</artifactId>
-                                <version>${jacoco.version}</version>
-                                <executions>
-                                    <execution>
-                                        <id>prepare-agent</id>
-                                        <goals>
-                                            <goal>prepare-agent</goal>
-                                        </goals>
-                                    </execution>
-                                    <execution>
-                                        <id>report</id>
-                                        <phase>test</phase>
-                                        <goals>
-                                            <goal>report</goal>
-                                        </goals>
-                                    </execution>
-                                </executions>
-                            </plugin>
-                        </plugins>
-                    </build>
-                </project>
-                """.formatted(basePackage);
-
+        String pomContent = TestMavenSupport.pomHeader("api-integration-tests", basePackage)
+                + TestMavenSupport.junitDependency()
+                + TestMavenSupport.buildSectionWithTestSupport();
         Files.write(Paths.get(outputDir, "pom.xml"), pomContent.getBytes());
     }
 
@@ -966,12 +932,10 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
      * Generate test utilities
      */
     private void generateTestUtilities(String outputDir, String basePackage) throws IOException {
-        String packageDir = outputDir + "/" + basePackage.replace(".", "/");
+        String packageDir = TestOutputLayout.testJavaDir(outputDir, basePackage);
         Files.createDirectories(Paths.get(packageDir));
-
-        // Generate IntegrationTestUtils class
-        String utilsContent = generateIntegrationTestUtilsClass(basePackage);
-        Files.write(Paths.get(packageDir, "IntegrationTestUtils.java"), utilsContent.getBytes());
+        Files.write(Paths.get(packageDir, "IntegrationTestUtils.java"),
+                generateIntegrationTestUtilsClass(basePackage).getBytes());
     }
 
     /**
@@ -986,37 +950,32 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 import java.time.Duration;
                 import java.util.*;
 
-                /**
-                 * Utility class for integration tests
-                 */
+                import %s.support.*;
+
                 public class IntegrationTestUtils {
 
                     private IntegrationTestUtils() {
                     }
 
-                    /**
-                     * Poll the server until a GET returns a non-5xx status or timeout elapses.
-                     */
                     public static boolean waitForServer(String baseUrl, Duration timeout) {
                         if (baseUrl == null || baseUrl.isBlank()) {
                             return false;
                         }
-                        HttpClient client = HttpClient.newBuilder().connectTimeout(timeout).build();
+                        HttpClient client = TestHttp.client();
                         long deadline = System.nanoTime() + timeout.toNanos();
                         while (System.nanoTime() < deadline) {
                             try {
                                 HttpRequest req = HttpRequest.newBuilder()
                                         .uri(URI.create(baseUrl))
                                         .timeout(Duration.ofSeconds(5))
+                                        .header("Accept-Language", TestEnv.acceptLanguage())
                                         .GET()
                                         .build();
                                 HttpResponse<Void> resp = client.send(req, HttpResponse.BodyHandlers.discarding());
                                 if (resp.statusCode() < 500) {
-                                    System.out.println("Server health check: " + resp.statusCode());
                                     return true;
                                 }
                             } catch (Exception ignored) {
-                                // retry
                             }
                             try {
                                 Thread.sleep(500);
@@ -1028,17 +987,13 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                         return false;
                     }
 
-                    /**
-                     * Heuristic JSON validation: object/array parse check plus required top-level field names.
-                     */
                     public static void assertJsonHasRequiredFields(String body, String... requiredFields) {
                         if (body == null) {
                             throw new AssertionError("Response body is null");
                         }
                         String trimmed = body.trim();
                         if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
-                            throw new AssertionError("Response should be JSON, got: "
-                                    + trimmed.substring(0, Math.min(50, trimmed.length())));
+                            throw new AssertionError("Response should be JSON");
                         }
                         if (requiredFields != null) {
                             for (String field : requiredFields) {
@@ -1049,27 +1004,118 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                         }
                     }
 
-                    /**
-                     * @deprecated Use {@link #assertJsonHasRequiredFields(String, String...)} instead.
-                     */
-                    @Deprecated
-                    public static boolean validateResponse(Object response, Map<String, Object> schema) {
-                        return true;
+                    public static String extractCreatedId(HttpResponse<String> response) {
+                        if (response == null) {
+                            return null;
+                        }
+                        String location = response.headers().firstValue("Location").orElse(null);
+                        if (location != null) {
+                            int slash = location.lastIndexOf('/');
+                            if (slash >= 0 && slash < location.length() - 1) {
+                                return location.substring(slash + 1);
+                            }
+                        }
+                        String body = response.body();
+                        if (body != null) {
+                            for (String key : List.of("id", "folderID", "folderId")) {
+                                String needle = "\\"" + key + "\\":\\"";
+                                int i = body.indexOf(needle);
+                                if (i >= 0) {
+                                    int start = i + needle.length();
+                                    int end = body.indexOf('"', start);
+                                    if (end > start) {
+                                        return body.substring(start, end);
+                                    }
+                                }
+                            }
+                        }
+                        return null;
                     }
 
-                    /**
-                     * Optional cleanup hook when INTEGRATION_CLEANUP_ENABLED=true.
-                     */
-                    public static void cleanupTestData(String resourceId) {
-                        if (!"true".equalsIgnoreCase(System.getenv("INTEGRATION_CLEANUP_ENABLED"))) {
+                    public static void assertGetMatchesCreate(HttpClient client, String id, String getPathTemplate,
+                                                              Duration timeout, String createBody, String token)
+                            throws Exception {
+                        String path = getPathTemplate.replaceAll("\\{[^}]+}", id);
+                        HttpRequest.Builder b = HttpRequest.newBuilder()
+                                .uri(URI.create(TestEnv.baseUrl() + path))
+                                .timeout(timeout)
+                                .header("Accept", "application/json")
+                                .header("Accept-Language", TestEnv.acceptLanguage())
+                                .GET();
+                        if (token != null && !token.isEmpty()) {
+                            b.header("Authorization", "Bearer " + token);
+                        }
+                        HttpResponse<String> getResp = client.send(b.build(), HttpResponse.BodyHandlers.ofString());
+                        if (getResp.statusCode() < 200 || getResp.statusCode() >= 300) {
+                            throw new AssertionError("GET after create failed: " + getResp.statusCode());
+                        }
+                        if (createBody != null && createBody.contains("\\"name\\"")) {
+                            assertJsonHasRequiredFields(getResp.body(), "name");
+                        }
+                    }
+
+                    public static void cleanupCreatedResources(HttpClient client, Duration timeout) throws Exception {
+                        for (String id : TestContext.createdIds()) {
+                            deleteResource(client, id, timeout);
+                        }
+                        TestContext.clearCreatedIds();
+                    }
+
+                    private static void deleteResource(HttpClient client, String id, Duration timeout) throws Exception {
+                        String deletePath = TestEnv.get("test.delete.path", "/folders/{folderID}")
+                                .replace("{folderID}", id).replace("{id}", id);
+                        HttpRequest.Builder b = HttpRequest.newBuilder()
+                                .uri(URI.create(TestEnv.baseUrl() + deletePath))
+                                .timeout(timeout)
+                                .header("Accept", "application/json")
+                                .header("Accept-Language", TestEnv.acceptLanguage())
+                                .DELETE();
+                        String token = TestAuth.rawToken();
+                        if (!token.isEmpty()) {
+                            b.header("Authorization", "Bearer " + token);
+                        }
+                        HttpResponse<String> resp = client.send(b.build(), HttpResponse.BodyHandlers.ofString());
+                        if (resp.statusCode() == 202) {
+                            pollAsyncDelete(client, resp, timeout);
+                        }
+                    }
+
+                    private static void pollAsyncDelete(HttpClient client, HttpResponse<String> accepted,
+                                                        Duration timeout) throws Exception {
+                        String taskUrl = accepted.headers().firstValue("Location").orElse(null);
+                        if (taskUrl == null) {
                             return;
                         }
+                        long deadline = System.nanoTime() + timeout.toNanos();
+                        while (System.nanoTime() < deadline) {
+                            HttpRequest poll = HttpRequest.newBuilder()
+                                    .uri(URI.create(taskUrl.startsWith("http") ? taskUrl : TestEnv.baseUrl() + taskUrl))
+                                    .timeout(Duration.ofSeconds(10))
+                                    .header("Accept", "application/json")
+                                    .GET()
+                                    .build();
+                            HttpResponse<String> r = client.send(poll, HttpResponse.BodyHandlers.ofString());
+                            if (r.statusCode() == 200 || r.statusCode() == 204) {
+                                return;
+                            }
+                            Thread.sleep(1000);
+                        }
+                    }
+
+                    public static void bootstrapBaseData(HttpClient client, Duration timeout) {
+                        String parent = TestEnv.parentFolderId();
+                        if (parent != null && !parent.isBlank()) {
+                            TestContext.setBootstrapParentFolderId(parent);
+                        }
+                    }
+
+                    public static void cleanupTestData(String resourceId) {
                         if (resourceId != null) {
-                            System.out.println("Cleanup requested for resource: " + resourceId);
+                            TestContext.trackCreatedId(resourceId);
                         }
                     }
                 }
-                """.formatted(basePackage);
+                """.formatted(basePackage, basePackage);
     }
 
     /**
@@ -1135,133 +1181,27 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
     /**
      * Generate auth setup methods from OAS securitySchemes
      */
-    @SuppressWarnings("unchecked")
     private void generateAuthSetupFromSecuritySchemes(StringBuilder sb, Map<String, Object> spec) {
         Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
         Map<String, Object> securitySchemes = components != null ? Util.asStringObjectMap(components.get("securitySchemes")) : null;
-
         if (securitySchemes == null || securitySchemes.isEmpty()) {
-            // Fallback: simple bearer token from environment
-            sb.append("    /**\n");
-            sb.append("     * Helper method to get authentication token\n");
-            sb.append("     */\n");
-            sb.append("    private String getAuthToken() {\n");
-            sb.append("        return System.getenv(\"API_TOKEN\");\n");
-            sb.append("    }\n\n");
             return;
         }
-
-        // Emit at most one getAuthToken(); collect OAuth token URL from first oauth2 scheme with flows
-        boolean generatedGetAuthToken = false;
-        String oauthTokenUrl = resolveFirstOAuthTokenUrl(securitySchemes);
-
         for (Map.Entry<String, Object> entry : securitySchemes.entrySet()) {
-            String schemeName = entry.getKey();
             Map<String, Object> scheme = Util.asStringObjectMap(entry.getValue());
-            if (scheme == null) {
+            if (scheme == null || !"apiKey".equals(scheme.get("type"))) {
                 continue;
             }
-
-            String schemeType = (String) scheme.get("type");
-            String bearerFormat = (String) scheme.get("bearerFormat");
-            String schemeStr = (String) scheme.get("scheme");
             String inField = (String) scheme.get("in");
             String paramName = (String) scheme.get("name");
-
-            if ("http".equals(schemeType) && "bearer".equals(schemeStr) && !generatedGetAuthToken) {
-                sb.append("    /**\n");
-                sb.append("     * Helper method to get authentication token (Bearer");
-                if (bearerFormat != null) sb.append(" - ").append(bearerFormat);
-                sb.append(")\n");
-                sb.append("     * Security scheme: ").append(schemeName).append("\n");
-                sb.append("     */\n");
-                sb.append("    private String getAuthToken() {\n");
-                sb.append("        String token = System.getenv(\"API_BEARER_TOKEN\");\n");
-                sb.append("        if (token == null || token.isEmpty()) {\n");
-                sb.append("            token = System.getenv(\"API_TOKEN\");\n");
-                sb.append("        }\n");
-                sb.append("        return token;\n");
-                sb.append("    }\n\n");
-                generatedGetAuthToken = true;
-
-            } else if ("apiKey".equals(schemeType)) {
-                String envVarName = "API_KEY";
-                sb.append("    /**\n");
-                sb.append("     * API key helpers — scheme: ").append(schemeName).append(" (apiKey in ").append(inField).append(")\n");
-                sb.append("     */\n");
-                if ("header".equals(inField)) {
-                    sb.append("    private String getApiKeyHeaderName() {\n");
-                    sb.append("        return \"").append(paramName != null ? paramName : "X-API-Key").append("\";\n");
-                    sb.append("    }\n\n");
-                    sb.append("    private String getApiKeyValue() {\n");
-                    sb.append("        return System.getenv(\"").append(envVarName).append("\");\n");
-                    sb.append("    }\n\n");
-                } else if ("query".equals(inField)) {
-                    sb.append("    private String getApiKeyParamName() {\n");
-                    sb.append("        return \"").append(paramName != null ? paramName : "api_key").append("\";\n");
-                    sb.append("    }\n\n");
-                    sb.append("    private String getApiKeyValue() {\n");
-                    sb.append("        return System.getenv(\"").append(envVarName).append("\");\n");
-                    sb.append("    }\n\n");
-                }
-                if (!generatedGetAuthToken) {
-                    sb.append("    private String getAuthToken() {\n");
-                    sb.append("        return getApiKeyValue();\n");
-                    sb.append("    }\n\n");
-                    generatedGetAuthToken = true;
-                }
-
-            } else if ("oauth2".equals(schemeType) && !generatedGetAuthToken) {
-                sb.append("    /**\n");
-                sb.append("     * OAuth2 token helper (first configured scheme; use OAUTH2_ACCESS_TOKEN to skip fetch)\n");
-                sb.append("     */\n");
-                sb.append("    private String getAuthToken() {\n");
-                sb.append("        String token = System.getenv(\"OAUTH2_ACCESS_TOKEN\");\n");
-                sb.append("        if (token != null && !token.isEmpty()) {\n");
-                sb.append("            return token;\n");
-                sb.append("        }\n");
-                sb.append("        String clientId = System.getenv(\"OAUTH_CLIENT_ID\");\n");
-                sb.append("        String clientSecret = System.getenv(\"OAUTH_CLIENT_SECRET\");\n");
-                sb.append("        String tokenUrl = \"").append(oauthTokenUrl != null ? oauthTokenUrl : "").append("\";\n");
-                sb.append("        if (clientId == null || clientSecret == null || tokenUrl.isEmpty()) {\n");
-                sb.append("            return null;\n");
-                sb.append("        }\n");
-                sb.append("        try {\n");
-                sb.append("            String credentials = java.util.Base64.getEncoder().encodeToString(\n");
-                sb.append("                (clientId + \":\" + clientSecret).getBytes());\n");
-                sb.append("            HttpRequest tokenRequest = HttpRequest.newBuilder()\n");
-                sb.append("                .uri(URI.create(tokenUrl))\n");
-                sb.append("                .timeout(REQUEST_TIMEOUT)\n");
-                sb.append("                .header(\"Authorization\", \"Basic \" + credentials)\n");
-                sb.append("                .header(\"Content-Type\", \"application/x-www-form-urlencoded\")\n");
-                sb.append("                .POST(HttpRequest.BodyPublishers.ofString(\"grant_type=client_credentials\"))\n");
-                sb.append("                .build();\n");
-                sb.append("            HttpResponse<String> tokenResponse = httpClient.send(tokenRequest, HttpResponse.BodyHandlers.ofString());\n");
-                sb.append("            if (tokenResponse.statusCode() == 200) {\n");
-                sb.append("                String body = tokenResponse.body();\n");
-                sb.append("                int start = body.indexOf(\"\\\"access_token\\\":\\\"\") + 16;\n");
-                sb.append("                int end = body.indexOf('\"', start);\n");
-                sb.append("                if (start > 15 && end > start) {\n");
-                sb.append("                    return body.substring(start, end);\n");
-                sb.append("                }\n");
-                sb.append("            }\n");
-                sb.append("        } catch (Exception e) {\n");
-                sb.append("            System.err.println(\"Error retrieving OAuth2 token: \" + e.getMessage());\n");
-                sb.append("        }\n");
-                sb.append("        return null;\n");
-                sb.append("    }\n\n");
-                generatedGetAuthToken = true;
-            }
-        }
-
-        // Fallback if no recognized scheme generated getAuthToken
-        if (!generatedGetAuthToken) {
-            sb.append("    /**\n");
-            sb.append("     * Helper method to get authentication token\n");
-            sb.append("     */\n");
-            sb.append("    private String getAuthToken() {\n");
-            sb.append("        return System.getenv(\"API_TOKEN\");\n");
+            sb.append("    private String getApiKeyValue() {\n");
+            sb.append("        return TestEnv.get(\"auth.apiKey\", System.getenv(\"API_KEY\"));\n");
             sb.append("    }\n\n");
+            if ("header".equals(inField)) {
+                sb.append("    private String getApiKeyHeaderName() {\n");
+                sb.append("        return \"").append(paramName != null ? paramName : "X-API-Key").append("\";\n");
+                sb.append("    }\n\n");
+            }
         }
     }
 

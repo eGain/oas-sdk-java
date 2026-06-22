@@ -9,6 +9,7 @@ import egain.oassdk.core.sequence.ChainConfig;
 import egain.oassdk.core.sequence.ChainEnumerator;
 import egain.oassdk.core.sequence.EnumeratedChain;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
+import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 import egain.oassdk.testgenerators.TestGenerator;
 
 import java.io.IOException;
@@ -413,7 +414,10 @@ public class SequenceChainTestGenerator implements TestGenerator, ConfigurableTe
             return "";
         }
         String json = extractor.buildRequestBodyForOperation(call.operation(), spec);
-        if (json == null) {
+        if (json == null || json.isBlank() || "{}".equals(json.trim())) {
+            json = IntegrationScenarioSupport.generateRequestBodyFromSchemaRaw(call.operation(), spec);
+        }
+        if (json == null || json.isBlank()) {
             return ", json={}";
         }
         return ", json=" + jsonToPythonLiteral(json);

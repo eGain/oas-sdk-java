@@ -12,6 +12,7 @@ import egain.oassdk.testgenerators.python.PytestIntegrationTestGenerator;
 import egain.oassdk.testgenerators.python.PytestUnitTestGenerator;
 import egain.oassdk.testgenerators.schemathesis.SchemathesisTestGenerator;
 import egain.oassdk.testgenerators.security.SecurityTestGenerator;
+import egain.oassdk.testgenerators.sequence.JavaSequenceChainTestGenerator;
 import egain.oassdk.testgenerators.sequence.SequenceChainTestGenerator;
 import egain.oassdk.testgenerators.unit.UnitTestGenerator;
 
@@ -71,6 +72,10 @@ public class TestGeneratorFactory {
 
             case "sequence":
                 generator = new SequenceChainTestGenerator();
+                break;
+
+            case "sequence-java":
+                generator = new JavaSequenceChainTestGenerator();
                 break;
 
             case "mock_data":

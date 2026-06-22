@@ -89,6 +89,10 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
             String baseUrl = resolveBaseUrl(spec, config);
             Map<String, String> props = buildPropertyValues(baseUrl, specFileName, config);
             writeProperties(bundleDir.resolve("schemathesis.properties"), props);
+            writeProperties(bundleDir.resolve("schemathesis.local.properties.example"), Map.of(
+                    "TOKEN", "'Bearer <jwt-from-test-env-or-login>'",
+                    "BASEURL", baseUrl.isBlank() ? "https://your-host.example/api" : baseUrl
+            ));
 
             String script = buildRunScript(specFileName);
             Path scriptPath = bundleDir.resolve("run-schemathesis.sh");

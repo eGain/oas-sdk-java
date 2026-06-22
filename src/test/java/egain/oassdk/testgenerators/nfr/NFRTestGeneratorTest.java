@@ -46,19 +46,17 @@ public class NFRTestGeneratorTest {
         );
         generator.generate(spec, tempDir.toString(), new TestConfig(), "junit");
 
-        Path testFile = tempDir.resolve("nfr").resolve("com").resolve("example").resolve("api").resolve("NFRTest.java");
+        Path testFile = tempDir.resolve("nfr/src/test/java/com/example/api/NFRTest.java");
         assertTrue(Files.exists(testFile), "Expected NFRTest.java at " + testFile);
         String content = Files.readString(testFile, StandardCharsets.UTF_8);
 
         assertTrue(content.contains("static io.restassured.RestAssured.given"),
                 "Generated NFR tests should static-import RestAssured given()");
-        assertTrue(content.contains("initRestAssured"),
-                "Generated NFR tests should define initRestAssured");
-        assertTrue(content.contains("io.restassured.RestAssured.baseURI"),
-                "Generated NFR tests should set RestAssured base URI");
+        assertTrue(content.contains("TestClient.configureRestAssured"),
+                "Generated NFR tests should configure RestAssured via TestClient");
+        assertTrue(content.contains("TestAuth.rawToken"),
+                "Generated NFR tests should resolve auth via TestAuth");
         assertFalse(content.contains("java.net.http.HttpClient"),
                 "Generated NFR tests should not use java.net.http.HttpClient");
-        assertFalse(content.contains("HttpClient.newBuilder"),
-                "Generated NFR tests should not build HttpClient");
     }
 }

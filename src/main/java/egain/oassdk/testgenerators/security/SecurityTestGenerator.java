@@ -4,6 +4,9 @@ import egain.oassdk.Util;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.Constants;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestCodegenSupport;
+import egain.oassdk.testgenerators.common.TestMavenSupport;
+import egain.oassdk.testgenerators.common.TestOutputLayout;
 import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.TestGenerator;
@@ -34,7 +37,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
 
             // Extract API information
             String apiTitle = TestSpecUtils.getApiTitle(spec);
-            String baseUrl = TestSpecUtils.getBaseUrl(spec);
+            String baseUrl = TestSpecUtils.resolveBaseUrl(spec, config);
             String basePackage = "com.example.api";
             if (config != null && config.getAdditionalProperties() != null) {
                 Object packageNameObj = config.getAdditionalProperties().get("packageName");
@@ -48,6 +51,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
 
             // Generate security test configuration
             generateSecurityConfiguration(outputPath.toString(), baseUrl);
+            generatePomXml(outputPath.toString(), basePackage);
 
         } catch (Exception e) {
             throw new GenerationException("Failed to generate security tests: " + e.getMessage(), e);
@@ -63,7 +67,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
             return;
         }
 
-        String packageDir = outputDir + "/" + basePackage.replace(".", "/");
+        String packageDir = TestOutputLayout.testJavaDir(outputDir, basePackage);
         Files.createDirectories(Paths.get(packageDir));
 
         // Generate security test class
@@ -89,7 +93,8 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
         sb.append("import java.net.URI;\n");
         sb.append("import java.time.Duration;\n");
         sb.append("import java.util.*;\n");
-        sb.append("import java.util.Base64;\n\n");
+        sb.append("import java.util.Base64;\n");
+        sb.append(TestCodegenSupport.supportImport(basePackage));
 
         // Class declaration
         sb.append("/**\n");
@@ -107,9 +112,21 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
         sb.append("public class ").append(className).append(" {\n\n");
 
         // Constants
-        sb.append("    private static final String BASE_URL = \"").append(baseUrl).append("\";\n");
         sb.append("    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);\n");
         sb.append("    private static HttpClient httpClient;\n\n");
+
+        sb.append("    @BeforeAll\n");
+        sb.append("    static void setUpAll() {\n");
+        sb.append("        httpClient = TestHttp.client();\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private URI uriFor(String pathTemplate) {\n");
+        sb.append("        String p = pathTemplate;\n");
+        sb.append("        p = p.replace(\"{folderID}\", TestEnv.folderId());\n");
+        sb.append("        p = p.replace(\"{promptID}\", TestEnv.get(\"test.prompt.id\", \"1\"));\n");
+        sb.append("        p = p.replace(\"{id}\", TestEnv.folderId());\n");
+        sb.append("        return URI.create(TestEnv.baseUrl() + p);\n");
+        sb.append("    }\n\n");
 
         // Test vectors
         sb.append("    // Security test vectors\n");
@@ -191,7 +208,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                                     .append(" - Missing Token\")\n");
                             sb.append("    void testAuthentication_MissingToken_").append(sanitizePath(path)).append("_").append(method).append("() throws Exception {\n");
                             sb.append("        // Arrange - Request without authentication\n");
-                            sb.append("        URI uri = URI.create(BASE_URL + \"").append(path).append("\");\n");
+                            sb.append("        URI uri = uriFor(\"").append(path).append("\");\n");
                             sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
                             sb.append("            .uri(uri)\n");
                             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -211,7 +228,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                                     .append(" - Invalid Token\")\n");
                             sb.append("    void testAuthentication_InvalidToken_").append(sanitizePath(path)).append("_").append(method).append("() throws Exception {\n");
                             sb.append("        // Arrange - Request with invalid token\n");
-                            sb.append("        URI uri = URI.create(BASE_URL + \"").append(path).append("\");\n");
+                            sb.append("        URI uri = uriFor(\"").append(path).append("\");\n");
                             sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
                             sb.append("            .uri(uri)\n");
                             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -286,7 +303,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                                 .append(" - Correct Scope (").append(scopeList).append(")\")\n");
                         sb.append("    void testAuthorization_CorrectScope_").append(safePath).append("_").append(method).append("() throws Exception {\n");
                         sb.append("        // Arrange - Request with a token bearing the required scopes: ").append(scopeList).append("\n");
-                        sb.append("        URI uri = URI.create(BASE_URL + \"").append(path).append("\");\n");
+                        sb.append("        URI uri = uriFor(\"").append(path).append("\");\n");
                         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
                         sb.append("            .uri(uri)\n");
                         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -307,7 +324,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                                 .append(" - Insufficient Scope\")\n");
                         sb.append("    void testAuthorization_InsufficientScope_").append(safePath).append("_").append(method).append("() throws Exception {\n");
                         sb.append("        // Arrange - Request with a token that does NOT have the required scopes\n");
-                        sb.append("        URI uri = URI.create(BASE_URL + \"").append(path).append("\");\n");
+                        sb.append("        URI uri = uriFor(\"").append(path).append("\");\n");
                         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
                         sb.append("            .uri(uri)\n");
                         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -328,7 +345,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                                 .append(" - Wrong Role\")\n");
                         sb.append("    void testAuthorization_WrongRole_").append(safePath).append("_").append(method).append("() throws Exception {\n");
                         sb.append("        // Arrange - Request with a valid token for a different role that lacks [").append(scopeList).append("]\n");
-                        sb.append("        URI uri = URI.create(BASE_URL + \"").append(path).append("\");\n");
+                        sb.append("        URI uri = uriFor(\"").append(path).append("\");\n");
                         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
                         sb.append("            .uri(uri)\n");
                         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -363,7 +380,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
             sb.append("    void testInputValidation_OversizedPayload() throws Exception {\n");
             sb.append("        // Arrange - Create oversized payload\n");
             sb.append("        String oversizedPayload = \"x\".repeat(100000); // 100KB payload\n");
-            sb.append("        URI uri = URI.create(BASE_URL + \"").append(firstPath).append("\");\n");
+            sb.append("        URI uri = uriFor(\"").append(firstPath).append("\");\n");
             sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
             sb.append("            .uri(uri)\n");
             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -396,7 +413,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
             sb.append("        for (String vector : SQL_INJECTION_VECTORS) {\n");
             sb.append("            // Arrange\n");
             sb.append("            String testPath = \"").append(firstPath).append("\" + \"?param=\" + vector;\n");
-            sb.append("            URI uri = URI.create(BASE_URL + testPath);\n");
+            sb.append("            URI uri = uriFor(testPath);\n");
             sb.append("            HttpRequest request = HttpRequest.newBuilder()\n");
             sb.append("                .uri(uri)\n");
             sb.append("                .timeout(REQUEST_TIMEOUT)\n");
@@ -434,7 +451,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
             sb.append("        for (String vector : XSS_VECTORS) {\n");
             sb.append("            // Arrange\n");
             sb.append("            String testPath = \"").append(firstPath).append("\" + \"?input=\" + vector;\n");
-            sb.append("            URI uri = URI.create(BASE_URL + testPath);\n");
+            sb.append("            URI uri = uriFor(testPath);\n");
             sb.append("            HttpRequest request = HttpRequest.newBuilder()\n");
             sb.append("                .uri(uri)\n");
             sb.append("                .timeout(REQUEST_TIMEOUT)\n");
@@ -471,7 +488,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
             sb.append("        for (String vector : PATH_TRAVERSAL_VECTORS) {\n");
             sb.append("            // Arrange\n");
             sb.append("            String testPath = \"").append(firstPath).append("\".replace(\"{id}\", vector);\n");
-            sb.append("            URI uri = URI.create(BASE_URL + testPath);\n");
+            sb.append("            URI uri = uriFor(testPath);\n");
             sb.append("            HttpRequest request = HttpRequest.newBuilder()\n");
             sb.append("                .uri(uri)\n");
             sb.append("                .timeout(REQUEST_TIMEOUT)\n");
@@ -505,7 +522,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
         sb.append("    @DisplayName(\"CORS: Preflight OPTIONS request returns correct headers\")\n");
         sb.append("    void testCORS_PreflightReturnsCorrectHeaders() throws Exception {\n");
         sb.append("        // Arrange - Send OPTIONS preflight request with Origin header\n");
-        sb.append("        URI uri = URI.create(BASE_URL + \"").append(firstPath).append("\");\n");
+        sb.append("        URI uri = uriFor(\"").append(firstPath).append("\");\n");
         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
         sb.append("            .uri(uri)\n");
         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -531,7 +548,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
         sb.append("    @DisplayName(\"CORS: Cross-origin request without proper Origin is rejected\")\n");
         sb.append("    void testCORS_UnauthorizedOriginRejected() throws Exception {\n");
         sb.append("        // Arrange - Send request with an unauthorized Origin\n");
-        sb.append("        URI uri = URI.create(BASE_URL + \"").append(firstPath).append("\");\n");
+        sb.append("        URI uri = uriFor(\"").append(firstPath).append("\");\n");
         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
         sb.append("            .uri(uri)\n");
         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -571,7 +588,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
         sb.append("    @DisplayName(\"Rate Limiting: Rapid requests return 429 Too Many Requests\")\n");
         sb.append("    void testRateLimiting_RapidRequestsReturn429() throws Exception {\n");
         sb.append("        // Arrange - Prepare a burst of rapid requests to the same endpoint\n");
-        sb.append("        URI uri = URI.create(BASE_URL + \"").append(firstPath).append("\");\n");
+        sb.append("        URI uri = uriFor(\"").append(firstPath).append("\");\n");
         sb.append("        int burstSize = 50;\n");
         sb.append("        boolean rateLimited = false;\n\n");
         sb.append("        // Act - Send requests in rapid succession\n");
@@ -597,6 +614,13 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
     /**
      * Generate security configuration
      */
+    private void generatePomXml(String outputDir, String basePackage) throws IOException {
+        String pom = TestMavenSupport.pomHeader("api-security-tests", basePackage)
+                + TestMavenSupport.junitDependency()
+                + TestMavenSupport.buildSectionWithTestSupport();
+        Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes());
+    }
+
     private void generateSecurityConfiguration(String outputDir, String baseUrl) throws IOException {
         String configContent = "# Security Test Configuration\n" +
                 "# Generated from OpenAPI specification\n\n" +

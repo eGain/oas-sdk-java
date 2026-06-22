@@ -3,6 +3,9 @@ package egain.oassdk.testgenerators.performance;
 import egain.oassdk.Util;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.common.TestCodegenSupport;
+import egain.oassdk.testgenerators.common.TestMavenSupport;
+import egain.oassdk.testgenerators.common.TestOutputLayout;
 import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.TestGenerator;
@@ -33,7 +36,7 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
 
             // Extract API information
             String apiTitle = TestSpecUtils.getApiTitle(spec);
-            String baseUrl = TestSpecUtils.getBaseUrl(spec);
+            String baseUrl = TestSpecUtils.resolveBaseUrl(spec, config);
             String basePackage = "com.example.api";
             if (config != null && config.getAdditionalProperties() != null) {
                 Object packageNameObj = config.getAdditionalProperties().get("packageName");
@@ -47,6 +50,7 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
 
             // Generate performance test configuration
             generatePerformanceConfiguration(outputPath.toString(), baseUrl);
+            generatePomXml(outputPath.toString(), basePackage);
 
         } catch (Exception e) {
             throw new GenerationException("Failed to generate performance tests: " + e.getMessage(), e);
@@ -62,7 +66,7 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
             return;
         }
 
-        String packageDir = outputDir + "/" + basePackage.replace(".", "/");
+        String packageDir = TestOutputLayout.testJavaDir(outputDir, basePackage);
         Files.createDirectories(Paths.get(packageDir));
 
         // Generate performance test class
@@ -89,7 +93,8 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
         sb.append("import java.time.Duration;\n");
         sb.append("import java.util.*;\n");
         sb.append("import java.util.concurrent.*;\n");
-        sb.append("import java.util.stream.Collectors;\n\n");
+        sb.append("import java.util.stream.Collectors;\n");
+        sb.append(TestCodegenSupport.supportImport(basePackage));
 
         // Class declaration
         sb.append("/**\n");
@@ -106,21 +111,23 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
         sb.append("public class ").append(className).append(" {\n\n");
 
         // Constants
-        sb.append("    private static final String BASE_URL = \"").append(baseUrl).append("\";\n");
         sb.append("    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);\n");
-        sb.append("    private static final int TARGET_RESPONSE_TIME_MS = 1000; // 1 second\n");
-        sb.append("    private static final int MAX_RESPONSE_TIME_MS = 2000; // 2 seconds\n");
-        sb.append("    private static final int LOAD_TEST_USERS = 50;\n");
-        sb.append("    private static final int REQUESTS_PER_USER = 20;\n");
-        sb.append("    private static final int STRESS_TEST_USERS = 100;\n");
+        sb.append("    private static final int TARGET_RESPONSE_TIME_MS = TestEnv.getInt(\"performance.targetResponseTimeMs\", 1000);\n");
+        sb.append("    private static final int MAX_RESPONSE_TIME_MS = TestEnv.getInt(\"performance.maxResponseTimeMs\", 2000);\n");
+        sb.append("    private static final int LOAD_TEST_USERS = TestEnv.getInt(\"performance.loadTestUsers\", 50);\n");
+        sb.append("    private static final int REQUESTS_PER_USER = TestEnv.getInt(\"performance.requestsPerUser\", 20);\n");
+        sb.append("    private static final int STRESS_TEST_USERS = TestEnv.getInt(\"performance.stressTestUsers\", 100);\n");
         sb.append("    private static HttpClient httpClient;\n\n");
 
-        // Setup
         sb.append("    @BeforeAll\n");
         sb.append("    static void setUpAll() {\n");
-        sb.append("        httpClient = HttpClient.newBuilder()\n");
-        sb.append("            .connectTimeout(REQUEST_TIMEOUT)\n");
-        sb.append("            .build();\n");
+        sb.append("        httpClient = TestHttp.client();\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private URI perfUri(String pathTemplate) {\n");
+        sb.append("        String p = pathTemplate.replace(\"{folderID}\", TestEnv.folderId())\n");
+        sb.append("                .replace(\"{promptID}\", TestEnv.get(\"test.prompt.id\", \"1\"));\n");
+        sb.append("        return URI.create(TestEnv.baseUrl() + p);\n");
         sb.append("    }\n\n");
 
         // Load test
@@ -250,7 +257,7 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
             testPath = paths.keySet().iterator().next();
         }
 
-        sb.append("        URI uri = URI.create(BASE_URL + \"").append(testPath).append("\");\n");
+        sb.append("        URI uri = perfUri(\"").append(testPath).append("\");\n");
         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
         sb.append("            .uri(uri)\n");
         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -288,7 +295,7 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
             testPath = paths.keySet().iterator().next();
         }
 
-        sb.append("        URI uri = URI.create(BASE_URL + \"").append(testPath).append("\");\n");
+        sb.append("        URI uri = perfUri(\"").append(testPath).append("\");\n");
         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
         sb.append("            .uri(uri)\n");
         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -325,7 +332,7 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
             testPath = paths.keySet().iterator().next();
         }
 
-        sb.append("        URI uri = URI.create(BASE_URL + \"").append(testPath).append("\");\n");
+        sb.append("        URI uri = perfUri(\"").append(testPath).append("\");\n");
         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
         sb.append("            .uri(uri)\n");
         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -374,7 +381,7 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
             testPath = paths.keySet().iterator().next();
         }
 
-        sb.append("        URI uri = URI.create(BASE_URL + \"").append(testPath).append("\");\n");
+        sb.append("        URI uri = perfUri(\"").append(testPath).append("\");\n");
         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
         sb.append("            .uri(uri)\n");
         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -396,6 +403,13 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
     /**
      * Generate performance configuration
      */
+    private void generatePomXml(String outputDir, String basePackage) throws IOException {
+        String pom = TestMavenSupport.pomHeader("api-performance-tests", basePackage)
+                + TestMavenSupport.junitDependency()
+                + TestMavenSupport.buildSectionWithTestSupport();
+        Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes());
+    }
+
     private void generatePerformanceConfiguration(String outputDir, String baseUrl) throws IOException {
         String configContent = "# Performance Test Configuration\n" +
                 "# Generated from OpenAPI specification\n\n" +

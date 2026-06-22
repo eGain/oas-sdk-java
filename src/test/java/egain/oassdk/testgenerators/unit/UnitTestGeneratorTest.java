@@ -158,7 +158,7 @@ public class UnitTestGeneratorTest {
         
         // Assert - Check that generated test methods are public
         Path unitDir = tempDir.resolve("unit");
-        Path packageDir = unitDir.resolve("com/example/api");
+        Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
             Files.walk(packageDir)
@@ -189,7 +189,7 @@ public class UnitTestGeneratorTest {
         
         // Assert - Check that pathParams is always declared
         Path unitDir = tempDir.resolve("unit");
-        Path packageDir = unitDir.resolve("com/example/api");
+        Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
             Files.walk(packageDir)
@@ -225,7 +225,7 @@ public class UnitTestGeneratorTest {
         
         // Assert - Check that queryParams is always declared
         Path unitDir = tempDir.resolve("unit");
-        Path packageDir = unitDir.resolve("com/example/api");
+        Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
             Files.walk(packageDir)
@@ -260,7 +260,7 @@ public class UnitTestGeneratorTest {
         
         // Assert - Check that valid request tests have comprehensive assertions
         Path unitDir = tempDir.resolve("unit");
-        Path packageDir = unitDir.resolve("com/example/api");
+        Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
             Files.walk(packageDir)
@@ -295,7 +295,7 @@ public class UnitTestGeneratorTest {
         
         // Assert - Check that invalid parameter tests have enhanced structure
         Path unitDir = tempDir.resolve("unit");
-        Path packageDir = unitDir.resolve("com/example/api");
+        Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
             Files.walk(packageDir)
@@ -329,7 +329,7 @@ public class UnitTestGeneratorTest {
 
         generator.generate(mixed, tempDir.toString(), testConfig, "junit5");
 
-        Path testFile = tempDir.resolve("unit/com/example/api/CatalogApiTest.java");
+        Path testFile = tempDir.resolve("unit/src/test/java/com/example/api/CatalogApiTest.java");
         assertTrue(Files.exists(testFile), "Expected CatalogApiTest.java for tag Catalog");
         String content = Files.readString(testFile);
         assertTrue(content.contains("void testSearchItems_InvalidQFormat(String invalidValue)"), content);
@@ -349,7 +349,7 @@ public class UnitTestGeneratorTest {
 
         generator.generate(s, tempDir.toString(), testConfig, "junit5");
 
-        Path testFile = tempDir.resolve("unit/com/example/api/WidgetApiTest.java");
+        Path testFile = tempDir.resolve("unit/src/test/java/com/example/api/WidgetApiTest.java");
         assertTrue(Files.exists(testFile));
         String content = Files.readString(testFile);
         assertTrue(content.contains("pathParams.put(\"widgetId\", invalidValue)"),
@@ -367,7 +367,7 @@ public class UnitTestGeneratorTest {
         
         // Assert - Check that missing required parameter tests have enhanced structure
         Path unitDir = tempDir.resolve("unit");
-        Path packageDir = unitDir.resolve("com/example/api");
+        Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
             Files.walk(packageDir)
@@ -405,7 +405,7 @@ public class UnitTestGeneratorTest {
         
         // Assert - Check that status code tests have enhanced structure
         Path unitDir = tempDir.resolve("unit");
-        Path packageDir = unitDir.resolve("com/example/api");
+        Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
             Files.walk(packageDir)
@@ -435,7 +435,7 @@ public class UnitTestGeneratorTest {
     public void testBeforeAllInitRestAssuredIsPresent(@TempDir Path tempDir) throws GenerationException, java.io.IOException {
         testConfig.setTestFramework("junit5");
         generator.generate(spec, tempDir.toString(), testConfig, "junit5");
-        Path packageDir = tempDir.resolve("unit").resolve("com/example/api");
+        Path packageDir = tempDir.resolve("unit").resolve("src/test/java/com/example/api");
         if (Files.exists(packageDir)) {
             Files.walk(packageDir)
                 .filter(Files::isRegularFile)
@@ -461,7 +461,7 @@ public class UnitTestGeneratorTest {
 
         generator.generate(spec, tempDir.toString(), testConfig, "junit5");
 
-        Path testFile = tempDir.resolve("unit/com/example/api/FoldersApiTest.java");
+        Path testFile = tempDir.resolve("unit/src/test/java/com/example/api/FoldersApiTest.java");
         assertTrue(Files.exists(testFile), "Expected FoldersApiTest.java");
         String content = Files.readString(testFile);
         assertTrue(content.contains("_ValidRequest()"), content);

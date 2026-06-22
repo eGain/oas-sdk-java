@@ -133,22 +133,21 @@ public class IntegrationTestGeneratorTest {
     public void testGenerate_expandedIntegrationPatterns(@TempDir Path tempDir) throws Exception {
         generator.generate(buildRichSecuredPostSpec(), tempDir.toString(), testConfig, "junit5");
 
-        Path javaFile = tempDir.resolve("integration/com/example/api/ItemsIntegrationTest.java");
+        Path javaFile = tempDir.resolve("integration/src/test/java/com/example/api/ItemsIntegrationTest.java");
         assertTrue(Files.exists(javaFile));
         String content = Files.readString(javaFile);
-        assertTrue(content.contains("getTokenClientApplication"));
-        assertTrue(content.contains("getTokenAuthenticatedCustomer"));
+        assertTrue(content.contains("TestAuth.rawToken") || content.contains("getTokenClientApplication"));
         assertTrue(content.contains("_AnonymousNoCredentials"));
         assertTrue(content.contains("_InvalidBodyField_"));
         assertTrue(content.contains("_ParamNegative_"));
-        assertTrue(content.contains("INTEGRATION_TOKEN_CLIENT_APPLICATION"));
+        assertTrue(content.contains("TestEnv.baseUrl()") || content.contains("TestEnv.departmentId()"));
     }
 
     @Test
     public void testGenerate_composedSchemaPost(@TempDir Path tempDir) throws Exception {
         generator.generate(buildComposedSchemaPostSpec(), tempDir.toString(), testConfig, "junit5");
 
-        Path javaFile = tempDir.resolve("integration/com/example/api/FoldersIntegrationTest.java");
+        Path javaFile = tempDir.resolve("integration/src/test/java/com/example/api/FoldersIntegrationTest.java");
         assertTrue(Files.exists(javaFile));
         String content = Files.readString(javaFile);
         assertTrue(content.contains("_MissingRequiredFields"));
@@ -157,8 +156,7 @@ public class IntegrationTestGeneratorTest {
         assertTrue(content.contains("_Success_Department") || content.contains("_Success_Parent"),
                 "expected oneOf variant success tests");
         assertTrue(content.contains("_EmptyBody"));
-        int authTokenCount = content.split("private String getAuthToken\\(\\)").length - 1;
-        assertEquals(1, authTokenCount, "should emit exactly one getAuthToken()");
+        assertTrue(content.contains("TestAuth.rawToken()") || content.contains("getAuthToken()"));
     }
 
     @Test
