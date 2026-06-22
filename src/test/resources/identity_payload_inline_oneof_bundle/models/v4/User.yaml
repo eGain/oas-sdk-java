@@ -1,0 +1,19 @@
+openapi: 3.0.0
+info:
+  title: stub User for Permission.yaml refs
+  version: '1.0.0'
+paths: {}
+components:
+  schemas:
+    BasicUser:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+          pattern: "^[1-9]\\d*$"
+          minLength: 1
+          maxLength: 9
+        userName:
+          type: string
+          readOnly: true

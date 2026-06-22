@@ -1,0 +1,54 @@
+openapi: '3.0.0'
+info:
+  title: Schema
+  version: '3.0.0'
+servers:
+  - url: https://api.server.test/v1
+tags:
+  - name: dummy
+    description: dummy
+paths:
+  /test:
+    get:
+      operationId: placeHolder
+      tags:
+        - dummy
+      description: dummy
+      responses:
+        '200':
+          description: OK
+
+components:
+  schemas:
+
+    IdentityPayload:
+      description: "The subject receiving the permissions. Must be either a User or a Group."
+      oneOf:
+        - title: User
+          type: object
+          required: [user]
+          properties:
+            user:
+              title: User Identity
+              description: The user assigned permissions
+              required: [id]
+              allOf:
+                - properties:
+                    id:
+                      type: string
+                      readOnly: false
+                - $ref: "../../../../models/v4/User.yaml#/components/schemas/BasicUser"
+        - title: Group
+          type: object
+          required: [group]
+          properties:
+            group:
+              title: Group Identity
+              description: The group assigned permissions
+              required: [id]
+              allOf:
+                - properties:
+                    id:
+                      type: string
+                      readOnly: false
+                - $ref: "../../../../models/v4/Group.yaml#/components/schemas/BasicGroup"

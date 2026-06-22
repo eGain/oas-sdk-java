@@ -1,0 +1,12 @@
+openapi: 3.0.0
+info:
+  title: stub Group for Permission.yaml refs
+  version: '1.0.0'
+paths: {}
+components:
+  schemas:
+    BasicGroup:
+      type: object
+      properties:
+        id:
+          type: string
