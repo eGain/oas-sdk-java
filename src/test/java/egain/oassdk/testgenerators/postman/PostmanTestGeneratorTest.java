@@ -116,7 +116,7 @@ public class PostmanTestGeneratorTest {
         
         assertNotNull(baseUrlVar, "base_url variable should exist");
         String value = (String) baseUrlVar.get("value");
-        assertTrue(value.contains("https://"), "Should use server URL from spec");
+        assertEquals("", value, "base_url is filled from test-env.properties via run-tests.sh sync");
         
         // Cleanup
         deleteDirectory(tempDir);
@@ -505,7 +505,7 @@ public class PostmanTestGeneratorTest {
                 .findFirst()
                 .orElse(null);
 
-        assertEquals("description", attrDefault);
+        assertEquals("", attrDefault, "Query defaults are synced from test-env.properties at run time");
 
         deleteDirectory(tempDir);
     }

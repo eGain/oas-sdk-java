@@ -578,13 +578,17 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
             }
         }
 
-        variables.add(variableEntry("base_url", baseUrl));
+        variables.add(variableEntry("base_url", ""));
         variables.add(variableEntry("auth_token", ""));
         variables.add(variableEntry("departmentId", ""));
         variables.add(variableEntry("filter_parent", ""));
         variables.add(variableEntry("folderID", ""));
+        variables.add(variableEntry("test_parent_folder_id", "${test.parent.folder.id}"));
+        variables.add(variableEntry("test_department_id", "${test.department.id}"));
         for (Map.Entry<String, String> e : paramDefaults.entrySet()) {
-            variables.add(variableEntry(e.getKey(), e.getValue()));
+            if (!variables.stream().anyMatch(v -> e.getKey().equals(v.get("key")))) {
+                variables.add(variableEntry(e.getKey(), ""));
+            }
         }
 
         return variables;
@@ -683,25 +687,60 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
 
         return String.format("""
                 #!/bin/bash
+                set -euo pipefail
+                ROOT="$(cd "$(dirname "$0")" && pwd)"
+                ENV_FILE="${TEST_ENV_FILE:-$ROOT/test-env.properties}"
                 
-                # Install Newman if not already installed
+                sync_env() {
+                  local env_json="%s"
+                  if [[ ! -f "$ENV_FILE" ]]; then
+                    echo "Warning: $ENV_FILE not found — using Postman env defaults" >&2
+                    return
+                  fi
+                  python3 - "$ENV_FILE" "$env_json" <<'PY' || true
+                import json, sys
+                props = {}
+                with open(sys.argv[1], encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith('#') or '=' not in line:
+                            continue
+                        k, v = line.split('=', 1)
+                        props[k.strip()] = v.strip()
+                with open(sys.argv[2], encoding='utf-8') as f:
+                    env = json.load(f)
+                mapping = {
+                    'base_url': props.get('base.url', ''),
+                    'departmentId': props.get('test.department.id', ''),
+                    'filter_parent': props.get('test.filter.parent.id', props.get('test.parent.folder.id', '')),
+                    'folderID': props.get('test.folder.id', ''),
+                    'auth_token': props.get('auth.token', ''),
+                }
+                for item in env.get('values', []):
+                    key = item.get('key')
+                    if key in mapping and mapping[key]:
+                        item['value'] = mapping[key]
+                with open(sys.argv[2], 'w', encoding='utf-8') as f:
+                    json.dump(env, f, indent=2)
+                PY
+                }
+                
                 if ! command -v newman &> /dev/null; then
                     echo "Installing Newman..."
                     npm install -g newman
                 fi
                 
-                # Run Postman collection tests
+                sync_env
                 echo "Running API tests with Newman..."
                 newman run %s -e %s --reporters cli,json --reporter-json-export test-results.json
                 
-                # Check test results
                 if [ $? -eq 0 ]; then
                     echo "All tests passed!"
                 else
                     echo "Some tests failed. Check test-results.json for details."
                     exit 1
                 fi
-                """, collectionFile, environmentFile);
+                """, environmentFile, collectionFile, environmentFile);
     }
 
     /**

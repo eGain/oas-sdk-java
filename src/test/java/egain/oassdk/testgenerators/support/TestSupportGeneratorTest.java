@@ -28,11 +28,20 @@ class TestSupportGeneratorTest {
         props.put("test.baseUrl", "https://host.example/v4");
         config.setAdditionalProperties(props);
 
-        new TestSupportGenerator().generate(spec, tempDir.toString(), config);
+        new TestSupportGenerator().generate(spec, tempDir.toString(), config,
+                List.of("unit", "integration"));
 
         assertThat(Files.exists(tempDir.resolve("test-env.properties"))).isTrue();
+        assertThat(Files.readString(tempDir.resolve("test-env.properties")))
+                .contains("auth.login.base")
+                .contains("schemathesis.include.operations");
         assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/TestEnv.java"))).isTrue();
+        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/RequestBodyEnv.java"))).isTrue();
         assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/EgainAuth.java"))).isTrue();
-        assertThat(Files.readString(tempDir.resolve("pom.xml"))).contains("sequence-java");
+        assertThat(Files.exists(tempDir.resolve("run-all.sh"))).isTrue();
+        String pom = Files.readString(tempDir.resolve("pom.xml"));
+        assertThat(pom).contains("<module>unit</module>");
+        assertThat(pom).contains("<module>integration</module>");
+        assertThat(pom).doesNotContain("sequence-java");
     }
 }

@@ -143,7 +143,7 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
         m.put("HEADER_ACCEPT", propString(config, "schemathesis.headerAccept", "Accept: application/json"));
         m.put("HEADER_ACCEPT_LANG", propString(config, "schemathesis.headerAcceptLanguage", "Accept-language: en-US"));
         m.put("HEADER_AUTH", propString(config, "schemathesis.headerAuthorization", "Authorization: %TOKEN%"));
-        m.put("EXTRA_ARGS", propString(config, "schemathesis.extraArgs", "").trim());
+        m.put("EXTRA_ARGS", buildDefaultExtraArgs(config));
         m.put("TLS_VERIFY", tlsVerifyPropertyString(config));
         return m;
     }
@@ -158,6 +158,23 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
             return "true";
         }
         return "false";
+    }
+
+    private static String buildDefaultExtraArgs(TestConfig config) {
+        String custom = propString(config, "schemathesis.extraArgs", null);
+        if (custom != null && !custom.isBlank()) {
+            return custom.trim();
+        }
+        String ops = propString(config, "schemathesis.include.operations",
+                "createFolder,getSubFolders,editFolder,getFolder");
+        StringBuilder sb = new StringBuilder();
+        for (String part : ops.split(",")) {
+            String op = part.trim();
+            if (!op.isEmpty()) {
+                sb.append(" --include-operation-id ").append(op);
+            }
+        }
+        return sb.toString().trim();
     }
 
     private static void writeProperties(Path path, Map<String, String> values) throws IOException {
@@ -190,6 +207,28 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
                 set -euo pipefail
                 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
                 cd "$SCRIPT_DIR"
+
+                load_test_env() {
+                  local env_root="${TEST_ENV_FILE:-$SCRIPT_DIR/../test-env.properties}"
+                  if [[ -f "$env_root" ]]; then
+                    while IFS='=' read -r key value; do
+                      [[ -z "$key" || "$key" =~ ^# ]] && continue
+                      key="$(echo "$key" | tr -d '[:space:]')"
+                      value="$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                      case "$key" in
+                        base.url) BASEURL="${BASEURL:-$value}" ;;
+                        auth.token) TOKEN="${TOKEN:-'Bearer '"$value"}" ;;
+                        schemathesis.include.operations) SCHEMATHESIS_OPS="$value" ;;
+                        test.destructive.enabled) DESTRUCTIVE="$value" ;;
+                      esac
+                    done < "$env_root"
+                  fi
+                  if [[ -f "$SCRIPT_DIR/../test-env.local.properties" ]]; then
+                    # shellcheck disable=SC1091
+                    source "$SCRIPT_DIR/../test-env.local.properties"
+                  fi
+                }
+                load_test_env
                 
                 get_prop() {
                   local key="$1"
@@ -223,6 +262,12 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
                 HEADER_ACCEPT_LANG="$(get_prop HEADER_ACCEPT_LANG 'Accept-language: en-US')"
                 HEADER_AUTH="$(get_prop HEADER_AUTH 'Authorization: %TOKEN%')"
                 EXTRA_ARGS="$(get_prop EXTRA_ARGS '')"
+                if [[ "${DESTRUCTIVE:-false}" != "true" && "${DESTRUCTIVE:-false}" != "1" ]]; then
+                  EXTRA_ARGS="${EXTRA_ARGS} --exclude-operation-id deleteFolder"
+                fi
+                if [[ -n "${TOKEN:-}" ]]; then
+                  HEADER_AUTH="Authorization: ${TOKEN}"
+                fi
                 TLS_VERIFY="$(get_prop TLS_VERIFY 'true')"
                 tls_lc=$(printf '%s' "$TLS_VERIFY" | tr '[:upper:]' '[:lower:]')
                 if [[ -z "$tls_lc" ]]; then tls_lc=true; fi

@@ -7,6 +7,7 @@ import egain.oassdk.core.exceptions.GenerationException;
 import egain.oassdk.testgenerators.common.TestCodegenSupport;
 import egain.oassdk.testgenerators.common.TestMavenSupport;
 import egain.oassdk.testgenerators.common.TestOutputLayout;
+import egain.oassdk.testgenerators.common.TestProfileSupport;
 import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.IntegrationScenarioSupport;
@@ -113,6 +114,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         sb.append("package ").append(basePackage).append(";\n\n");
 
         sb.append("import org.junit.jupiter.api.*;\n");
+        sb.append("import org.junit.jupiter.api.Assumptions;\n");
         sb.append("import org.junit.jupiter.api.DisplayName;\n");
         sb.append("import org.junit.jupiter.params.ParameterizedTest;\n");
         sb.append("import org.junit.jupiter.params.provider.ValueSource;\n");
@@ -138,6 +140,8 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
 
         sb.append(TestCodegenSupport.restAssuredInit()).append("\n");
 
+        sb.append(TestCodegenSupport.invalidTestConstants()).append("\n");
+
         if (needsConcurrent) {
             sb.append("    private static final int CONCURRENT_TEST_THREADS = ").append(concurrentThreads).append(";\n\n");
         }
@@ -147,8 +151,8 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         sb.append("    }\n\n");
 
         sb.append("    @AfterEach\n");
-        sb.append("    void tearDown() {\n");
-        sb.append("        // Live resource cleanup: see integration and sequence-java modules\n");
+        sb.append("    void tearDown() throws Exception {\n");
+        sb.append("        UnitTestUtils.cleanupCreatedResources();\n");
         sb.append("    }\n\n");
 
         for (OperationInfo opInfo : operations) {
@@ -204,16 +208,22 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                 : new HashMap<>();
 
         String successMatcher = hamcrestSuccessStatusMatcher(responses);
+        boolean smoke = TestProfileSupport.isSmoke(config);
+        boolean destructiveOp = "DELETE".equals(method);
 
         sb.append("    @Test\n");
         sb.append("    @DisplayName(\"").append(escapeJavaString(summary != null ? summary : method + " " + path))
                 .append(" - Valid Request\")\n");
         sb.append("    public void test").append(capitalize(testMethodName)).append("_ValidRequest() {\n");
+        if (destructiveOp) {
+            sb.append(TestCodegenSupport.destructiveGate());
+        }
         appendParamMaps(sb, parameters);
         String bodyLiteral = jsonBodyLiteral(operation, spec);
         appendRestAssuredWhenThen(sb, method, path, bodyLiteral, "        .then()\n            .statusCode(" + successMatcher + ");\n");
         sb.append("    }\n\n");
 
+        if (!smoke) {
         for (Map<String, Object> param : parameters) {
             String paramName = (String) param.get("name");
             Boolean required = param.containsKey("required") ? (Boolean) param.get("required") : Boolean.FALSE;
@@ -250,7 +260,9 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                 }
             }
         }
+        } // end !smoke param negatives
 
+        if (!smoke) {
         for (String statusCode : responses.keySet()) {
             if ("default".equals(statusCode)) {
                 continue;
@@ -302,8 +314,9 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             }
             sb.append("    }\n\n");
         }
+        } // end !smoke status matrix
 
-        if ("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method)) {
+        if (!smoke && ("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method))) {
             Map<String, Object> requestBody = operation.containsKey("requestBody")
                     ? Util.asStringObjectMap(operation.get("requestBody"))
                     : null;
@@ -559,8 +572,8 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                 continue;
             }
             String name = (String) param.get("name");
-            sb.append("        pathParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                    .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
+            sb.append("        pathParams.put(\"").append(escapeJavaString(name)).append("\", ")
+                    .append(TestCodegenSupport.paramValueExpression(name, IntegrationScenarioSupport.getParameterExample(param))).append(");\n");
         }
         sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
         for (Map<String, Object> param : parameters) {
@@ -587,8 +600,9 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             if (name.equals(invalidParamName)) {
                 sb.append("        pathParams.put(\"").append(escapeJavaString(name)).append("\", ").append(invalidVar).append(");\n");
             } else {
-                sb.append("        pathParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                        .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
+                sb.append("        pathParams.put(\"").append(escapeJavaString(name)).append("\", ")
+                        .append(TestCodegenSupport.paramValueExpression(name,
+                                IntegrationScenarioSupport.getParameterExample(param))).append(");\n");
             }
         }
         sb.append("        Map<String, String> queryParams = new HashMap<>();\n");
@@ -600,8 +614,9 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             if (name.equals(invalidParamName)) {
                 sb.append("        queryParams.put(\"").append(escapeJavaString(name)).append("\", ").append(invalidVar).append(");\n");
             } else {
-                sb.append("        queryParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                        .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
+                sb.append("        queryParams.put(\"").append(escapeJavaString(name)).append("\", ")
+                        .append(TestCodegenSupport.paramValueExpression(name,
+                                IntegrationScenarioSupport.getParameterExample(param))).append(");\n");
             }
         }
     }
@@ -763,7 +778,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         if (raw == null || raw.isBlank()) {
             return "\"{}\"";
         }
-        return "\"" + IntegrationScenarioSupport.escapeJavaString(raw) + "\"";
+        return TestCodegenSupport.requestBodyBind(IntegrationScenarioSupport.escapeJavaString(raw));
     }
 
     private String hamcrestSuccessStatusMatcher(Map<String, Object> responses) {
@@ -816,6 +831,129 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         String packageDir = TestOutputLayout.testJavaDir(outputDir, basePackage);
         Files.createDirectories(Paths.get(packageDir));
         Files.write(Paths.get(packageDir, "TestUtils.java"), generateTestUtilsClass(basePackage).getBytes());
+        Files.write(Paths.get(packageDir, "UnitTestUtils.java"), generateUnitTestUtilsClass(basePackage).getBytes());
+    }
+
+    private String generateUnitTestUtilsClass(String basePackage) {
+        return """
+                package %s;
+
+                import io.restassured.response.Response;
+
+                import static io.restassured.RestAssured.given;
+
+                import %s.support.*;
+
+                public final class UnitTestUtils {
+
+                    private UnitTestUtils() {
+                    }
+
+                    public static void cleanupCreatedResources() throws Exception {
+                        for (String id : TestContext.createdIds()) {
+                            deleteResource(id);
+                        }
+                        TestContext.clearCreatedIds();
+                    }
+
+                    private static void deleteResource(String id) {
+                        String hierarchyRoot = TestEnv.hierarchyRootFolderId();
+                        if (hierarchyRoot != null && hierarchyRoot.equals(id)) {
+                            return;
+                        }
+                        String deletePath = TestEnv.get("test.delete.path", "/folders/{folderID}")
+                                .replace("{folderID}", id).replace("{id}", id);
+                        var spec = TestClient.givenAuth();
+                        Response resp = spec.delete(deletePath);
+                        if (resp.getStatusCode() == 202) {
+                            pollAsyncDelete(resp);
+                        }
+                    }
+
+                    private static void pollAsyncDelete(Response accepted) {
+                        String taskUrl = accepted.getHeader("Location");
+                        if (taskUrl == null) {
+                            return;
+                        }
+                        long deadline = System.nanoTime() + 30_000_000_000L;
+                        while (System.nanoTime() < deadline) {
+                            Response r = TestClient.givenAuth()
+                                    .get(taskUrl.startsWith("http") ? taskUrl : taskUrl);
+                            if (r.getStatusCode() == 200 || r.getStatusCode() == 204) {
+                                return;
+                            }
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                return;
+                            }
+                        }
+                    }
+
+                    public static void assertGetMatchesCreate(Response createResponse, String getPath, String createBody) {
+                        String createdId = extractCreatedId(createResponse);
+                        if (createdId == null) {
+                            return;
+                        }
+                        TestContext.trackCreatedId(createdId);
+                        String path = getPath.replaceAll("\\{[^}]+}", createdId);
+                        Response getResp = TestClient.givenAuth().get(path);
+                        if (getResp.getStatusCode() < 200 || getResp.getStatusCode() >= 300) {
+                            throw new AssertionError("GET after create failed: " + getResp.getStatusCode());
+                        }
+                        String getBody = getResp.getBody().asString();
+                        assertFieldEqual(createBody, getBody, "name");
+                        assertFieldEqual(createBody, getBody, "description");
+                    }
+
+                    private static void assertFieldEqual(String createJson, String getJson, String field) {
+                        String createVal = extractJsonField(createJson, field);
+                        if (createVal == null) {
+                            return;
+                        }
+                        String getVal = extractJsonField(getJson, field);
+                        if (getVal != null && !createVal.equals(getVal)) {
+                            throw new AssertionError("Field '" + field + "' should match after create");
+                        }
+                    }
+
+                    public static String extractCreatedId(Response response) {
+                        if (response == null) {
+                            return null;
+                        }
+                        String location = response.getHeader("Location");
+                        if (location != null) {
+                            int slash = location.lastIndexOf('/');
+                            if (slash >= 0 && slash < location.length() - 1) {
+                                return location.substring(slash + 1);
+                            }
+                        }
+                        String body = response.getBody().asString();
+                        for (String key : new String[]{"id", "folderID", "folderId"}) {
+                            String val = extractJsonField(body, key);
+                            if (val != null) {
+                                return val;
+                            }
+                        }
+                        return null;
+                    }
+
+                    private static String extractJsonField(String json, String field) {
+                        if (json == null) {
+                            return null;
+                        }
+                        String needle = "\\"" + field + "\\":\\"";
+                        int i = json.indexOf(needle);
+                        if (i < 0) {
+                            return null;
+                        }
+                        int start = i + needle.length();
+                        int end = json.indexOf('"', start);
+                        return end > start ? json.substring(start, end) : null;
+                    }
+                }
+                """.formatted(basePackage, basePackage);
     }
 
     private void generatePomXml(String outputDir, String basePackage) throws IOException {

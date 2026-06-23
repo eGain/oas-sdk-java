@@ -5,11 +5,14 @@ import egain.oassdk.core.exceptions.GenerationException;
 import egain.oassdk.testgenerators.common.TestOutputLayout;
 import egain.oassdk.testgenerators.common.TestSpecUtils;
 
+import egain.oassdk.testgenerators.common.TestProfileSupport;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -19,11 +22,17 @@ import java.util.Map;
 public class TestSupportGenerator {
 
     public void generate(Map<String, Object> spec, String outputDir, TestConfig config) throws GenerationException {
+        generate(spec, outputDir, config, List.of("unit", "integration", "nfr", "performance", "security", "sequence-java"));
+    }
+
+    public void generate(Map<String, Object> spec, String outputDir, TestConfig config, List<String> testTypes)
+            throws GenerationException {
         try {
             String basePackage = resolvePackage(config);
             String supportPackage = TestOutputLayout.supportPackage(basePackage);
-            String defaultBaseUrl = TestSpecUtils.resolveBaseUrl(spec, config);
+            String defaultBaseUrl = resolveTemplateBaseUrl(spec, config);
             boolean egainAuth = TestSpecUtils.useEgainAuth(config, spec);
+            List<String> modules = TestProfileSupport.aggregatorModules(testTypes);
 
             Path supportDir = Paths.get(TestOutputLayout.supportJavaDir(outputDir, basePackage));
             Files.createDirectories(supportDir);
@@ -33,6 +42,7 @@ public class TestSupportGenerator {
             write(supportDir.resolve("TestHttp.java"), testHttpSource(supportPackage));
             write(supportDir.resolve("TestClient.java"), testClientSource(supportPackage));
             write(supportDir.resolve("TestContext.java"), testContextSource(supportPackage));
+            write(supportDir.resolve("RequestBodyEnv.java"), requestBodyEnvSource(supportPackage));
             if (egainAuth) {
                 write(supportDir.resolve("EgainAuth.java"), egainAuthSource(supportPackage));
             }
@@ -43,7 +53,10 @@ public class TestSupportGenerator {
             write(testsRoot.resolve("test-env.local.properties.example"), testEnvLocalExample(egainAuth));
             write(testsRoot.resolve("run-smoke.sh"), runSmokeScript());
             write(testsRoot.resolve("run-smoke.bat"), runSmokeBat());
-            write(testsRoot.resolve("pom.xml"), aggregatorPom());
+            write(testsRoot.resolve("run-all.sh"), runAllScript(modules));
+            write(testsRoot.resolve("run-all.bat"), runAllBat(modules));
+            write(testsRoot.resolve("fetch-token.sh"), fetchTokenScript());
+            write(testsRoot.resolve("pom.xml"), aggregatorPom(modules));
             write(testsRoot.resolve("README-TESTS.md"), readmeTests(egainAuth));
 
         } catch (IOException e) {
@@ -59,6 +72,17 @@ public class TestSupportGenerator {
             }
         }
         return "com.example.api";
+    }
+
+    private static String resolveTemplateBaseUrl(Map<String, Object> spec, TestConfig config) {
+        String resolved = TestSpecUtils.resolveBaseUrl(spec, config);
+        if (resolved == null || resolved.isBlank()) {
+            return "";
+        }
+        if (resolved.contains("${")) {
+            return "";
+        }
+        return resolved;
     }
 
     private static void write(Path path, String content) throws IOException {
@@ -193,6 +217,35 @@ public class TestSupportGenerator {
                         return get("test.folder.id", parentFolderId());
                     }
 
+                    public static String hierarchyRootFolderId() {
+                        return get("test.hierarchy.root.folder.id", get("test.filter.parent.id", parentFolderId()));
+                    }
+
+                    public static String userId() {
+                        return get("test.user.id", "1");
+                    }
+
+                    public static String userGroupId() {
+                        return get("test.user.group.id", "1");
+                    }
+
+                    public static String promptId() {
+                        return get("test.prompt.id", "1");
+                    }
+
+                    public static String loginBase() {
+                        return get("auth.login.base", get("auth.login.url", ""));
+                    }
+
+                    public static String exchangePath() {
+                        return get("auth.exchange.path", "/authentication/user/advisor/oauth2/token");
+                    }
+
+                    public static String schemathesisIncludeOperations() {
+                        return get("schemathesis.include.operations",
+                                "createFolder,getSubFolders,editFolder,getFolder");
+                    }
+
                     public static String pageNum() {
                         return String.valueOf(getInt("test.pagination.pageNum", 1));
                     }
@@ -225,6 +278,7 @@ public class TestSupportGenerator {
                 ? """
                         String egain = EgainAuth.fetchBearerToken();
                         if (egain != null && !egain.isBlank()) {
+                            cacheToken(egain);
                             return egain;
                         }
                         """
@@ -237,10 +291,19 @@ public class TestSupportGenerator {
                  */
                 public final class TestAuth {
 
+                    private static volatile String cachedToken;
+
                     private TestAuth() {
                     }
 
+                    public static void clearCache() {
+                        cachedToken = null;
+                    }
+
                     public static String rawToken() {
+                        if (cachedToken != null && !cachedToken.isBlank()) {
+                            return cachedToken;
+                        }
                         String t = System.getenv("API_TOKEN");
                         if (t != null && !t.isBlank()) {
                             return t.trim();
@@ -255,10 +318,17 @@ public class TestSupportGenerator {
                         }
                         t = TestEnv.get("auth.token", null);
                         if (t != null && !t.isBlank()) {
-                            return t.trim();
+                            cachedToken = t.trim();
+                            return cachedToken;
                         }
                         %s
                         return "";
+                    }
+
+                    public static void cacheToken(String token) {
+                        if (token != null && !token.isBlank()) {
+                            cachedToken = token.trim();
+                        }
                     }
 
                     public static String bearerHeader() {
@@ -358,6 +428,7 @@ public class TestSupportGenerator {
                     private static final CopyOnWriteArrayList<String> CREATED_IDS = new CopyOnWriteArrayList<>();
                     private static volatile String bootstrapParentFolderId;
                     private static volatile String bootstrapHierarchyRootId;
+                    private static volatile String disposableFolderId;
 
                     private TestContext() {
                     }
@@ -391,6 +462,55 @@ public class TestSupportGenerator {
                     public static void setBootstrapHierarchyRootId(String id) {
                         bootstrapHierarchyRootId = id;
                     }
+
+                    public static String disposableFolderId() {
+                        return disposableFolderId;
+                    }
+
+                    public static void setDisposableFolderId(String id) {
+                        disposableFolderId = id;
+                    }
+                }
+                """.formatted(pkg);
+    }
+
+    private static String requestBodyEnvSource(String pkg) {
+        return """
+                package %s;
+
+                /**
+                 * Binds request JSON bodies to {@link TestEnv} at runtime (parent folder, user IDs, etc.).
+                 */
+                public final class RequestBodyEnv {
+
+                    private RequestBodyEnv() {
+                    }
+
+                    public static String bind(String json) {
+                        if (json == null || json.isBlank()) {
+                            return json;
+                        }
+                        String bound = json;
+                        bound = bound.replace("${test.parent.folder.id}", TestEnv.parentFolderId());
+                        bound = bound.replace("${test.filter.parent.id}", TestEnv.get("test.filter.parent.id", TestEnv.parentFolderId()));
+                        bound = bound.replace("${test.user.id}", TestEnv.userId());
+                        bound = bound.replace("${test.user.group.id}", TestEnv.userGroupId());
+                        bound = bound.replace("${test.department.id}", TestEnv.departmentId());
+                        bound = replaceParentId(bound, TestEnv.parentFolderId());
+                        if (!bound.contains("\\"name\\"") && bound.contains("createFolder")) {
+                            bound = bound.replaceFirst("\\{", "{\\"name\\":\\"SDK-generated-folder\\",");
+                        }
+                        return bound;
+                    }
+
+                    private static String replaceParentId(String json, String parentId) {
+                        if (parentId == null || parentId.isBlank()) {
+                            return json;
+                        }
+                        return json.replaceAll(
+                                "\\"parent\\"\\\\s*:\\\\s*\\\\{[^}]*\\\\"id\\\\"\\\\s*:\\\\s*\\\\\\"[^\\\\\\"]*\\\\\\"",
+                                "\\"parent\\":{\\"id\\":\\"" + parentId + "\\"}");
+                    }
                 }
                 """.formatted(pkg);
     }
@@ -406,8 +526,8 @@ public class TestSupportGenerator {
                 import java.time.Duration;
 
                 /**
-                 * eGain session login + JWT bearer exchange.
-                 * Configure auth.login.url, auth.username, auth.password in test-env.properties.
+                 * eGain v20 session login + advisor OAuth2 bearer exchange.
+                 * Configure auth.login.base, auth.username, auth.password in test-env.properties.
                  */
                 public final class EgainAuth {
 
@@ -417,16 +537,18 @@ public class TestSupportGenerator {
                     public static String fetchBearerToken() {
                         String username = TestEnv.get("auth.username", null);
                         String password = TestEnv.get("auth.password", null);
-                        if (username == null || password == null) {
+                        if (username == null || password == null || username.isBlank() || password.isBlank()) {
+                            return null;
+                        }
+                        String loginBase = TestEnv.loginBase();
+                        if (loginBase == null || loginBase.isBlank()) {
                             return null;
                         }
                         try {
-                            String loginUrl = TestEnv.get("auth.login.url",
-                                    TestEnv.get("auth.oauth.tokenUrl", ""));
-                            if (loginUrl == null || loginUrl.isBlank()) {
-                                return null;
-                            }
                             HttpClient client = TestHttp.client();
+                            String loginUrl = loginBase.endsWith("/")
+                                    ? loginBase + "authentication/user/login"
+                                    : loginBase + "/authentication/user/login";
                             String sessionBody = "{\\"username\\":\\"" + escapeJson(username)
                                     + "\\",\\"password\\":\\"" + escapeJson(password) + "\\"}";
                             HttpRequest login = HttpRequest.newBuilder()
@@ -438,31 +560,40 @@ public class TestSupportGenerator {
                                     .build();
                             HttpResponse<String> loginResp = client.send(login, HttpResponse.BodyHandlers.ofString());
                             if (loginResp.statusCode() >= 300) {
+                                System.err.println("EgainAuth: login failed HTTP " + loginResp.statusCode());
                                 return null;
                             }
-                            String sessionToken = extractJsonString(loginResp.body(), "sessionId");
-                            if (sessionToken == null) {
-                                sessionToken = extractJsonString(loginResp.body(), "access_token");
+                            String sessionId = loginResp.headers().firstValue("X-egain-session").orElse(null);
+                            if (sessionId == null) {
+                                sessionId = extractJsonString(loginResp.body(), "sessionId");
                             }
-                            if (sessionToken == null) {
+                            if (sessionId == null) {
                                 return null;
                             }
-                            String exchangeUrl = TestEnv.get("auth.bearer.exchange.url", loginUrl + "/oauth2/token");
-                            String exchangeBody = "{\\"grant_type\\":\\"client_credentials\\",\\"sessionId\\":\\""
-                                    + escapeJson(sessionToken) + "\\"}";
+                            String exchangePath = TestEnv.exchangePath();
+                            String exchangeUrl = loginBase.endsWith("/")
+                                    ? loginBase.substring(0, loginBase.length() - 1) + exchangePath
+                                    : loginBase + exchangePath;
                             HttpRequest exchange = HttpRequest.newBuilder()
                                     .uri(URI.create(exchangeUrl))
                                     .timeout(Duration.ofSeconds(30))
-                                    .header("Content-Type", "application/json")
                                     .header("Accept", "application/json")
-                                    .POST(HttpRequest.BodyPublishers.ofString(exchangeBody))
+                                    .header("X-egain-session", sessionId)
+                                    .GET()
                                     .build();
                             HttpResponse<String> exchangeResp = client.send(exchange, HttpResponse.BodyHandlers.ofString());
                             if (exchangeResp.statusCode() >= 300) {
-                                return sessionToken;
+                                System.err.println("EgainAuth: exchange failed HTTP " + exchangeResp.statusCode());
+                                return null;
                             }
                             String bearer = extractJsonString(exchangeResp.body(), "access_token");
-                            return bearer != null ? bearer : sessionToken;
+                            if (bearer == null) {
+                                bearer = extractJsonString(exchangeResp.body(), "token");
+                            }
+                            if (bearer != null) {
+                                TestAuth.cacheToken(bearer);
+                            }
+                            return bearer;
                         } catch (Exception e) {
                             System.err.println("EgainAuth: " + e.getMessage());
                             return null;
@@ -493,44 +624,61 @@ public class TestSupportGenerator {
     private static String testEnvProperties(String defaultBaseUrl, boolean egainAuth) {
         StringBuilder sb = new StringBuilder();
         sb.append("# Generated test environment — copy test-env.local.properties.example for secrets\n");
-        sb.append("base.url=").append(defaultBaseUrl).append("\n");
+        if (defaultBaseUrl == null || defaultBaseUrl.isBlank()) {
+            sb.append("# base.url must include /system/ws/... for eGain authoring hosts\n");
+            sb.append("base.url=\n");
+        } else {
+            sb.append("base.url=").append(defaultBaseUrl).append("\n");
+        }
         sb.append("accept.language=en-US\n");
         sb.append("tls.verify=false\n\n");
         sb.append("# Test data IDs (discover via GET /folders?departmentId=...)\n");
         sb.append("test.department.id=\n");
         sb.append("test.parent.folder.id=\n");
         sb.append("test.filter.parent.id=\n");
+        sb.append("test.hierarchy.root.folder.id=\n");
         sb.append("test.folder.id=\n");
+        sb.append("test.user.id=\n");
+        sb.append("test.user.group.id=\n");
         sb.append("test.prompt.id=\n\n");
         sb.append("test.pagination.pageNum=1\n");
         sb.append("test.pagination.pageSize=10\n\n");
         sb.append("test.bootstrap.enabled=false\n");
         sb.append("test.destructive.enabled=false\n");
         sb.append("test.validateResponseSchema=false\n\n");
-        sb.append("# Auth — set API_TOKEN env or auth.token property\n");
+        sb.append("schemathesis.include.operations=createFolder,getSubFolders,editFolder,getFolder\n\n");
+        sb.append("# Auth — optional manual token (CI secret store)\n");
+        sb.append("auth.token=\n");
         if (egainAuth) {
             sb.append("auth.provider=egain\n");
-            sb.append("auth.login.url=\n");
-            sb.append("auth.bearer.exchange.url=\n");
+            sb.append("auth.login.base=\n");
+            sb.append("auth.exchange.path=/authentication/user/advisor/oauth2/token\n");
             sb.append("auth.username=\n");
             sb.append("auth.password=\n");
         }
-        sb.append("auth.token=\n");
         return sb.toString();
     }
 
     private static String testEnvLocalExample(boolean egainAuth) {
         StringBuilder sb = new StringBuilder();
         sb.append("# Local overrides — do not commit\n");
-        sb.append("base.url=https://your-host.example/system/ws/knowledge/contentmgr/v4\n");
+        sb.append("base.url=https://YOUR-HOST/system/ws/knowledge/contentmgr/v4\n");
+        sb.append("accept.language=en-US\n");
+        sb.append("tls.verify=false\n\n");
         if (egainAuth) {
+            sb.append("auth.login.base=https://YOUR-HOST/system/ws/v20\n");
             sb.append("auth.username=your-user\n");
-            sb.append("auth.password=your-password\n");
-            sb.append("auth.login.url=https://your-host.example/system/ws/v20/authentication/user/login\n");
+            sb.append("auth.password=CHANGE_ME\n");
         }
         sb.append("test.department.id=1001\n");
         sb.append("test.parent.folder.id=\n");
+        sb.append("test.filter.parent.id=\n");
+        sb.append("test.hierarchy.root.folder.id=\n");
         sb.append("test.folder.id=\n");
+        sb.append("test.user.id=\n");
+        sb.append("test.user.group.id=\n");
+        sb.append("test.bootstrap.enabled=false\n");
+        sb.append("test.destructive.enabled=false\n");
         return sb.toString();
     }
 
@@ -561,7 +709,11 @@ public class TestSupportGenerator {
                 """;
     }
 
-    private static String aggregatorPom() {
+    private static String aggregatorPom(List<String> modules) {
+        StringBuilder moduleXml = new StringBuilder();
+        for (String module : modules) {
+            moduleXml.append("        <module>").append(module).append("</module>\n");
+        }
         return """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -573,14 +725,78 @@ public class TestSupportGenerator {
                     <version>1.0.0</version>
                     <packaging>pom</packaging>
                     <modules>
-                        <module>unit</module>
-                        <module>integration</module>
-                        <module>nfr</module>
-                        <module>performance</module>
-                        <module>security</module>
-                        <module>sequence-java</module>
-                    </modules>
+                __MODULES__    </modules>
                 </project>
+                """.replace("__MODULES__", moduleXml.toString());
+    }
+
+    private static String runAllScript(List<String> modules) {
+        String mvnModules = String.join(",", modules);
+        return """
+                #!/usr/bin/env bash
+                set -euo pipefail
+                ROOT="$(cd "$(dirname "$0")" && pwd)"
+                export TEST_ENV_FILE="${TEST_ENV_FILE:-$ROOT/test-env.properties}"
+                if [[ -f "$ROOT/test-env.local.properties" ]]; then
+                  set -a
+                  # shellcheck disable=SC1091
+                  source "$ROOT/test-env.local.properties"
+                  set +a
+                fi
+                PROFILE="${TEST_PROFILE:-full}"
+                echo "Running test profile: $PROFILE"
+                ./run-smoke.sh
+                if [[ "$PROFILE" != "smoke" ]]; then
+                  mvn -q test -pl __MVN_MODULES__
+                else
+                  mvn -q test -pl integration
+                fi
+                if [[ -d "$ROOT/schemathesis" && -x "$ROOT/schemathesis/run-schemathesis.sh" ]]; then
+                  (cd "$ROOT/schemathesis" && ./run-schemathesis.sh) || true
+                fi
+                if [[ -x "$ROOT/run-tests.sh" ]]; then
+                  ./run-tests.sh || true
+                fi
+                echo "run-all finished."
+                """.replace("__MVN_MODULES__", mvnModules);
+    }
+
+    private static String runAllBat(List<String> modules) {
+        String mvnModules = String.join(",", modules);
+        return """
+                @echo off
+                set ROOT=%~dp0
+                if not defined TEST_ENV_FILE set TEST_ENV_FILE=%ROOT%test-env.properties
+                if not defined TEST_PROFILE set TEST_PROFILE=full
+                call %ROOT%run-smoke.bat
+                if /I "%TEST_PROFILE%"=="smoke" (
+                  cd /d %ROOT%integration
+                  call mvn -q test
+                ) else (
+                  cd /d %ROOT%
+                  call mvn -q test -pl __MVN_MODULES__
+                )
+                echo run-all finished.
+                """.replace("__MVN_MODULES__", mvnModules);
+    }
+
+    private static String fetchTokenScript() {
+        return """
+                #!/usr/bin/env bash
+                set -euo pipefail
+                ROOT="$(cd "$(dirname "$0")" && pwd)"
+                export TEST_ENV_FILE="${TEST_ENV_FILE:-$ROOT/test-env.properties}"
+                cd "$ROOT/unit"
+                mvn -q -DincludeScope=test -DskipTests compile test-compile
+                TOKEN=$(java -cp "target/test-classes:target/classes:$ROOT/test-support/target/test-classes" \\
+                  -Dtest.env.file="$TEST_ENV_FILE" \\
+                  com.example.api.support.EgainAuth 2>/dev/null || true)
+                if [[ -n "${TOKEN:-}" ]]; then
+                  echo "TOKEN='Bearer $TOKEN'"
+                else
+                  echo "Could not fetch token — set auth.username/auth.password in test-env.local.properties" >&2
+                  exit 1
+                fi
                 """;
     }
 
@@ -591,17 +807,30 @@ public class TestSupportGenerator {
                 ## Quick start
 
                 1. Copy `test-env.local.properties.example` to `test-env.local.properties` and fill in values.
-                2. Set `TEST_ENV_FILE` to the absolute path of your properties file (optional if running from this directory).
-                3. Run smoke: `./run-smoke.sh` (or `run-smoke.bat` on Windows).
-                4. Run all Java modules: `mvn test` from this directory.
+                2. Run all suites: `./run-all.sh` (or `run-all.bat` on Windows).
+                3. Smoke only: `./run-smoke.sh`.
+                4. Profile `smoke`: `TEST_PROFILE=smoke ./run-all.sh` (integration + schemathesis, no unit matrix).
 
                 ## Configuration
 
                 All Java test modules load `test-env.properties` via `TestEnv`. Environment variables override properties.
 
-                Key properties: `base.url`, `test.department.id`, `test.parent.folder.id`, `test.folder.id`, `accept.language`.
+                Key properties: `base.url`, `test.department.id`, `test.parent.folder.id`, `test.hierarchy.root.folder.id`, `accept.language`.
+
+                ## Suite overlap
+
+                | Suite | Role |
+                |-------|------|
+                | Integration (JUnit) | Business scenarios, bootstrap, create→verify |
+                | Unit (RestAssured) | Contract/param matrix against live API |
+                | Schemathesis | Contract fuzz / property-based exploration |
+                | Postman/Newman | Manual collection replay |
+
+                Use `TEST_PROFILE=smoke` to reduce duplicate coverage between unit and integration.
                 """
-                + (egainAuth ? "\n\neGain auth: set `auth.username`, `auth.password`, `auth.login.url` or export `API_TOKEN`.\n" : "");
+                + (egainAuth
+                ? "\n\neGain auth: set `auth.login.base`, `auth.username`, `auth.password` — no manual JWT copy needed.\n"
+                : "\n\nSet `auth.token` or export `API_TOKEN` for bearer auth.\n");
     }
 
     private static String escapeJava(String s) {

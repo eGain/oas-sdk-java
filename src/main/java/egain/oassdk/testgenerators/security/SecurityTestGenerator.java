@@ -207,6 +207,9 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                             sb.append("    @DisplayName(\"Authentication: ").append(summary != null ? summary : method.toUpperCase() + " " + path)
                                     .append(" - Missing Token\")\n");
                             sb.append("    void testAuthentication_MissingToken_").append(sanitizePath(path)).append("_").append(method).append("() throws Exception {\n");
+                            if ("delete".equals(method)) {
+                                sb.append(TestCodegenSupport.destructiveGate());
+                            }
                             sb.append("        // Arrange - Request without authentication\n");
                             sb.append("        URI uri = uriFor(\"").append(path).append("\");\n");
                             sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");

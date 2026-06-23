@@ -41,9 +41,13 @@ class SchemathesisTestGeneratorTest {
         assertTrue(props.contains("JUNIT_REPORT="));
         assertTrue(props.contains("%TOKEN%"));
         assertTrue(props.contains("TLS_VERIFY=false"));
+        assertTrue(props.contains("EXTRA_ARGS="));
+        assertTrue(props.contains("--include-operation-id createFolder"));
 
         String script = Files.readString(bundle.resolve("run-schemathesis.sh"));
         assertTrue(script.contains("st run"));
+        assertTrue(script.contains("load_test_env"));
+        assertTrue(script.contains("deleteFolder"));
         assertTrue(script.contains("--phases="));
         assertTrue(script.contains("--tls-verify=false"));
     }
