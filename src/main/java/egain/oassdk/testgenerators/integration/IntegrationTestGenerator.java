@@ -7,6 +7,7 @@ import egain.oassdk.core.exceptions.GenerationException;
 import egain.oassdk.testgenerators.common.TestCodegenSupport;
 import egain.oassdk.testgenerators.common.TestMavenSupport;
 import egain.oassdk.testgenerators.common.TestOutputLayout;
+import egain.oassdk.testgenerators.common.TestProfileSupport;
 import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.IntegrationScenarioSupport;
@@ -158,9 +159,10 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
 
         sb.append("    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);\n");
         sb.append("    private static HttpClient httpClient;\n\n");
+        sb.append(TestCodegenSupport.invalidTestConstants()).append("\n");
 
         sb.append("    @BeforeAll\n");
-        sb.append("    static void setUpAll() {\n");
+        sb.append("    static void setUpAll() throws Exception {\n");
         sb.append("        httpClient = TestHttp.client();\n");
         sb.append("        String url = TestEnv.baseUrl();\n");
         sb.append("        if (!IntegrationTestUtils.waitForServer(url, REQUEST_TIMEOUT)) {\n");
@@ -253,7 +255,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         sb.append("            TestContext.trackCreatedId(createdId);\n");
         sb.append("            IntegrationTestUtils.assertGetMatchesCreate(httpClient, createdId, \"")
                 .append(IntegrationScenarioSupport.escapeJavaString(getPath))
-                .append("\", REQUEST_TIMEOUT, response.body()");
+                .append("\", REQUEST_TIMEOUT, requestBody");
         if (requiresAuth) {
             sb.append(", getTokenClientApplication()");
         } else {
@@ -409,11 +411,14 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 pathParams.put(paramName, IntegrationScenarioSupport.getParameterExample(param));
             }
         }
+        // path params resolved via TestEnv in appendJavaPathUriBlocks
 
         int maxBody = IntegrationScenarioSupport.maxInvalidBodyFields(config);
         int maxParam = IntegrationScenarioSupport.maxInvalidParamCases(config);
         String requestBodyRaw = IntegrationScenarioSupport.generateRequestBodyFromSchemaRaw(operation, spec);
         String requestBodyEscaped = IntegrationScenarioSupport.escapeJavaString(requestBodyRaw);
+        boolean smoke = TestProfileSupport.isSmoke(config);
+        boolean destructiveOp = "DELETE".equals(method);
         Map<String, Object> requestBodySchema = IntegrationScenarioSupport.extractRequestBodySchema(operation, spec);
         boolean jsonBody = "POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method);
 
@@ -425,6 +430,9 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("    @Order(").append(order).append(")\n");
             sb.append("    @DisplayName(\"").append(displayBase).append(" - Successful request (client application)\")\n");
             sb.append("    void test").append(capitalize(testMethodName)).append("_Success_ClientApplication() throws Exception {\n");
+            if (destructiveOp) {
+                sb.append(TestCodegenSupport.destructiveGate());
+            }
             sb.append("        String tok = getTokenClientApplication();\n");
             sb.append("        Assumptions.assumeTrue(tok != null && !tok.isEmpty(), \"Skip: set INTEGRATION_TOKEN_CLIENT_APPLICATION (or API_BEARER_TOKEN / API_TOKEN)\");\n");
             appendJavaPathUriBlocks(sb, path, pathParams, queryParams);
@@ -435,7 +443,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("            .header(\"Accept-Language\", TestEnv.acceptLanguage())\n");
             sb.append("            .header(\"Authorization\", \"Bearer \" + tok);\n");
             if (jsonBody) {
-                sb.append("        String requestBody = \"").append(requestBodyEscaped).append("\";\n");
+                sb.append("        String requestBody = ").append(TestCodegenSupport.requestBodyBind(requestBodyEscaped)).append(";\n");
             }
             appendHttpMethodOnRequestBuilder(sb, method, jsonBody);
             sb.append("        HttpRequest request = requestBuilder.build();\n");
@@ -463,7 +471,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("            .header(\"Accept-Language\", TestEnv.acceptLanguage())\n");
             sb.append("            .header(\"Authorization\", \"Bearer \" + tok);\n");
             if (jsonBody) {
-                sb.append("        String requestBody = \"").append(requestBodyEscaped).append("\";\n");
+                sb.append("        String requestBody = ").append(TestCodegenSupport.requestBodyBind(requestBodyEscaped)).append(";\n");
             }
             appendHttpMethodOnRequestBuilder(sb, method, jsonBody);
             sb.append("        HttpRequest request = requestBuilder.build();\n");
@@ -487,7 +495,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
             sb.append("            .header(\"Accept\", \"application/json\");\n");
             if (jsonBody) {
-                sb.append("        String requestBody = \"").append(requestBodyEscaped).append("\";\n");
+                sb.append("        String requestBody = ").append(TestCodegenSupport.requestBodyBind(requestBodyEscaped)).append(";\n");
             }
             appendHttpMethodOnRequestBuilder(sb, method, jsonBody);
             sb.append("        HttpRequest request = requestBuilder.build();\n");
@@ -502,7 +510,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         }
 
         List<IntegrationScenarioSupport.OneOfVariantBody> oneOfVariants =
-                jsonBody ? IntegrationScenarioSupport.buildOneOfVariantBodies(requestBodySchema, spec) : List.of();
+                jsonBody && !smoke ? IntegrationScenarioSupport.buildOneOfVariantBodies(requestBodySchema, spec) : List.of();
         for (IntegrationScenarioSupport.OneOfVariantBody variant : oneOfVariants) {
             order++;
             sb.append("    @Test\n");
@@ -534,7 +542,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("    }\n\n");
         }
 
-        if (IntegrationScenarioSupport.emitDeclaredErrorCodes(config)) {
+        if (!smoke && IntegrationScenarioSupport.emitDeclaredErrorCodes(config)) {
             List<IntegrationScenarioSupport.DeclaredErrorCase> declaredErrors =
                     IntegrationScenarioSupport.buildDeclaredErrorCases(operation, queryParams);
             for (IntegrationScenarioSupport.DeclaredErrorCase dec : declaredErrors) {
@@ -557,7 +565,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                     sb.append("        }\n");
                 }
                 if (jsonBody) {
-                    sb.append("        String requestBody = \"").append(requestBodyEscaped).append("\";\n");
+                    sb.append("        String requestBody = ").append(TestCodegenSupport.requestBodyBind(requestBodyEscaped)).append(";\n");
                 }
                 appendHttpMethodOnRequestBuilder(sb, method, jsonBody);
                 sb.append("        HttpRequest request = requestBuilder.build();\n");
@@ -569,6 +577,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             }
         }
 
+        if (!smoke) {
         List<IntegrationScenarioSupport.IntegrationParamNegativeCase> paramCases =
                 IntegrationScenarioSupport.buildParamNegativeCases(path, operation, pathParams, queryParams, maxParam);
         for (IntegrationScenarioSupport.IntegrationParamNegativeCase nc : paramCases) {
@@ -591,7 +600,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 sb.append("        }\n");
             }
             if (jsonBody) {
-                sb.append("        String requestBody = \"").append(requestBodyEscaped).append("\";\n");
+                sb.append("        String requestBody = ").append(TestCodegenSupport.requestBodyBind(requestBodyEscaped)).append(";\n");
             }
             appendHttpMethodOnRequestBuilder(sb, method, jsonBody);
             sb.append("        HttpRequest request = requestBuilder.build();\n");
@@ -601,6 +610,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             generateErrorResponseSchemaValidation(sb, responses, spec);
             sb.append("    }\n\n");
         }
+        } // end !smoke param negatives
 
         if (requiresAuth) {
             order++;
@@ -614,7 +624,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
             sb.append("            .header(\"Accept\", \"application/json\");\n");
             if (jsonBody) {
-                sb.append("        String requestBody = \"").append(requestBodyEscaped).append("\";\n");
+                sb.append("        String requestBody = ").append(TestCodegenSupport.requestBodyBind(requestBodyEscaped)).append(";\n");
             }
             appendHttpMethodOnRequestBuilder(sb, method, jsonBody);
             sb.append("        HttpRequest request = requestBuilder.build();\n");
@@ -626,7 +636,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("    }\n\n");
         }
 
-        if (jsonBody) {
+        if (jsonBody && !smoke) {
             if (IntegrationScenarioSupport.isRequestBodyRequired(operation, spec)) {
                 order++;
                 sb.append("    @Test\n");
@@ -1049,9 +1059,84 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                         if (getResp.statusCode() < 200 || getResp.statusCode() >= 300) {
                             throw new AssertionError("GET after create failed: " + getResp.statusCode());
                         }
-                        if (createBody != null && createBody.contains("\\"name\\"")) {
-                            assertJsonHasRequiredFields(getResp.body(), "name");
+                        String getBody = getResp.body();
+                        if (createBody == null || createBody.isBlank()) {
+                            return;
                         }
+                        assertFieldEqual(createBody, getBody, "name");
+                        assertFieldEqual(createBody, getBody, "description");
+                        assertNestedFieldEqual(createBody, getBody, "parent", "id");
+                        assertFieldEqual(createBody, getBody, "translateContent");
+                    }
+
+                    private static void assertFieldEqual(String createJson, String getJson, String field) {
+                        String createVal = extractJsonString(createJson, field);
+                        if (createVal == null) {
+                            return;
+                        }
+                        String getVal = extractJsonString(getJson, field);
+                        if (getVal != null && !createVal.equals(getVal)) {
+                            throw new AssertionError("Field '" + field + "' should match after create");
+                        }
+                    }
+
+                    private static void assertNestedFieldEqual(String createJson, String getJson, String object, String field) {
+                        String createVal = extractNestedJsonString(createJson, object, field);
+                        if (createVal == null) {
+                            return;
+                        }
+                        String getVal = extractNestedJsonString(getJson, object, field);
+                        if (getVal != null && !createVal.equals(getVal)) {
+                            throw new AssertionError(object + "." + field + " should match after create");
+                        }
+                    }
+
+                    private static String extractJsonString(String json, String field) {
+                        if (json == null) {
+                            return null;
+                        }
+                        String needle = "\\"" + field + "\\":\\"";
+                        int i = json.indexOf(needle);
+                        if (i < 0) {
+                            needle = "\\"" + field + "\\":";
+                            i = json.indexOf(needle);
+                            if (i < 0) {
+                                return null;
+                            }
+                            int start = i + needle.length();
+                            int end = json.indexOf(',', start);
+                            if (end < 0) {
+                                end = json.indexOf('}', start);
+                            }
+                            return end > start ? json.substring(start, end).trim().replaceAll("\\"", "") : null;
+                        }
+                        int start = i + needle.length();
+                        int end = json.indexOf('"', start);
+                        return end > start ? json.substring(start, end) : null;
+                    }
+
+                    private static String extractNestedJsonString(String json, String object, String field) {
+                        if (json == null) {
+                            return null;
+                        }
+                        String objNeedle = "\\"" + object + "\\":{";
+                        int objIdx = json.indexOf(objNeedle);
+                        if (objIdx < 0) {
+                            return null;
+                        }
+                        int brace = json.indexOf('{', objIdx);
+                        int depth = 0;
+                        for (int i = brace; i < json.length(); i++) {
+                            char c = json.charAt(i);
+                            if (c == '{') depth++;
+                            else if (c == '}') {
+                                depth--;
+                                if (depth == 0) {
+                                    return extractJsonString(json.substring(brace, i + 1), field);
+                                }
+                            }
+                        }
+                        return null;
                     }
 
                     public static void cleanupCreatedResources(HttpClient client, Duration timeout) throws Exception {
@@ -1062,6 +1147,10 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                     }
 
                     private static void deleteResource(HttpClient client, String id, Duration timeout) throws Exception {
+                        String hierarchyRoot = TestEnv.hierarchyRootFolderId();
+                        if (hierarchyRoot != null && hierarchyRoot.equals(id)) {
+                            return;
+                        }
                         String deletePath = TestEnv.get("test.delete.path", "/folders/{folderID}")
                                 .replace("{folderID}", id).replace("{id}", id);
                         HttpRequest.Builder b = HttpRequest.newBuilder()
@@ -1102,11 +1191,68 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                         }
                     }
 
-                    public static void bootstrapBaseData(HttpClient client, Duration timeout) {
+                    public static void bootstrapBaseData(HttpClient client, Duration timeout) throws Exception {
                         String parent = TestEnv.parentFolderId();
+                        String hierarchyRoot = TestEnv.hierarchyRootFolderId();
                         if (parent != null && !parent.isBlank()) {
+                            verifyFolderExists(client, parent, timeout, "test.parent.folder.id");
                             TestContext.setBootstrapParentFolderId(parent);
                         }
+                        if (hierarchyRoot != null && !hierarchyRoot.isBlank()) {
+                            verifyFolderExists(client, hierarchyRoot, timeout, "test.hierarchy.root.folder.id");
+                            TestContext.setBootstrapHierarchyRootId(hierarchyRoot);
+                        }
+                        if (!TestEnv.destructiveEnabled() && parent != null && !parent.isBlank()) {
+                            String disposable = createDisposableSubfolder(client, parent, timeout);
+                            if (disposable != null) {
+                                TestContext.setDisposableFolderId(disposable);
+                            }
+                        }
+                    }
+
+                    private static void verifyFolderExists(HttpClient client, String folderId, Duration timeout,
+                                                           String propertyName) throws Exception {
+                        String path = "/folders/" + folderId;
+                        HttpRequest.Builder b = HttpRequest.newBuilder()
+                                .uri(URI.create(TestEnv.baseUrl() + path))
+                                .timeout(timeout)
+                                .header("Accept", "application/json")
+                                .header("Accept-Language", TestEnv.acceptLanguage())
+                                .GET();
+                        String token = TestAuth.rawToken();
+                        if (!token.isEmpty()) {
+                            b.header("Authorization", "Bearer " + token);
+                        }
+                        HttpResponse<String> resp = client.send(b.build(), HttpResponse.BodyHandlers.ofString());
+                        if (resp.statusCode() == 404) {
+                            throw new AssertionError(propertyName + "=" + folderId + " not found — update test-env.properties");
+                        }
+                    }
+
+                    private static String createDisposableSubfolder(HttpClient client, String parentId, Duration timeout)
+                            throws Exception {
+                        String body = RequestBodyEnv.bind("{\\"name\\":\\"sdk-bootstrap-disposable\\",\\"parent\\":{\\"id\\":\\""
+                                + parentId + "\\"}}");
+                        HttpRequest.Builder b = HttpRequest.newBuilder()
+                                .uri(URI.create(TestEnv.baseUrl() + "/folders"))
+                                .timeout(timeout)
+                                .header("Content-Type", "application/json")
+                                .header("Accept", "application/json")
+                                .header("Accept-Language", TestEnv.acceptLanguage())
+                                .POST(HttpRequest.BodyPublishers.ofString(body));
+                        String token = TestAuth.rawToken();
+                        if (!token.isEmpty()) {
+                            b.header("Authorization", "Bearer " + token);
+                        }
+                        HttpResponse<String> resp = client.send(b.build(), HttpResponse.BodyHandlers.ofString());
+                        if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
+                            String id = extractCreatedId(resp);
+                            if (id != null) {
+                                TestContext.trackCreatedId(id);
+                            }
+                            return id;
+                        }
+                        return null;
                     }
 
                     public static void cleanupTestData(String resourceId) {

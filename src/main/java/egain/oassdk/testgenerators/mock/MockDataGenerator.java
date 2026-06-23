@@ -5,6 +5,7 @@ import egain.oassdk.Util;
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.Constants;
 import egain.oassdk.core.exceptions.GenerationException;
+import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.TestGenerator;
@@ -544,7 +545,8 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
                 if (opId == null || opId.isBlank()) {
                     opId = method + pathEntry.getKey().replaceAll("[^a-zA-Z0-9]", "_");
                 }
-                String json = generateRequestBodyJsonForWrite(operation, spec);
+                String json = bindMockRequestPlaceholders(
+                        IntegrationScenarioSupport.generateRequestBodyFromSchemaRaw(operation, spec));
                 Files.writeString(Paths.get(outputDir, opId + "_request.json"), json);
             }
         }
@@ -555,7 +557,20 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
         if (json == null || json.isBlank()) {
             return "{}";
         }
-        return json;
+        return bindMockRequestPlaceholders(json);
+    }
+
+    private static String bindMockRequestPlaceholders(String json) {
+        if (json == null || json.isBlank()) {
+            return "{}";
+        }
+        String bound = json.replaceAll(
+                "\"parent\"\\s*:\\s*\\{[^}]*\"id\"\\s*:\\s*\"[^\"]*\"",
+                "\"parent\":{\"id\":\"${test.parent.folder.id}\"}");
+        if (!bound.contains("\"name\"")) {
+            bound = bound.replaceFirst("\\{", "{\"name\":\"SDK-mock-folder\",");
+        }
+        return bound;
     }
 
     /**

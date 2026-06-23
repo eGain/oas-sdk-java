@@ -12,6 +12,19 @@ public final class TestCodegenSupport {
         return "import " + TestOutputLayout.supportPackage(basePackage) + ".*;\n";
     }
 
+    public static String invalidTestConstants() {
+        return """
+                private static final String INVALID_PARENT_ID = "not-a-valid-folder-id";
+                private static final String INVALID_DEPARTMENT_ID = "not-a-number";
+                private static final String INVALID_FOLDER_ID = "invalid-folder";
+                private static final String INVALID_PAGE_SIZE = "9999";
+                """;
+    }
+
+    public static String requestBodyBind(String escapedJson) {
+        return "RequestBodyEnv.bind(\"" + escapedJson + "\")";
+    }
+
     public static String baseUrlField() {
         return """
                 private static String baseUrl() {
@@ -96,7 +109,7 @@ public final class TestCodegenSupport {
             return "TestEnv.parentFolderId()";
         }
         if (key.equals("folderid") || key.equals("folder_id") || key.contains("folderid")) {
-            return "TestEnv.folderId()";
+            return "TestContext.disposableFolderId() != null ? TestContext.disposableFolderId() : TestEnv.folderId()";
         }
         if (key.equals("$pagenum") || key.equals("pagenum")) {
             return "TestEnv.pageNum()";
@@ -108,9 +121,33 @@ public final class TestCodegenSupport {
             return "TestEnv.acceptLanguage()";
         }
         if (key.equals("promptid") || key.contains("prompt")) {
-            return "TestEnv.get(\"test.prompt.id\", \"" + escapeJava(fallbackLiteral) + "\")";
+            return "TestEnv.promptId()";
         }
         return "\"" + escapeJava(fallbackLiteral) + "\"";
+    }
+
+    /**
+     * Invalid literals for negative tests — never use OAS example IDs.
+     */
+    public static String paramValueExpressionNegative(String paramName) {
+        String key = paramName.toLowerCase(java.util.Locale.ROOT);
+        if (key.contains("department")) {
+            return "INVALID_DEPARTMENT_ID";
+        }
+        if (key.equals("filter[parent]") || key.contains("parent")) {
+            return "INVALID_PARENT_ID";
+        }
+        if (key.equals("folderid") || key.equals("folder_id") || key.contains("folderid")) {
+            return "INVALID_FOLDER_ID";
+        }
+        if (key.equals("$pagesize") || key.equals("pagesize")) {
+            return "INVALID_PAGE_SIZE";
+        }
+        return "\"invalid-value\"";
+    }
+
+    public static String destructiveGate() {
+        return "        Assumptions.assumeTrue(TestEnv.destructiveEnabled(), \"Skip: test.destructive.enabled=false\");\n";
     }
 
     public static String escapeJava(String s) {

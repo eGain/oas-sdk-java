@@ -1,9 +1,10 @@
 package egain.oassdk;
 
 import egain.oassdk.config.GeneratorConfig;
+import egain.oassdk.config.TestConfig;
 import egain.oassdk.core.Constants;
 import egain.oassdk.config.SLAConfig;
-import egain.oassdk.config.TestConfig;
+import egain.oassdk.testgenerators.common.TestProfileSupport;
 import egain.oassdk.core.exceptions.GenerationException;
 import egain.oassdk.core.exceptions.OASSDKException;
 import egain.oassdk.core.exceptions.ValidationException;
@@ -427,9 +428,11 @@ public class OASSDK implements AutoCloseable {
             // Filter spec if filters are set
             Map<String, Object> specToUse = filterSpec(spec);
 
+            List<String> effectiveTypes = TestProfileSupport.filterTestTypes(testTypes, testConfig);
+
             // Shared test-support (TestEnv, TestAuth, test-env.properties)
             new egain.oassdk.testgenerators.support.TestSupportGenerator()
-                    .generate(specToUse, outputDir, testConfig);
+                    .generate(specToUse, outputDir, testConfig, effectiveTypes);
 
             // Ensure testConfig has language/framework information from generatorConfig if not already set
             if (testConfig != null && generatorConfig != null) {
@@ -450,7 +453,7 @@ public class OASSDK implements AutoCloseable {
             }
 
             // Generate each test type
-            for (String testType : testTypes) {
+            for (String testType : effectiveTypes) {
                 var testGenerator = testGeneratorFactory.getGenerator(testType, testConfig);
                 testGenerator.generate(specToUse, outputDir, testConfig, testFramework);
             }
