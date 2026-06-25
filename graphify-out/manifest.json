@@ -420,13 +420,13 @@
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/testgenerators/integration/IntegrationTestGenerator.java": {
-    "mtime": 1782194622.3815017,
-    "ast_hash": "2816bc296bb5055c14f0ccc36b61e0bd",
+    "mtime": 1782371442.2391994,
+    "ast_hash": "50b67b94dcce6970dff704db47d17f6e",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/testgenerators/mock/MockDataGenerator.java": {
-    "mtime": 1782195746.2167547,
-    "ast_hash": "256d3addebc4222c353cdf5b32790fdf",
+    "mtime": 1782371374.0153441,
+    "ast_hash": "d4b8fa7c6073b93bf638b14c62d9a836",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/testgenerators/nfr/NFRTestGenerator.java": {
@@ -460,8 +460,8 @@
     "semantic_hash": "d0154b468b4079e0444727ea6f0609b3"
   },
   "src/main/java/egain/oassdk/testgenerators/postman/PostmanTestGenerator.java": {
-    "mtime": 1782194622.397221,
-    "ast_hash": "2bc5e54243db06a899ae4d58f87d6397",
+    "mtime": 1782371348.9956734,
+    "ast_hash": "e7563843973839f7d9ba9b80f131da8e",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/testgenerators/python/PytestIntegrationTestGenerator.java": {
@@ -475,8 +475,8 @@
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/testgenerators/schemathesis/SchemathesisTestGenerator.java": {
-    "mtime": 1782194622.411521,
-    "ast_hash": "3f660b2e0addd4af8b79935a4b785059",
+    "mtime": 1782371353.887598,
+    "ast_hash": "8beb7ad73731a69066a3670a8c73a4f7",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/testgenerators/security/SecurityTestGenerator.java": {
@@ -490,8 +490,8 @@
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/testgenerators/unit/UnitTestGenerator.java": {
-    "mtime": 1782194622.4285955,
-    "ast_hash": "7ee3507649c013a7a8db24ff3fbe74df",
+    "mtime": 1782371380.908532,
+    "ast_hash": "36bcc7390794e00acaab5fb75f99bf38",
     "semantic_hash": ""
   },
   "src/main/resources/runtime/jersey/ApiService.java": {
@@ -930,7 +930,7 @@
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/testgenerators/mock/MockDataGeneratorTest.java": {
-    "mtime": 1782195752.9388025,
+    "mtime": 1782196258.336951,
     "ast_hash": "45ddd772614daa5dcb6c800c47cc084e",
     "semantic_hash": ""
   },
@@ -1130,8 +1130,8 @@
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/testgenerators/common/TestCodegenSupport.java": {
-    "mtime": 1782194622.3658104,
-    "ast_hash": "5bb198f132cafc77a788c631d95efd09",
+    "mtime": 1782371349.2367237,
+    "ast_hash": "26ce8ad637d2eb1aa2ec1f4da12fb159",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/testgenerators/common/TestMavenSupport.java": {
@@ -1150,8 +1150,8 @@
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/testgenerators/support/TestSupportGenerator.java": {
-    "mtime": 1782194622.4285955,
-    "ast_hash": "c5dd64094a98ba6b38a008f8737aa016",
+    "mtime": 1782371061.0249195,
+    "ast_hash": "014eeaa9359e52a77e8b99d859a7510c",
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/testgenerators/IntegrationScenarioSupportBoundsTest.java": {
@@ -1165,8 +1165,8 @@
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/testgenerators/support/TestSupportGeneratorTest.java": {
-    "mtime": 1782194622.473178,
-    "ast_hash": "43c4b2556ed6e64da3127287a2a9eca7",
+    "mtime": 1782371390.6993992,
+    "ast_hash": "03d2c62b2855b9cf666cf154756525d2",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/testgenerators/common/TestProfileSupport.java": {
@@ -1177,6 +1177,101 @@
   "src/test/java/egain/oassdk/testgenerators/common/TestProfileSupportTest.java": {
     "mtime": 1782194622.4445415,
     "ast_hash": "74d2937cdb86f0bdc106bf42304b4497",
+    "semantic_hash": ""
+  },
+  "src/main/java/egain/oassdk/testgenerators/lifecycle/LifecycleHookRegistry.java": {
+    "mtime": 1782370960.9649773,
+    "ast_hash": "9ed8855058ee108e4349a6530f93c3ef",
+    "semantic_hash": ""
+  },
+  "src/test/java/egain/oassdk/testgenerators/lifecycle/LifecycleHookRegistryTest.java": {
+    "mtime": 1782371387.5131824,
+    "ast_hash": "0d59bcd3f1c449368915a43f0a5bb290",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-01.png": {
+    "mtime": 1782370161.8208618,
+    "ast_hash": "2879d62cdc535405964713a0cdb9016c",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-02.png": {
+    "mtime": 1782370161.993906,
+    "ast_hash": "395a3a35a90318f78e9e7c1a53f32ffd",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-03.png": {
+    "mtime": 1782370162.2188804,
+    "ast_hash": "9841d131f6e8ea71771920d204fa4d17",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-04.png": {
+    "mtime": 1782370162.4314563,
+    "ast_hash": "5eec7a082d9d7016f01026e34b643790",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-05.png": {
+    "mtime": 1782370162.6205244,
+    "ast_hash": "4fd8d6c57cfd90657aa695759862f450",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-06.png": {
+    "mtime": 1782370218.4915211,
+    "ast_hash": "4140f41b3d50e617e8d31521ab6068dc",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-07.png": {
+    "mtime": 1782370218.7553098,
+    "ast_hash": "f57fc907fb98bb9753b9f3dea6197b3c",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-08.png": {
+    "mtime": 1782370219.0303228,
+    "ast_hash": "4ccaba4b0b6be41610caf19392cf512a",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-09.png": {
+    "mtime": 1782370219.299096,
+    "ast_hash": "e78f5fe5eec3bc3fd3885f70de0f8019",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-10.png": {
+    "mtime": 1782370219.5254478,
+    "ast_hash": "044dbeb8c19255ab25bd5a71c6a449bb",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-11.png": {
+    "mtime": 1782370219.7403276,
+    "ast_hash": "b2762ea799cddca372ad827c83e66364",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-12.png": {
+    "mtime": 1782370219.9737656,
+    "ast_hash": "7f573678c04b3277cc5c3fa3a8384a3e",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-13.png": {
+    "mtime": 1782370220.1566625,
+    "ast_hash": "c603ce7755c66ad070402e4eab9a49ce",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-14.png": {
+    "mtime": 1782370220.339835,
+    "ast_hash": "7acb25af9a582560b9f416b1336a40a0",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-15.png": {
+    "mtime": 1782370220.541756,
+    "ast_hash": "6acd4b57b8a64ffe4d547d571c1782a1",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-16.png": {
+    "mtime": 1782370220.8457186,
+    "ast_hash": "0b3a0d2e71cde2d2c74b416cb15802e4",
+    "semantic_hash": ""
+  },
+  ".tmp-p3-pages/page-17.png": {
+    "mtime": 1782370220.906093,
+    "ast_hash": "2369c7aba832c38682378e7e669567d9",
     "semantic_hash": ""
   }
 }

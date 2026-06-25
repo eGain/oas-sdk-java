@@ -38,6 +38,14 @@ class TestSupportGeneratorTest {
         assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/TestEnv.java"))).isTrue();
         assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/RequestBodyEnv.java"))).isTrue();
         assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/EgainAuth.java"))).isTrue();
+        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/EgainAsyncTaskHelper.java"))).isTrue();
+        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/EgainInternalKbHelper.java"))).isTrue();
+        String egainAuth = Files.readString(tempDir.resolve("test-support/src/test/java/com/example/api/support/EgainAuth.java"));
+        assertThat(egainAuth).contains("public static void main(String[] args)");
+        assertThat(egainAuth).contains("sessionId()");
+        assertThat(Files.readString(tempDir.resolve("test-env.properties")))
+                .contains("test.verify.internal.kb")
+                .contains("test.topic.parent.folder.id");
         assertThat(Files.exists(tempDir.resolve("run-all.sh"))).isTrue();
         String pom = Files.readString(tempDir.resolve("pom.xml"));
         assertThat(pom).contains("<module>unit</module>");

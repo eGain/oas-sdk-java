@@ -18,6 +18,8 @@ public final class TestCodegenSupport {
                 private static final String INVALID_DEPARTMENT_ID = "not-a-number";
                 private static final String INVALID_FOLDER_ID = "invalid-folder";
                 private static final String INVALID_PAGE_SIZE = "9999";
+                private static final String INVALID_ASSIGNEE_ID = "999999999999999";
+                private static final String NONEXISTENT_PARENT_FOLDER_ID = "NONEXISTENT_PARENT_FOLDER_ID";
                 """;
     }
 

@@ -45,6 +45,8 @@ public class TestSupportGenerator {
             write(supportDir.resolve("RequestBodyEnv.java"), requestBodyEnvSource(supportPackage));
             if (egainAuth) {
                 write(supportDir.resolve("EgainAuth.java"), egainAuthSource(supportPackage));
+                write(supportDir.resolve("EgainAsyncTaskHelper.java"), egainAsyncTaskHelperSource(supportPackage));
+                write(supportDir.resolve("EgainInternalKbHelper.java"), egainInternalKbHelperSource(supportPackage));
             }
 
             Path testsRoot = Paths.get(outputDir);
@@ -55,7 +57,7 @@ public class TestSupportGenerator {
             write(testsRoot.resolve("run-smoke.bat"), runSmokeBat());
             write(testsRoot.resolve("run-all.sh"), runAllScript(modules));
             write(testsRoot.resolve("run-all.bat"), runAllBat(modules));
-            write(testsRoot.resolve("fetch-token.sh"), fetchTokenScript());
+            write(testsRoot.resolve("fetch-token.sh"), fetchTokenScript(basePackage));
             write(testsRoot.resolve("pom.xml"), aggregatorPom(modules));
             write(testsRoot.resolve("README-TESTS.md"), readmeTests(egainAuth));
 
@@ -269,6 +271,65 @@ public class TestSupportGenerator {
                     public static boolean validateResponseSchema() {
                         return getBoolean("test.validateResponseSchema", false);
                     }
+
+                    public static boolean verifyInternalKb() {
+                        return getBoolean("test.verify.internal.kb", true);
+                    }
+
+                    public static boolean bootstrapHierarchyEnabled() {
+                        return getBoolean("test.bootstrap.hierarchy.enabled", false);
+                    }
+
+                    public static String topicParentFolderId() {
+                        return get("test.topic.parent.folder.id", "");
+                    }
+
+                    public static String folderNoDeletePermissionId() {
+                        return get("test.folder.no.delete.permission.id", "");
+                    }
+
+                    public static String folderNoCreatePermissionId() {
+                        return get("test.folder.no.create.permission.id", "");
+                    }
+
+                    /**
+                     * Resolve absolute URL for /system/ws/... paths using auth.login.base; v4 paths use base.url.
+                     */
+                    public static String resolveSystemUrl(String relativeOrAbsolute) {
+                        if (relativeOrAbsolute == null || relativeOrAbsolute.isBlank()) {
+                            return baseUrl();
+                        }
+                        if (relativeOrAbsolute.startsWith("http://") || relativeOrAbsolute.startsWith("https://")) {
+                            return relativeOrAbsolute;
+                        }
+                        if (relativeOrAbsolute.startsWith("/system/ws/")) {
+                            String loginBase = loginBase();
+                            if (loginBase != null && !loginBase.isBlank()) {
+                                String lb = loginBase.endsWith("/") ? loginBase.substring(0, loginBase.length() - 1) : loginBase;
+                                return lb + relativeOrAbsolute.substring("/system/ws".length());
+                            }
+                        }
+                        String base = baseUrl();
+                        if (base.endsWith("/") && relativeOrAbsolute.startsWith("/")) {
+                            return base.substring(0, base.length() - 1) + relativeOrAbsolute;
+                        }
+                        if (!base.endsWith("/") && !relativeOrAbsolute.startsWith("/")) {
+                            return base + "/" + relativeOrAbsolute;
+                        }
+                        return base + relativeOrAbsolute;
+                    }
+
+                    public static String tokenForScheme(String scheme) {
+                        if (scheme == null || scheme.isBlank()) {
+                            return get("auth.token", "");
+                        }
+                        String key = "auth.token." + scheme.toLowerCase(Locale.ROOT).replace(' ', '_');
+                        String v = get(key, null);
+                        if (v != null && !v.isBlank()) {
+                            return v;
+                        }
+                        return get("auth.token", "");
+                    }
                 }
                 """.formatted(pkg, escapeJava(defaultBaseUrl));
     }
@@ -323,6 +384,14 @@ public class TestSupportGenerator {
                         }
                         %s
                         return "";
+                    }
+
+                    public static String tokenForScheme(String scheme) {
+                        String fromEnv = TestEnv.tokenForScheme(scheme);
+                        if (fromEnv != null && !fromEnv.isBlank()) {
+                            return fromEnv;
+                        }
+                        return rawToken();
                     }
 
                     public static void cacheToken(String token) {
@@ -470,6 +539,16 @@ public class TestSupportGenerator {
                     public static void setDisposableFolderId(String id) {
                         disposableFolderId = id;
                     }
+
+                    private static volatile boolean hierarchyTreeConfigured;
+
+                    public static boolean hierarchyTreeConfigured() {
+                        return hierarchyTreeConfigured;
+                    }
+
+                    public static void setHierarchyTreeConfigured(boolean configured) {
+                        hierarchyTreeConfigured = configured;
+                    }
                 }
                 """.formatted(pkg);
     }
@@ -497,6 +576,7 @@ public class TestSupportGenerator {
                         bound = bound.replace("${test.user.group.id}", TestEnv.userGroupId());
                         bound = bound.replace("${test.department.id}", TestEnv.departmentId());
                         bound = replaceParentId(bound, TestEnv.parentFolderId());
+                        bound = replacePermissionUserIds(bound);
                         if (!bound.contains("\\"name\\"") && bound.contains("createFolder")) {
                             bound = bound.replaceFirst("\\{", "{\\"name\\":\\"SDK-generated-folder\\",");
                         }
@@ -510,6 +590,26 @@ public class TestSupportGenerator {
                         return json.replaceAll(
                                 "\\"parent\\"\\\\s*:\\\\s*\\\\{[^}]*\\\\"id\\\\"\\\\s*:\\\\s*\\\\\\"[^\\\\\\"]*\\\\\\"",
                                 "\\"parent\\":{\\"id\\":\\"" + parentId + "\\"}");
+                    }
+
+                    private static String replacePermissionUserIds(String json) {
+                        if (json == null || json.isBlank()) {
+                            return json;
+                        }
+                        String userId = TestEnv.userId();
+                        String groupId = TestEnv.userGroupId();
+                        String result = json;
+                        if (userId != null && !userId.isBlank()) {
+                            result = result.replaceAll(
+                                    "(\\\\"user\\\\"\\\\s*:\\\\s*\\\\{[^}]*\\\\"id\\\\"\\\\s*:\\\\s*\\\\\\")[^\\\\\\"]*(\\\\\\")",
+                                    "$1" + userId + "$2");
+                        }
+                        if (groupId != null && !groupId.isBlank()) {
+                            result = result.replaceAll(
+                                    "(\\\\"group\\\\"\\\\s*:\\\\s*\\\\{[^}]*\\\\"id\\\\"\\\\s*:\\\\s*\\\\\\")[^\\\\\\"]*(\\\\\\")",
+                                    "$1" + groupId + "$2");
+                        }
+                        return result;
                     }
                 }
                 """.formatted(pkg);
@@ -531,10 +631,29 @@ public class TestSupportGenerator {
                  */
                 public final class EgainAuth {
 
+                    private static volatile String cachedSessionId;
+                    private static volatile String cachedBearer;
+
                     private EgainAuth() {
                     }
 
+                    public static void clearCache() {
+                        cachedSessionId = null;
+                        cachedBearer = null;
+                    }
+
+                    public static String sessionId() {
+                        if (cachedSessionId != null && !cachedSessionId.isBlank()) {
+                            return cachedSessionId;
+                        }
+                        ensureLogin();
+                        return cachedSessionId;
+                    }
+
                     public static String fetchBearerToken() {
+                        if (cachedBearer != null && !cachedBearer.isBlank()) {
+                            return cachedBearer;
+                        }
                         String username = TestEnv.get("auth.username", null);
                         String password = TestEnv.get("auth.password", null);
                         if (username == null || password == null || username.isBlank() || password.isBlank()) {
@@ -545,58 +664,90 @@ public class TestSupportGenerator {
                             return null;
                         }
                         try {
-                            HttpClient client = TestHttp.client();
-                            String loginUrl = loginBase.endsWith("/")
-                                    ? loginBase + "authentication/user/login"
-                                    : loginBase + "/authentication/user/login";
-                            String sessionBody = "{\\"username\\":\\"" + escapeJson(username)
-                                    + "\\",\\"password\\":\\"" + escapeJson(password) + "\\"}";
-                            HttpRequest login = HttpRequest.newBuilder()
-                                    .uri(URI.create(loginUrl))
-                                    .timeout(Duration.ofSeconds(30))
-                                    .header("Content-Type", "application/json")
-                                    .header("Accept", "application/json")
-                                    .POST(HttpRequest.BodyPublishers.ofString(sessionBody))
-                                    .build();
-                            HttpResponse<String> loginResp = client.send(login, HttpResponse.BodyHandlers.ofString());
-                            if (loginResp.statusCode() >= 300) {
-                                System.err.println("EgainAuth: login failed HTTP " + loginResp.statusCode());
+                            if (!ensureLogin()) {
                                 return null;
                             }
-                            String sessionId = loginResp.headers().firstValue("X-egain-session").orElse(null);
-                            if (sessionId == null) {
-                                sessionId = extractJsonString(loginResp.body(), "sessionId");
-                            }
-                            if (sessionId == null) {
-                                return null;
-                            }
-                            String exchangePath = TestEnv.exchangePath();
-                            String exchangeUrl = loginBase.endsWith("/")
-                                    ? loginBase.substring(0, loginBase.length() - 1) + exchangePath
-                                    : loginBase + exchangePath;
-                            HttpRequest exchange = HttpRequest.newBuilder()
-                                    .uri(URI.create(exchangeUrl))
-                                    .timeout(Duration.ofSeconds(30))
-                                    .header("Accept", "application/json")
-                                    .header("X-egain-session", sessionId)
-                                    .GET()
-                                    .build();
-                            HttpResponse<String> exchangeResp = client.send(exchange, HttpResponse.BodyHandlers.ofString());
-                            if (exchangeResp.statusCode() >= 300) {
-                                System.err.println("EgainAuth: exchange failed HTTP " + exchangeResp.statusCode());
-                                return null;
-                            }
-                            String bearer = extractJsonString(exchangeResp.body(), "access_token");
-                            if (bearer == null) {
-                                bearer = extractJsonString(exchangeResp.body(), "token");
-                            }
+                            String bearer = exchangeBearer(loginBase, cachedSessionId);
                             if (bearer != null) {
+                                cachedBearer = bearer;
                                 TestAuth.cacheToken(bearer);
                             }
                             return bearer;
                         } catch (Exception e) {
                             System.err.println("EgainAuth: " + e.getMessage());
                             return null;
+                        }
+                    }
+
+                    private static boolean ensureLogin() throws Exception {
+                        if (cachedSessionId != null && !cachedSessionId.isBlank()) {
+                            return true;
+                        }
+                        String username = TestEnv.get("auth.username", null);
+                        String password = TestEnv.get("auth.password", null);
+                        if (username == null || password == null || username.isBlank() || password.isBlank()) {
+                            return false;
+                        }
+                        String loginBase = TestEnv.loginBase();
+                        if (loginBase == null || loginBase.isBlank()) {
+                            return false;
+                        }
+                        HttpClient client = TestHttp.client();
+                        String loginUrl = loginBase.endsWith("/")
+                                ? loginBase + "authentication/user/login"
+                                : loginBase + "/authentication/user/login";
+                        String sessionBody = "{\\"username\\":\\"" + escapeJson(username)
+                                + "\\",\\"password\\":\\"" + escapeJson(password) + "\\"}";
+                        HttpRequest login = HttpRequest.newBuilder()
+                                .uri(URI.create(loginUrl))
+                                .timeout(Duration.ofSeconds(30))
+                                .header("Content-Type", "application/json")
+                                .header("Accept", "application/json")
+                                .POST(HttpRequest.BodyPublishers.ofString(sessionBody))
+                                .build();
+                        HttpResponse<String> loginResp = client.send(login, HttpResponse.BodyHandlers.ofString());
+                        if (loginResp.statusCode() >= 300) {
+                            System.err.println("EgainAuth: login failed HTTP " + loginResp.statusCode());
+                            return false;
+                        }
+                        cachedSessionId = loginResp.headers().firstValue("X-egain-session").orElse(null);
+                        if (cachedSessionId == null) {
+                            cachedSessionId = extractJsonString(loginResp.body(), "sessionId");
+                        }
+                        return cachedSessionId != null && !cachedSessionId.isBlank();
+                    }
+
+                    private static String exchangeBearer(String loginBase, String sessionId) throws Exception {
+                        String exchangePath = TestEnv.exchangePath();
+                        String exchangeUrl = loginBase.endsWith("/")
+                                ? loginBase.substring(0, loginBase.length() - 1) + exchangePath
+                                : loginBase + exchangePath;
+                        HttpRequest exchange = HttpRequest.newBuilder()
+                                .uri(URI.create(exchangeUrl))
+                                .timeout(Duration.ofSeconds(30))
+                                .header("Accept", "application/json")
+                                .header("X-egain-session", sessionId)
+                                .GET()
+                                .build();
+                        HttpResponse<String> exchangeResp = TestHttp.client().send(exchange, HttpResponse.BodyHandlers.ofString());
+                        if (exchangeResp.statusCode() >= 300) {
+                            System.err.println("EgainAuth: exchange failed HTTP " + exchangeResp.statusCode());
+                            return null;
+                        }
+                        String bearer = extractJsonString(exchangeResp.body(), "access_token");
+                        if (bearer == null) {
+                            bearer = extractJsonString(exchangeResp.body(), "token");
+                        }
+                        return bearer;
+                    }
+
+                    public static void main(String[] args) {
+                        String token = fetchBearerToken();
+                        if (token != null && !token.isBlank()) {
+                            System.out.print(token);
+                        } else {
+                            System.err.println("EgainAuth: could not obtain bearer token");
+                            System.exit(1);
                         }
                     }
 
@@ -621,6 +772,228 @@ public class TestSupportGenerator {
                 """.formatted(pkg);
     }
 
+    private static String egainAsyncTaskHelperSource(String pkg) {
+        return """
+                package %s;
+
+                import java.net.URI;
+                import java.net.http.HttpClient;
+                import java.net.http.HttpRequest;
+                import java.net.http.HttpResponse;
+                import java.time.Duration;
+
+                /** Poll v20 async task completion after v4 DELETE 202. */
+                public final class EgainAsyncTaskHelper {
+
+                    private EgainAsyncTaskHelper() {
+                    }
+
+                    public static String extractTaskId(HttpResponse<String> accepted) {
+                        if (accepted == null) {
+                            return null;
+                        }
+                        String location = accepted.headers().firstValue("Location").orElse(null);
+                        if (location != null) {
+                            int slash = location.lastIndexOf('/');
+                            if (slash >= 0 && slash < location.length() - 1) {
+                                return location.substring(slash + 1).replaceAll("[^0-9]", "");
+                            }
+                        }
+                        String body = accepted.body();
+                        if (body != null) {
+                            for (String key : new String[]{"taskId", "id"}) {
+                                String needle = "\\"" + key + "\\":\\"";
+                                int i = body.indexOf(needle);
+                                if (i >= 0) {
+                                    int start = i + needle.length();
+                                    int end = body.indexOf('"', start);
+                                    if (end > start) {
+                                        return body.substring(start, end);
+                                    }
+                                }
+                            }
+                        }
+                        return null;
+                    }
+
+                    public static void pollUntilComplete(HttpClient client, HttpResponse<String> accepted,
+                                                         Duration timeout) throws Exception {
+                        String taskId = extractTaskId(accepted);
+                        if (taskId == null || taskId.isBlank()) {
+                            return;
+                        }
+                        String sessionId = EgainAuth.sessionId();
+                        if (sessionId == null || sessionId.isBlank()) {
+                            return;
+                        }
+                        String pollUrl = TestEnv.resolveSystemUrl("/system/ws/v20/async/task/" + taskId);
+                        long deadline = System.nanoTime() + timeout.toNanos();
+                        while (System.nanoTime() < deadline) {
+                            HttpRequest poll = HttpRequest.newBuilder()
+                                    .uri(URI.create(pollUrl))
+                                    .timeout(Duration.ofSeconds(10))
+                                    .header("Accept", "application/json")
+                                    .header("X-egain-session", sessionId)
+                                    .GET()
+                                    .build();
+                            HttpResponse<String> r = client.send(poll, HttpResponse.BodyHandlers.ofString());
+                            if (r.statusCode() == 200 || r.statusCode() == 204) {
+                                return;
+                            }
+                            Thread.sleep(500);
+                        }
+                        throw new AssertionError("Async task " + taskId + " did not complete within " + timeout);
+                    }
+                }
+                """.formatted(pkg);
+    }
+
+    private static String egainInternalKbHelperSource(String pkg) {
+        return """
+                package %s;
+
+                import java.net.URI;
+                import java.net.http.HttpClient;
+                import java.net.http.HttpRequest;
+                import java.net.http.HttpResponse;
+                import java.time.Duration;
+
+                /** Authoritative folder state via v20 internal KB GET. */
+                public final class EgainInternalKbHelper {
+
+                    private EgainInternalKbHelper() {
+                    }
+
+                    public static HttpResponse<String> getFolder(HttpClient client, String folderId, Duration timeout)
+                            throws Exception {
+                        String sessionId = EgainAuth.sessionId();
+                        if (sessionId == null || sessionId.isBlank()) {
+                            throw new AssertionError("No session for internal KB GET");
+                        }
+                        String url = TestEnv.resolveSystemUrl("/system/ws/v20/internal/kb/folder/" + folderId);
+                        HttpRequest req = HttpRequest.newBuilder()
+                                .uri(URI.create(url))
+                                .timeout(timeout)
+                                .header("Accept", "application/json")
+                                .header("X-egain-session", sessionId)
+                                .GET()
+                                .build();
+                        return client.send(req, HttpResponse.BodyHandlers.ofString());
+                    }
+
+                    public static void assertFolderMatches(HttpClient client, String folderId, String createOrEditJson,
+                                                           Duration timeout) throws Exception {
+                        if (!TestEnv.verifyInternalKb()) {
+                            return;
+                        }
+                        HttpResponse<String> resp = getFolder(client, folderId, timeout);
+                        if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+                            throw new AssertionError("Internal KB GET failed: " + resp.statusCode());
+                        }
+                        String body = resp.body();
+                        assertFieldEqual(createOrEditJson, body, "name");
+                        assertFieldEqual(createOrEditJson, body, "description");
+                        assertNestedFieldEqual(createOrEditJson, body, "parent", "id");
+                    }
+
+                    public static void assertFolderGone(HttpClient client, String folderId, Duration timeout)
+                            throws Exception {
+                        if (!TestEnv.verifyInternalKb()) {
+                            return;
+                        }
+                        long deadline = System.nanoTime() + timeout.toNanos();
+                        while (System.nanoTime() < deadline) {
+                            HttpResponse<String> resp = getFolder(client, folderId, timeout);
+                            if (resp.statusCode() == 404 || resp.statusCode() == 204) {
+                                return;
+                            }
+                            Thread.sleep(500);
+                        }
+                        throw new AssertionError("Folder " + folderId + " still exists after delete");
+                    }
+
+                    public static void syncDeleteFolder(HttpClient client, String folderId, Duration timeout)
+                            throws Exception {
+                        String sessionId = EgainAuth.sessionId();
+                        if (sessionId == null || sessionId.isBlank()) {
+                            return;
+                        }
+                        String url = TestEnv.resolveSystemUrl("/system/ws/v20/internal/kb/folder/" + folderId);
+                        HttpRequest req = HttpRequest.newBuilder()
+                                .uri(URI.create(url))
+                                .timeout(timeout)
+                                .header("Accept", "application/json")
+                                .header("X-egain-session", sessionId)
+                                .DELETE()
+                                .build();
+                        client.send(req, HttpResponse.BodyHandlers.discarding());
+                    }
+
+                    private static void assertFieldEqual(String expectedJson, String actualJson, String field) {
+                        String expected = extractJsonString(expectedJson, field);
+                        if (expected == null) {
+                            return;
+                        }
+                        String actual = extractJsonString(actualJson, field);
+                        if (actual != null && !expected.equals(actual)) {
+                            throw new AssertionError("Internal KB field '" + field + "' mismatch");
+                        }
+                    }
+
+                    private static void assertNestedFieldEqual(String expectedJson, String actualJson,
+                                                               String object, String field) {
+                        String expected = extractNestedJsonString(expectedJson, object, field);
+                        if (expected == null) {
+                            return;
+                        }
+                        String actual = extractNestedJsonString(actualJson, object, field);
+                        if (actual != null && !expected.equals(actual)) {
+                            throw new AssertionError("Internal KB " + object + "." + field + " mismatch");
+                        }
+                    }
+
+                    private static String extractJsonString(String json, String field) {
+                        if (json == null) {
+                            return null;
+                        }
+                        String needle = "\\"" + field + "\\":\\"";
+                        int i = json.indexOf(needle);
+                        if (i < 0) {
+                            return null;
+                        }
+                        int start = i + needle.length();
+                        int end = json.indexOf('"', start);
+                        return end > start ? json.substring(start, end) : null;
+                    }
+
+                    private static String extractNestedJsonString(String json, String object, String field) {
+                        if (json == null) {
+                            return null;
+                        }
+                        String objNeedle = "\\"" + object + "\\":{";
+                        int objIdx = json.indexOf(objNeedle);
+                        if (objIdx < 0) {
+                            return null;
+                        }
+                        int brace = json.indexOf('{', objIdx);
+                        int depth = 0;
+                        for (int i = brace; i < json.length(); i++) {
+                            char c = json.charAt(i);
+                            if (c == '{') {
+                                depth++;
+                            } else if (c == '}') {
+                                depth--;
+                                if (depth == 0) {
+                                    return extractJsonString(json.substring(brace, i + 1), field);
+                                }
+                            }
+                        }
+                        return null;
+                    }
+                }
+                """.formatted(pkg);
+    }
+
     private static String testEnvProperties(String defaultBaseUrl, boolean egainAuth) {
         StringBuilder sb = new StringBuilder();
         sb.append("# Generated test environment — copy test-env.local.properties.example for secrets\n");
@@ -640,15 +1013,22 @@ public class TestSupportGenerator {
         sb.append("test.folder.id=\n");
         sb.append("test.user.id=\n");
         sb.append("test.user.group.id=\n");
-        sb.append("test.prompt.id=\n\n");
+        sb.append("test.prompt.id=\n");
+        sb.append("test.topic.parent.folder.id=\n");
+        sb.append("test.folder.no.delete.permission.id=\n");
+        sb.append("test.folder.no.create.permission.id=\n\n");
         sb.append("test.pagination.pageNum=1\n");
         sb.append("test.pagination.pageSize=10\n\n");
         sb.append("test.bootstrap.enabled=false\n");
+        sb.append("test.bootstrap.hierarchy.enabled=false\n");
         sb.append("test.destructive.enabled=false\n");
-        sb.append("test.validateResponseSchema=false\n\n");
+        sb.append("test.validateResponseSchema=false\n");
+        sb.append("test.verify.internal.kb=true\n\n");
         sb.append("schemathesis.include.operations=createFolder,getSubFolders,editFolder,getFolder\n\n");
         sb.append("# Auth — optional manual token (CI secret store)\n");
         sb.append("auth.token=\n");
+        sb.append("auth.token.client_application=\n");
+        sb.append("auth.token.authenticated_customer=\n");
         if (egainAuth) {
             sb.append("auth.provider=egain\n");
             sb.append("auth.login.base=\n");
@@ -678,7 +1058,9 @@ public class TestSupportGenerator {
         sb.append("test.user.id=\n");
         sb.append("test.user.group.id=\n");
         sb.append("test.bootstrap.enabled=false\n");
+        sb.append("test.bootstrap.hierarchy.enabled=false\n");
         sb.append("test.destructive.enabled=false\n");
+        sb.append("test.verify.internal.kb=true\n");
         return sb.toString();
     }
 
@@ -743,7 +1125,7 @@ public class TestSupportGenerator {
                   source "$ROOT/test-env.local.properties"
                   set +a
                 fi
-                PROFILE="${TEST_PROFILE:-full}"
+                PROFILE="${TEST_PROFILE:-smoke}"
                 echo "Running test profile: $PROFILE"
                 ./run-smoke.sh
                 if [[ "$PROFILE" != "smoke" ]]; then
@@ -780,24 +1162,24 @@ public class TestSupportGenerator {
                 """.replace("__MVN_MODULES__", mvnModules);
     }
 
-    private static String fetchTokenScript() {
+    private static String fetchTokenScript(String basePackage) {
+        String supportClass = TestOutputLayout.supportPackage(basePackage) + ".EgainAuth";
         return """
                 #!/usr/bin/env bash
                 set -euo pipefail
                 ROOT="$(cd "$(dirname "$0")" && pwd)"
                 export TEST_ENV_FILE="${TEST_ENV_FILE:-$ROOT/test-env.properties}"
-                cd "$ROOT/unit"
-                mvn -q -DincludeScope=test -DskipTests compile test-compile
-                TOKEN=$(java -cp "target/test-classes:target/classes:$ROOT/test-support/target/test-classes" \\
-                  -Dtest.env.file="$TEST_ENV_FILE" \\
-                  com.example.api.support.EgainAuth 2>/dev/null || true)
+                cd "$ROOT/test-support"
+                mvn -q -DskipTests compile test-compile
+                CP="target/test-classes:target/classes"
+                TOKEN=$(java -cp "$CP" -Dtest.env.file="$TEST_ENV_FILE" %s 2>/dev/null || true)
                 if [[ -n "${TOKEN:-}" ]]; then
                   echo "TOKEN='Bearer $TOKEN'"
                 else
                   echo "Could not fetch token — set auth.username/auth.password in test-env.local.properties" >&2
                   exit 1
                 fi
-                """;
+                """.formatted(supportClass);
     }
 
     private static String readmeTests(boolean egainAuth) {

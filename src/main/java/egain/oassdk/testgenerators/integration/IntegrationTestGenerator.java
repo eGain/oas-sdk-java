@@ -9,6 +9,7 @@ import egain.oassdk.testgenerators.common.TestMavenSupport;
 import egain.oassdk.testgenerators.common.TestOutputLayout;
 import egain.oassdk.testgenerators.common.TestProfileSupport;
 import egain.oassdk.testgenerators.common.TestSpecUtils;
+import egain.oassdk.testgenerators.lifecycle.LifecycleHookRegistry;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 import egain.oassdk.testgenerators.TestGenerator;
@@ -31,10 +32,15 @@ import java.util.Map;
 public class IntegrationTestGenerator implements TestGenerator, ConfigurableTestGenerator {
 
     private TestConfig config;
+    private LifecycleHookRegistry lifecycleHooks = new LifecycleHookRegistry();
+    private boolean egainLifecycle;
 
     @Override
     public void generate(Map<String, Object> spec, String outputDir, TestConfig config, String testFramework) throws GenerationException {
         this.config = config;
+        this.lifecycleHooks = new LifecycleHookRegistry();
+        this.lifecycleHooks.registerFromSpec(spec);
+        this.egainLifecycle = TestSpecUtils.useEgainAuth(config, spec);
 
         try {
             // Create output directory structure
@@ -262,7 +268,58 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append(", null");
         }
         sb.append(");\n");
+        if (egainLifecycle) {
+            sb.append("            EgainInternalKbHelper.assertFolderMatches(httpClient, createdId, requestBody, REQUEST_TIMEOUT);\n");
+        }
         sb.append("        }\n");
+    }
+
+    private void appendIfMatchWhenNeeded(StringBuilder sb, String method, String operationId, boolean requiresAuth) {
+        if (!"PATCH".equals(method) || !lifecycleHooks.hasHook(operationId, LifecycleHookRegistry.Hook.IF_MATCH_EDIT)) {
+            return;
+        }
+        sb.append("        String ifMatchEtag = IntegrationTestUtils.readEtag(httpClient, uri, REQUEST_TIMEOUT, ");
+        sb.append(requiresAuth ? "getTokenClientApplication()" : "null");
+        sb.append(");\n");
+        sb.append("        requestBuilder.header(\"If-Match\", ifMatchEtag != null ? ifMatchEtag : \"*\");\n");
+    }
+
+    private void appendDeletePollWhenNeeded(StringBuilder sb, String method, String operationId) {
+        if (!"DELETE".equals(method) || !egainLifecycle) {
+            return;
+        }
+        if (!lifecycleHooks.hasHook(operationId, LifecycleHookRegistry.Hook.V20_ASYNC_TASK_POLL)) {
+            return;
+        }
+        sb.append("        if (response.statusCode() == 202) {\n");
+        sb.append("            EgainAsyncTaskHelper.pollUntilComplete(httpClient, response, REQUEST_TIMEOUT);\n");
+        sb.append("            String deletedId = IntegrationTestUtils.folderIdFromUri(uri);\n");
+        sb.append("            if (deletedId != null) {\n");
+        sb.append("                EgainInternalKbHelper.assertFolderGone(httpClient, deletedId, REQUEST_TIMEOUT);\n");
+        sb.append("            }\n");
+        sb.append("        }\n");
+    }
+
+    private void appendEditInternalVerifyBlock(StringBuilder sb, String method, String operationId) {
+        if (!"PATCH".equals(method) || !egainLifecycle) {
+            return;
+        }
+        if (!lifecycleHooks.hasHook(operationId, LifecycleHookRegistry.Hook.V20_INTERNAL_KB_VERIFY)) {
+            return;
+        }
+        sb.append("        String editedId = IntegrationTestUtils.folderIdFromUri(uri);\n");
+        sb.append("        if (editedId != null) {\n");
+        sb.append("            EgainInternalKbHelper.assertFolderMatches(httpClient, editedId, requestBody, REQUEST_TIMEOUT);\n");
+        sb.append("        }\n");
+    }
+
+    private void appendSortLevelHierarchyAssume(StringBuilder sb, OperationInfo opInfo) {
+        String operationId = (String) opInfo.operation.get("operationId");
+        if (!"getSubFolders".equals(operationId)) {
+            return;
+        }
+        sb.append("        Assumptions.assumeTrue(TestEnv.bootstrapHierarchyEnabled() || TestContext.hierarchyTreeConfigured(),\n");
+        sb.append("            \"Skip: configure test.bootstrap.hierarchy.enabled or pre-built sort/level tree\");\n");
     }
 
     private String findGetByIdPath(Map<String, Object> spec, String collectionPath) {
@@ -436,6 +493,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("        String tok = getTokenClientApplication();\n");
             sb.append("        Assumptions.assumeTrue(tok != null && !tok.isEmpty(), \"Skip: set INTEGRATION_TOKEN_CLIENT_APPLICATION (or API_BEARER_TOKEN / API_TOKEN)\");\n");
             appendJavaPathUriBlocks(sb, path, pathParams, queryParams);
+            appendSortLevelHierarchyAssume(sb, opInfo);
             sb.append("        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()\n");
             sb.append("            .uri(uri)\n");
             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -445,13 +503,16 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             if (jsonBody) {
                 sb.append("        String requestBody = ").append(TestCodegenSupport.requestBodyBind(requestBodyEscaped)).append(";\n");
             }
+            appendIfMatchWhenNeeded(sb, method, operationId, true);
             appendHttpMethodOnRequestBuilder(sb, method, jsonBody);
             sb.append("        HttpRequest request = requestBuilder.build();\n");
             sb.append("        HttpResponse<String> response = sendRequest(request);\n");
             sb.append("        assertNotNull(response);\n");
             appendSuccessStatusAssertions(sb, responses);
             sb.append("        assertNotNull(response.body());\n");
+            appendDeletePollWhenNeeded(sb, method, operationId);
             appendCreateGetVerifyBlock(sb, method, path, opInfo, spec, requiresAuth);
+            appendEditInternalVerifyBlock(sb, method, operationId);
             sb.append("        // Validate response against schema\n");
             generateResponseSchemaValidation(sb, responses, spec);
             sb.append("    }\n\n");
@@ -464,6 +525,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("        String tok = getTokenAuthenticatedCustomer();\n");
             sb.append("        Assumptions.assumeTrue(tok != null && !tok.isEmpty(), \"Skip: set INTEGRATION_TOKEN_AUTHENTICATED_CUSTOMER\");\n");
             appendJavaPathUriBlocks(sb, path, pathParams, queryParams);
+            appendSortLevelHierarchyAssume(sb, opInfo);
             sb.append("        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()\n");
             sb.append("            .uri(uri)\n");
             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -473,13 +535,16 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             if (jsonBody) {
                 sb.append("        String requestBody = ").append(TestCodegenSupport.requestBodyBind(requestBodyEscaped)).append(";\n");
             }
+            appendIfMatchWhenNeeded(sb, method, operationId, true);
             appendHttpMethodOnRequestBuilder(sb, method, jsonBody);
             sb.append("        HttpRequest request = requestBuilder.build();\n");
             sb.append("        HttpResponse<String> response = sendRequest(request);\n");
             sb.append("        assertNotNull(response);\n");
             appendSuccessStatusAssertions(sb, responses);
             sb.append("        assertNotNull(response.body());\n");
+            appendDeletePollWhenNeeded(sb, method, operationId);
             appendCreateGetVerifyBlock(sb, method, path, opInfo, spec, requiresAuth);
+            appendEditInternalVerifyBlock(sb, method, operationId);
             sb.append("        // Validate response against schema\n");
             generateResponseSchemaValidation(sb, responses, spec);
             sb.append("    }\n\n");
@@ -490,6 +555,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("    @DisplayName(\"").append(displayBase).append(" - Successful Request\")\n");
             sb.append("    void test").append(capitalize(testMethodName)).append("_Success() throws Exception {\n");
             appendJavaPathUriBlocks(sb, path, pathParams, queryParams);
+            appendSortLevelHierarchyAssume(sb, opInfo);
             sb.append("        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()\n");
             sb.append("            .uri(uri)\n");
             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
@@ -497,13 +563,16 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             if (jsonBody) {
                 sb.append("        String requestBody = ").append(TestCodegenSupport.requestBodyBind(requestBodyEscaped)).append(";\n");
             }
+            appendIfMatchWhenNeeded(sb, method, operationId, false);
             appendHttpMethodOnRequestBuilder(sb, method, jsonBody);
             sb.append("        HttpRequest request = requestBuilder.build();\n");
             sb.append("        HttpResponse<String> response = sendRequest(request);\n");
             sb.append("        assertNotNull(response);\n");
             appendSuccessStatusAssertions(sb, responses);
             sb.append("        assertNotNull(response.body());\n");
+            appendDeletePollWhenNeeded(sb, method, operationId);
             appendCreateGetVerifyBlock(sb, method, path, opInfo, spec, requiresAuth);
+            appendEditInternalVerifyBlock(sb, method, operationId);
             sb.append("        // Validate response against schema\n");
             generateResponseSchemaValidation(sb, responses, spec);
             sb.append("    }\n\n");
@@ -787,6 +856,48 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 generateErrorResponseSchemaValidation(sb, responses, spec);
                 sb.append("    }\n\n");
             }
+        }
+
+        if (!smoke && "editFolder".equals(operationId) && lifecycleHooks.hasHook(operationId, LifecycleHookRegistry.Hook.IF_MATCH_EDIT)) {
+            order++;
+            sb.append("    @Test\n");
+            sb.append("    @Order(").append(order).append(")\n");
+            sb.append("    @DisplayName(\"").append(displayBase).append(" - Stale If-Match returns 412\")\n");
+            sb.append("    void test").append(capitalize(testMethodName)).append("_StaleIfMatch() throws Exception {\n");
+            sb.append("        String tok = getPreferredAuthToken();\n");
+            sb.append("        Assumptions.assumeTrue(tok != null && !tok.isEmpty(), \"Skip: auth required\");\n");
+            appendJavaPathUriBlocks(sb, path, pathParams, queryParams);
+            sb.append("        String requestBody = ").append(TestCodegenSupport.requestBodyBind(requestBodyEscaped)).append(";\n");
+            sb.append("        HttpRequest patchReq = HttpRequest.newBuilder().uri(uri).timeout(REQUEST_TIMEOUT)\n");
+            sb.append("            .header(\"Accept\", \"application/json\").header(\"Authorization\", \"Bearer \" + tok)\n");
+            sb.append("            .header(\"Content-Type\", \"application/json\")\n");
+            sb.append("            .header(\"If-Match\", \"stale-etag-value\")\n");
+            sb.append("            .method(\"PATCH\", HttpRequest.BodyPublishers.ofString(requestBody)).build();\n");
+            sb.append("        HttpResponse<String> response = sendRequest(patchReq);\n");
+            sb.append("        assertTrue(response.statusCode() == 412 || response.statusCode() == 428,\n");
+            sb.append("            \"Expected 412/428 for stale If-Match, got: \" + response.statusCode());\n");
+            sb.append("    }\n\n");
+        }
+
+        if (!smoke && "getFolder".equals(operationId)) {
+            order++;
+            sb.append("    @Test\n");
+            sb.append("    @Order(").append(order).append(")\n");
+            sb.append("    @DisplayName(\"").append(displayBase).append(" - ko-KR lang must not 500\")\n");
+            sb.append("    void test").append(capitalize(testMethodName)).append("_KoKrLangRegression() throws Exception {\n");
+            appendJavaPathUriBlocks(sb, path, pathParams, queryParams);
+            sb.append("        Map<String, String> qp = new HashMap<>(queryParams);\n");
+            sb.append("        qp.put(\"$lang\", \"ko-KR\");\n");
+            sb.append("        URI uriKo = buildUri(path, qp);\n");
+            sb.append("        HttpRequest.Builder b = HttpRequest.newBuilder().uri(uriKo).timeout(REQUEST_TIMEOUT)\n");
+            sb.append("            .header(\"Accept\", \"application/json\").header(\"Accept-Language\", \"ko-KR\").GET();\n");
+            if (requiresAuth) {
+                sb.append("        String tok = getPreferredAuthToken();\n");
+                sb.append("        if (tok != null && !tok.isEmpty()) { b.header(\"Authorization\", \"Bearer \" + tok); }\n");
+            }
+            sb.append("        HttpResponse<String> response = sendRequest(b.build());\n");
+            sb.append("        assertNotEquals(500, response.statusCode(), \"ko-KR must not return HTTP 500\");\n");
+            sb.append("    }\n\n");
         }
     }
 
@@ -1165,30 +1276,66 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                         }
                         HttpResponse<String> resp = client.send(b.build(), HttpResponse.BodyHandlers.ofString());
                         if (resp.statusCode() == 202) {
-                            pollAsyncDelete(client, resp, timeout);
+                            pollAsyncDelete(client, resp, id, timeout);
+                        } else if (TestEnv.verifyInternalKb()) {
+                            try {
+                                EgainInternalKbHelper.syncDeleteFolder(client, id, timeout);
+                            } catch (Exception ignored) {
+                            }
                         }
                     }
 
-                    private static void pollAsyncDelete(HttpClient client, HttpResponse<String> accepted,
+                    private static void pollAsyncDelete(HttpClient client, HttpResponse<String> accepted, String folderId,
                                                         Duration timeout) throws Exception {
-                        String taskUrl = accepted.headers().firstValue("Location").orElse(null);
-                        if (taskUrl == null) {
-                            return;
-                        }
-                        long deadline = System.nanoTime() + timeout.toNanos();
-                        while (System.nanoTime() < deadline) {
-                            HttpRequest poll = HttpRequest.newBuilder()
-                                    .uri(URI.create(taskUrl.startsWith("http") ? taskUrl : TestEnv.baseUrl() + taskUrl))
-                                    .timeout(Duration.ofSeconds(10))
-                                    .header("Accept", "application/json")
-                                    .GET()
-                                    .build();
-                            HttpResponse<String> r = client.send(poll, HttpResponse.BodyHandlers.ofString());
-                            if (r.statusCode() == 200 || r.statusCode() == 204) {
+                        try {
+                            EgainAsyncTaskHelper.pollUntilComplete(client, accepted, timeout);
+                            if (folderId != null) {
+                                EgainInternalKbHelper.assertFolderGone(client, folderId, timeout);
+                            }
+                        } catch (NoClassDefFoundError | Exception e) {
+                            String taskUrl = accepted.headers().firstValue("Location").orElse(null);
+                            if (taskUrl == null) {
                                 return;
                             }
-                            Thread.sleep(1000);
+                            long deadline = System.nanoTime() + timeout.toNanos();
+                            while (System.nanoTime() < deadline) {
+                                HttpRequest poll = HttpRequest.newBuilder()
+                                        .uri(URI.create(TestEnv.resolveSystemUrl(taskUrl)))
+                                        .timeout(Duration.ofSeconds(10))
+                                        .header("Accept", "application/json")
+                                        .GET()
+                                        .build();
+                                HttpResponse<String> r = client.send(poll, HttpResponse.BodyHandlers.ofString());
+                                if (r.statusCode() == 200 || r.statusCode() == 204) {
+                                    return;
+                                }
+                                Thread.sleep(500);
+                            }
                         }
+                    }
+
+                    public static String readEtag(HttpClient client, URI uri, Duration timeout, String token)
+                            throws Exception {
+                        HttpRequest.Builder b = HttpRequest.newBuilder()
+                                .uri(uri)
+                                .timeout(timeout)
+                                .header("Accept", "application/json")
+                                .header("Accept-Language", TestEnv.acceptLanguage())
+                                .GET();
+                        if (token != null && !token.isEmpty()) {
+                            b.header("Authorization", "Bearer " + token);
+                        }
+                        HttpResponse<String> resp = client.send(b.build(), HttpResponse.BodyHandlers.ofString());
+                        return resp.headers().firstValue("ETag").orElse(null);
+                    }
+
+                    public static String folderIdFromUri(URI uri) {
+                        if (uri == null) {
+                            return null;
+                        }
+                        String path = uri.getPath();
+                        int slash = path.lastIndexOf('/');
+                        return slash >= 0 && slash < path.length() - 1 ? path.substring(slash + 1) : null;
                     }
 
                     public static void bootstrapBaseData(HttpClient client, Duration timeout) throws Exception {
@@ -1208,6 +1355,50 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                                 TestContext.setDisposableFolderId(disposable);
                             }
                         }
+                        if (TestEnv.bootstrapHierarchyEnabled() && hierarchyRoot != null && !hierarchyRoot.isBlank()) {
+                            bootstrapHierarchyTree(client, hierarchyRoot, timeout);
+                        } else if (hierarchyRoot != null && !hierarchyRoot.isBlank()) {
+                            TestContext.setHierarchyTreeConfigured(false);
+                        }
+                    }
+
+                    private static void bootstrapHierarchyTree(HttpClient client, String rootId, Duration timeout)
+                            throws Exception {
+                        String[][] tree = {
+                                {"2", "root"}, {"2.1", "2"}, {"2.2", "2"}, {"2.3", "2"},
+                                {"3", "2"}, {"3.1", "3"}, {"4", "2"}, {"4.1", "4"}, {"4.2", "4"}
+                        };
+                        java.util.Map<String, String> nameToId = new java.util.HashMap<>();
+                        nameToId.put("root", rootId);
+                        for (String[] node : tree) {
+                            String name = node[0];
+                            String parentName = node[1];
+                            String parentId = "root".equals(parentName) ? rootId : nameToId.get(parentName);
+                            if (parentId == null) {
+                                continue;
+                            }
+                            String body = RequestBodyEnv.bind("{\\"name\\":\\"" + name
+                                    + "\\",\\"parent\\":{\\"id\\":\\"" + parentId + "\\"}}");
+                            HttpRequest.Builder b = HttpRequest.newBuilder()
+                                    .uri(URI.create(TestEnv.baseUrl() + "/folders"))
+                                    .timeout(timeout)
+                                    .header("Content-Type", "application/json")
+                                    .header("Accept", "application/json")
+                                    .POST(HttpRequest.BodyPublishers.ofString(body));
+                            String token = TestAuth.rawToken();
+                            if (!token.isEmpty()) {
+                                b.header("Authorization", "Bearer " + token);
+                            }
+                            HttpResponse<String> resp = client.send(b.build(), HttpResponse.BodyHandlers.ofString());
+                            if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
+                                String id = extractCreatedId(resp);
+                                if (id != null) {
+                                    nameToId.put(name, id);
+                                    TestContext.trackCreatedId(id);
+                                }
+                            }
+                        }
+                        TestContext.setHierarchyTreeConfigured(true);
                     }
 
                     private static void verifyFolderExists(HttpClient client, String folderId, Duration timeout,
