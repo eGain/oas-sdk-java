@@ -48,6 +48,7 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
             // Generate mock data for all schemas
             generateMockDataForSchemas(spec, outputPath.toString(), apiTitle);
             generateOperationRequestBodies(spec, outputPath.resolve("operations").toString());
+            copyOperationBodiesToTestModules(outputPath);
 
             // Generate mock data generator utility class
             generateMockDataGeneratorClass(outputPath.toString());
@@ -521,6 +522,27 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
             return listToJson((List<?>) mockData, 0);
         }
         return "{}";
+    }
+
+    private void copyOperationBodiesToTestModules(Path mockDataRoot) throws IOException {
+        Path operations = mockDataRoot.resolve("operations");
+        if (!Files.isDirectory(operations)) {
+            return;
+        }
+        Path testsRoot = mockDataRoot.getParent();
+        if (testsRoot == null) {
+            return;
+        }
+        for (String module : List.of("integration", "unit")) {
+            Path target = testsRoot.resolve(module).resolve("src/test/resources/mock-data");
+            Files.createDirectories(target);
+            try (var stream = Files.list(operations)) {
+                for (Path file : stream.filter(p -> p.toString().endsWith("_request.json")).toList()) {
+                    Files.copy(file, target.resolve(file.getFileName()),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
     }
 
     private void generateOperationRequestBodies(Map<String, Object> spec, String outputDir) throws IOException {

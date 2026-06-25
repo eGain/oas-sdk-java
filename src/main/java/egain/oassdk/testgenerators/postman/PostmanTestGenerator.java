@@ -714,12 +714,21 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
                     'departmentId': props.get('test.department.id', ''),
                     'filter_parent': props.get('test.filter.parent.id', props.get('test.parent.folder.id', '')),
                     'folderID': props.get('test.folder.id', ''),
+                    'hierarchy_root': props.get('test.hierarchy.root.folder.id', ''),
+                    'parent_folder_id': props.get('test.parent.folder.id', ''),
+                    'user_id': props.get('test.user.id', ''),
+                    'user_group_id': props.get('test.user.group.id', ''),
                     'auth_token': props.get('auth.token', ''),
                 }
                 for item in env.get('values', []):
                     key = item.get('key')
                     if key in mapping and mapping[key]:
                         item['value'] = mapping[key]
+                    val = item.get('value', '')
+                    if isinstance(val, str) and val.startswith('${test.') and val.endswith('}'):
+                        prop_key = val[2:-1]
+                        if prop_key in props and props[prop_key]:
+                            item['value'] = props[prop_key]
                 with open(sys.argv[2], 'w', encoding='utf-8') as f:
                     json.dump(env, f, indent=2)
                 PY

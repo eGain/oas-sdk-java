@@ -91,7 +91,7 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
             writeProperties(bundleDir.resolve("schemathesis.properties"), props);
             writeProperties(bundleDir.resolve("schemathesis.local.properties.example"), Map.of(
                     "TOKEN", "'Bearer <jwt-from-test-env-or-login>'",
-                    "BASEURL", baseUrl.isBlank() ? "https://your-host.example/api" : baseUrl
+                    "BASEURL", baseUrl.isBlank() ? "" : baseUrl
             ));
 
             String script = buildRunScript(specFileName);
@@ -262,6 +262,15 @@ public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTes
                 HEADER_ACCEPT_LANG="$(get_prop HEADER_ACCEPT_LANG 'Accept-language: en-US')"
                 HEADER_AUTH="$(get_prop HEADER_AUTH 'Authorization: %TOKEN%')"
                 EXTRA_ARGS="$(get_prop EXTRA_ARGS '')"
+                if [[ -n "${SCHEMATHESIS_OPS:-}" ]]; then
+                  IFS=',' read -ra OPS <<< "${SCHEMATHESIS_OPS}"
+                  for op in "${OPS[@]}"; do
+                    op="$(echo "$op" | tr -d '[:space:]')"
+                    if [[ -n "$op" ]]; then
+                      EXTRA_ARGS="${EXTRA_ARGS} --include-operation-id ${op}"
+                    fi
+                  done
+                fi
                 if [[ "${DESTRUCTIVE:-false}" != "true" && "${DESTRUCTIVE:-false}" != "1" ]]; then
                   EXTRA_ARGS="${EXTRA_ARGS} --exclude-operation-id deleteFolder"
                 fi

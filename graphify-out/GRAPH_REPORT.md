@@ -1,16 +1,16 @@
-# Graph Report - oas-sdk-java  (2026-06-23)
+# Graph Report - oas-sdk-java  (2026-06-25)
 
 ## Corpus Check
-- 236 files · ~185,439 words
+- 238 files · ~542,631 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4107 nodes · 12430 edges · 190 communities (163 shown, 27 thin omitted)
-- Extraction: 81% EXTRACTED · 19% INFERRED · 0% AMBIGUOUS · INFERRED: 2309 edges (avg confidence: 0.8)
+- 4134 nodes · 12507 edges · 178 communities (155 shown, 23 thin omitted)
+- Extraction: 81% EXTRACTED · 19% INFERRED · 0% AMBIGUOUS · INFERRED: 2328 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `81749ad8`
+- Built from commit: `335473a6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -121,7 +121,6 @@
 - [[_COMMUNITY_Community 103|Community 103]]
 - [[_COMMUNITY_Community 104|Community 104]]
 - [[_COMMUNITY_Community 105|Community 105]]
-- [[_COMMUNITY_Community 106|Community 106]]
 - [[_COMMUNITY_Community 107|Community 107]]
 - [[_COMMUNITY_Community 108|Community 108]]
 - [[_COMMUNITY_Community 109|Community 109]]
@@ -169,7 +168,6 @@
 - [[_COMMUNITY_Community 151|Community 151]]
 - [[_COMMUNITY_Community 152|Community 152]]
 - [[_COMMUNITY_Community 153|Community 153]]
-- [[_COMMUNITY_Community 154|Community 154]]
 - [[_COMMUNITY_Community 155|Community 155]]
 - [[_COMMUNITY_Community 156|Community 156]]
 - [[_COMMUNITY_Community 157|Community 157]]
@@ -181,30 +179,20 @@
 - [[_COMMUNITY_Community 163|Community 163]]
 - [[_COMMUNITY_Community 164|Community 164]]
 - [[_COMMUNITY_Community 165|Community 165]]
-- [[_COMMUNITY_Community 166|Community 166]]
 - [[_COMMUNITY_Community 167|Community 167]]
-- [[_COMMUNITY_Community 168|Community 168]]
 - [[_COMMUNITY_Community 169|Community 169]]
 - [[_COMMUNITY_Community 170|Community 170]]
 - [[_COMMUNITY_Community 171|Community 171]]
-- [[_COMMUNITY_Community 172|Community 172]]
-- [[_COMMUNITY_Community 173|Community 173]]
 - [[_COMMUNITY_Community 174|Community 174]]
-- [[_COMMUNITY_Community 175|Community 175]]
 - [[_COMMUNITY_Community 176|Community 176]]
 - [[_COMMUNITY_Community 177|Community 177]]
 - [[_COMMUNITY_Community 178|Community 178]]
-- [[_COMMUNITY_Community 179|Community 179]]
 - [[_COMMUNITY_Community 180|Community 180]]
 - [[_COMMUNITY_Community 181|Community 181]]
-- [[_COMMUNITY_Community 182|Community 182]]
 - [[_COMMUNITY_Community 183|Community 183]]
 - [[_COMMUNITY_Community 184|Community 184]]
 - [[_COMMUNITY_Community 185|Community 185]]
 - [[_COMMUNITY_Community 186|Community 186]]
-- [[_COMMUNITY_Community 187|Community 187]]
-- [[_COMMUNITY_Community 188|Community 188]]
-- [[_COMMUNITY_Community 189|Community 189]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `OASSDK` - 91 edges
@@ -233,18 +221,18 @@
 ## Import Cycles
 - None detected.
 
-## Communities (190 total, 27 thin omitted)
+## Communities (178 total, 23 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.17
 Nodes (11): AfterEach, Arguments, MethodSource, RegressionTest, ParameterizedTest, BeforeEach, DisplayName, List (+3 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.14
-Nodes (4): OASParserTest, BeforeEach, Path, Test
+Cohesion: 0.05
+Nodes (29): String, GenerateSequenceChainsFromSpec, FileSystem, JerseyGeneratorConfigTest, LocalDateTime, LocalDateTimeValidationTest, TestObject, OASParser (+21 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.27
+Cohesion: 0.26
 Nodes (7): JerseySchemaUtils, ObjectWithSingleArrayInfo, Boolean, List, Map, Object, String
 
 ### Community 3 - "Community 3"
@@ -260,20 +248,20 @@ Cohesion: 0.28
 Nodes (7): SecurityTestGenerator, Map, Object, Override, String, StringBuilder, TestConfig
 
 ### Community 6 - "Community 6"
-Cohesion: 0.09
-Nodes (22): NegativeCase, NegativeCase, PostmanNegativeRequestFactory, PostmanParameterSupport, PostmanTestGenerator, Integer, List, Map (+14 more)
+Cohesion: 0.06
+Nodes (30): HttpServer, __CLASS_NAME__, ObjectMapperContextResolver, NegativeCase, ObjectMapper, NegativeCase, PostmanNegativeRequestFactory, PostmanParameterSupport (+22 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.20
-Nodes (6): ObservabilityConfig, ObservabilityConfigTest, Override, String, DisplayName, Test
+Cohesion: 0.17
+Nodes (7): ObservabilityConfig, ObservabilityConfigTest, Map, Override, String, DisplayName, Test
 
 ### Community 8 - "Community 8"
-Cohesion: 0.21
-Nodes (5): JerseyGenerationContextTest, ObservabilityConfig, DisplayName, Path, Test
+Cohesion: 0.05
+Nodes (28): JerseyBuildGenerator, JerseyGenerationContext, JerseyGenerationContextTest, JerseyGenerator, JerseyObservabilityGenerator, JerseyValidationFrameworkGenerator, ObservabilityConfig, JerseyGenerationContext (+20 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.11
-Nodes (7): Builder, GeneratorConfig, List, Map, Object, Override, String
+Cohesion: 0.06
+Nodes (12): Builder, GeneratorConfig, GeneratorConfigTest, List, Map, Object, Override, String (+4 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.09
@@ -293,7 +281,7 @@ Nodes (19): Builder, SLAConfig, SLAConfigTest, Builder, TestConfig, TestConfigTe
 
 ### Community 14 - "Community 14"
 Cohesion: 0.14
-Nodes (18): Integer, IntegrationParamNegativeCase, List, Map, Object, PerFieldInvalidBody, Set, String (+10 more)
+Nodes (18): Properties, Integer, IntegrationParamNegativeCase, List, Map, Object, PerFieldInvalidBody, Set (+10 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.10
@@ -324,11 +312,11 @@ Cohesion: 0.14
 Nodes (12): ExpressGenerator, PathOperation, SecurityInfo, SecurityInfo, GeneratorConfig, List, Map, Object (+4 more)
 
 ### Community 22 - "Community 22"
-Cohesion: 0.06
-Nodes (24): TestCodegenSupport, IntegrationTestGenerator, OperationInfo, String, Integer, List, Map, Object (+16 more)
+Cohesion: 0.11
+Nodes (12): TestCodegenSupport, String, List, Map, Object, OperationInfo, Override, String (+4 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.12
+Cohesion: 0.13
 Nodes (15): Function, JerseyAuthorizationFrameworkGenerator, JerseyResourceGenerator, PathOperation, JerseyGenerationContext, Set, String, JerseyGenerationContext (+7 more)
 
 ### Community 24 - "Community 24"
@@ -336,43 +324,47 @@ Cohesion: 0.33
 Nodes (6): ApiCallExtractor, ApiCallInfo, List, Map, Object, String
 
 ### Community 25 - "Community 25"
-Cohesion: 0.13
-Nodes (3): JerseyNamingUtilsTest, DisplayName, Test
+Cohesion: 0.10
+Nodes (5): JerseyNamingUtils, JerseyNamingUtilsTest, String, DisplayName, Test
+
+### Community 26 - "Community 26"
+Cohesion: 0.09
+Nodes (20): Hook, IntegrationTestGenerator, OperationInfo, LifecycleHookRegistry, LifecycleHookRegistryTest, Integer, List, Map (+12 more)
 
 ### Community 27 - "Community 27"
 Cohesion: 0.16
 Nodes (14): SequenceChainTestGenerator, ApiCallExtractor, ApiCallInfo, Boolean, ChainConfig, EnumeratedChain, Integer, List (+6 more)
 
 ### Community 28 - "Community 28"
-Cohesion: 0.26
-Nodes (7): OASParser, ResolveResult, Map, Object, Path, Set, String
+Cohesion: 0.17
+Nodes (7): Util, UtilTest, List, Map, Object, String, Test
 
 ### Community 29 - "Community 29"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (17): ConstructorSpec, FieldSpec, GeneratedClass, ConstructorSpec, FieldSpec, GeneratedClass, JerseyAuthorizationDataGenerator, ParamSpec (+9 more)
 
 ### Community 30 - "Community 30"
-Cohesion: 0.24
-Nodes (6): GenerateBundleSDK, String, JerseyGeneratorValidationTest, OASSDK, DisplayName, Test
+Cohesion: 0.26
+Nodes (3): JerseyGeneratorValidationTest, DisplayName, Test
 
 ### Community 31 - "Community 31"
-Cohesion: 0.13
-Nodes (14): AutoCloseable, CompleteExample, String, HelloWorldExample, String, OASSDK, GeneratorConfig, List (+6 more)
+Cohesion: 0.15
+Nodes (11): AutoCloseable, CompleteExample, String, HelloWorldExample, String, OASSDK, List, Map (+3 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.16
-Nodes (12): Double, MockDataGenerator, MockDataGeneratorTest, Integer, List, Map, Object, Override (+4 more)
+Cohesion: 0.15
+Nodes (13): Double, MockDataGenerator, MockDataGeneratorTest, Integer, List, Map, Object, Override (+5 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.18
 Nodes (11): OperationInfo, PytestIntegrationTestGenerator, Integer, List, Map, Object, OperationInfo, Override (+3 more)
 
 ### Community 34 - "Community 34"
-Cohesion: 0.14
-Nodes (3): BeforeEach, Test, TestGeneratorFactoryTest
+Cohesion: 0.07
+Nodes (17): JestUnitTestGenerator, OperationInfo, List, Map, Object, OperationInfo, Override, String (+9 more)
 
 ### Community 35 - "Community 35"
-Cohesion: 0.13
+Cohesion: 0.14
 Nodes (14): ContentMgrFolderPermissionsEntryIT, JerseyModelGeneratorFolderYamlParityTest, JerseyModelGeneratorVersionsYamlParityTest, Map, Object, String, SuppressWarnings, Test (+6 more)
 
 ### Community 36 - "Community 36"
@@ -388,7 +380,7 @@ Cohesion: 0.12
 Nodes (10): OASMetadata, OASMetadataTest, Map, Object, String, BeforeEach, Map, Object (+2 more)
 
 ### Community 39 - "Community 39"
-Cohesion: 0.28
+Cohesion: 0.26
 Nodes (7): NFRTestGenerator, Map, Object, Override, String, StringBuilder, TestConfig
 
 ### Community 40 - "Community 40"
@@ -400,24 +392,24 @@ Cohesion: 0.16
 Nodes (7): BusinessLogicFunction, ValidationRules, BusinessLogicConnectorTest, List, BeforeEach, Test, ValidationRule
 
 ### Community 42 - "Community 42"
-Cohesion: 0.22
-Nodes (7): JerseyModelGenerator, WrapperToGenerate, Map, Object, Set, String, StringBuilder
+Cohesion: 0.19
+Nodes (10): JerseyModelGenerator, WrapperToGenerate, JerseySchemaCollector, JerseyGenerationContext, JerseyTypeUtils, Map, Object, Set (+2 more)
 
 ### Community 43 - "Community 43"
 Cohesion: 0.10
 Nodes (7): PathResolver, PathResolverTest, List, Path, String, BeforeEach, Test
 
 ### Community 44 - "Community 44"
-Cohesion: 0.19
-Nodes (5): BeforeEach, Path, SuppressWarnings, Test, UnitTestGeneratorTest
+Cohesion: 0.15
+Nodes (8): BeforeEach, Map, Object, Path, String, SuppressWarnings, Test, UnitTestGeneratorTest
 
 ### Community 45 - "Community 45"
 Cohesion: 0.29
 Nodes (9): BusinessLogicFunction, BusinessLogicConnector, ValidationRule, MonitoringConfig, Map, Object, Response, String (+1 more)
 
 ### Community 46 - "Community 46"
-Cohesion: 0.08
-Nodes (18): TestOutputLayout, TestProfileSupport, TestProfileSupportTest, Path, String, List, String, TestConfig (+10 more)
+Cohesion: 0.11
+Nodes (12): TestOutputLayout, Path, String, List, Map, Object, Path, String (+4 more)
 
 ### Community 48 - "Community 48"
 Cohesion: 0.20
@@ -428,8 +420,8 @@ Cohesion: 0.19
 Nodes (7): IntegrationTestGeneratorTest, BeforeEach, Map, Object, Path, String, Test
 
 ### Community 50 - "Community 50"
-Cohesion: 0.17
-Nodes (9): JerseyGenerator, JerseyGeneratorConfigTest, GeneratorConfig, Map, Object, Override, String, DisplayName (+1 more)
+Cohesion: 0.20
+Nodes (7): PytestUnitTestGeneratorTest, BeforeEach, Map, Object, Path, String, Test
 
 ### Community 51 - "Community 51"
 Cohesion: 0.19
@@ -476,12 +468,12 @@ Cohesion: 0.32
 Nodes (4): SLAProcessorTest, BeforeEach, Path, Test
 
 ### Community 62 - "Community 62"
-Cohesion: 0.41
-Nodes (3): Map, Object, String
+Cohesion: 0.25
+Nodes (6): TestProfileSupport, TestProfileSupportTest, List, String, TestConfig, Test
 
 ### Community 63 - "Community 63"
-Cohesion: 0.28
-Nodes (3): JerseyGeneratorArrayTypesAndSetTest, DisplayName, Test
+Cohesion: 0.24
+Nodes (6): GenerateBundleSDK, String, JerseyGeneratorArrayTypesAndSetTest, OASSDK, DisplayName, Test
 
 ### Community 64 - "Community 64"
 Cohesion: 0.20
@@ -492,32 +484,32 @@ Cohesion: 0.20
 Nodes (7): PerformanceTestGeneratorTest, BeforeEach, Map, Object, Path, String, Test
 
 ### Community 66 - "Community 66"
-Cohesion: 0.10
-Nodes (17): OperationInfo, PytestUnitTestGenerator, PytestUnitTestGeneratorTest, List, Map, Object, OperationInfo, Override (+9 more)
+Cohesion: 0.20
+Nodes (10): OperationInfo, PytestUnitTestGenerator, List, Map, Object, OperationInfo, Override, String (+2 more)
 
 ### Community 67 - "Community 67"
 Cohesion: 0.30
 Nodes (7): RedoclyGenerator, RedoclyGeneratorTest, Map, Object, String, Path, Test
 
 ### Community 68 - "Community 68"
-Cohesion: 0.33
-Nodes (4): Parameter, ParameterValidatorMapKey, Validations, Override
+Cohesion: 0.42
+Nodes (6): OpenApiOneOfXor, SimpleOneOfXorInfo, Boolean, Map, Object, String
 
 ### Community 69 - "Community 69"
 Cohesion: 0.22
 Nodes (9): OpenApiMapYamlWriter, OpenApiMapYamlWriterTest, Map, Object, Path, Set, String, Path (+1 more)
 
 ### Community 70 - "Community 70"
-Cohesion: 0.27
-Nodes (9): PrefixResult, ChainEnumerator, PrefixResult, ApiCallInfo, EnumeratedChain, List, Set, String (+1 more)
+Cohesion: 0.13
+Nodes (14): Builder, PrefixResult, Builder, ChainConfig, ChainEnumerator, PrefixResult, ApiCallInfo, ChainConfig (+6 more)
 
 ### Community 71 - "Community 71"
 Cohesion: 0.30
 Nodes (7): RateLimitChecker, RateLimitCheckerTest, Map, Object, String, Path, Test
 
 ### Community 72 - "Community 72"
-Cohesion: 0.07
-Nodes (25): OpenApiOneOfXor, SimpleOneOfXorInfo, ObjectWithSingleArrayInfo, OpenApiSchemaUtils, Util, UtilTest, PythonSchemaMergeUtils, Boolean (+17 more)
+Cohesion: 0.19
+Nodes (7): ObjectWithSingleArrayInfo, OpenApiSchemaUtils, Boolean, List, Map, Object, String
 
 ### Community 73 - "Community 73"
 Cohesion: 0.17
@@ -536,7 +528,7 @@ Cohesion: 0.41
 Nodes (5): SequenceTestFixtures, Map, Object, String, SuppressWarnings
 
 ### Community 77 - "Community 77"
-Cohesion: 0.29
+Cohesion: 0.30
 Nodes (5): Map, Object, String, Test, IntegrationScenarioSupportTest
 
 ### Community 78 - "Community 78"
@@ -556,8 +548,8 @@ Cohesion: 0.24
 Nodes (3): GinGeneratorTest, BeforeEach, Test
 
 ### Community 82 - "Community 82"
-Cohesion: 0.24
-Nodes (10): AuthSelector, AuthWiring, FastAPIRouteGenerator, List, Map, Object, PathOperation, PythonGenerationContext (+2 more)
+Cohesion: 0.26
+Nodes (9): AuthSelector, FastAPIRouteGenerator, List, Map, Object, PathOperation, PythonGenerationContext, String (+1 more)
 
 ### Community 83 - "Community 83"
 Cohesion: 0.25
@@ -568,16 +560,12 @@ Cohesion: 0.25
 Nodes (3): FlaskGeneratorTest, BeforeEach, Test
 
 ### Community 85 - "Community 85"
-Cohesion: 0.18
-Nodes (5): Builder, Builder, ChainConfig, ChainConfig, UnresolvedParamPolicy
+Cohesion: 0.32
+Nodes (5): PythonSchemaMergeUtils, List, Map, Object, String
 
 ### Community 86 - "Community 86"
 Cohesion: 0.31
 Nodes (4): DocumentationGeneratorTest, BeforeEach, Path, Test
-
-### Community 87 - "Community 87"
-Cohesion: 0.22
-Nodes (10): JestUnitTestGenerator, OperationInfo, List, Map, Object, OperationInfo, Override, String (+2 more)
 
 ### Community 88 - "Community 88"
 Cohesion: 0.32
@@ -646,10 +634,6 @@ Nodes (5): List, T, ValidationError, ValidatorAction, Validator
 ### Community 105 - "Community 105"
 Cohesion: 0.36
 Nodes (5): GeneratePortalMgrSDKTest, DisplayName, Path, String, Test
-
-### Community 106 - "Community 106"
-Cohesion: 0.12
-Nodes (10): FileSystem, HttpServer, __CLASS_NAME__, ObjectMapperContextResolver, ObjectMapper, ResourceConfig, List, Class (+2 more)
 
 ### Community 107 - "Community 107"
 Cohesion: 0.36
@@ -736,8 +720,8 @@ Cohesion: 0.40
 Nodes (3): T, ValidationError, ValidatorAction
 
 ### Community 136 - "Community 136"
-Cohesion: 0.25
-Nodes (7): TestSpecUtils, TestSpecUtilsTest, Map, Object, String, TestConfig, Test
+Cohesion: 0.42
+Nodes (5): TestSpecUtils, Map, Object, String, TestConfig
 
 ### Community 139 - "Community 139"
 Cohesion: 0.41
@@ -764,8 +748,8 @@ Cohesion: 0.24
 Nodes (9): DeclaredErrorCase, OneOfVariantBody, OneOfXorNegativeBody, List, Map, Object, String, SuppressWarnings (+1 more)
 
 ### Community 146 - "Community 146"
-Cohesion: 0.25
-Nodes (10): FlattenedObjectSchema, Properties, IntegrationParamNegativeCase, List, Map, Object, PerFieldInvalidBody, String (+2 more)
+Cohesion: 0.16
+Nodes (14): FlattenedObjectSchema, Parameter, ParameterValidatorMapKey, Validations, IntegrationParamNegativeCase, List, Map, Object (+6 more)
 
 ### Community 147 - "Community 147"
 Cohesion: 0.20
@@ -776,8 +760,8 @@ Cohesion: 0.18
 Nodes (6): Level, LoggerConfig, LoggerConfigTest, Class, String, Test
 
 ### Community 149 - "Community 149"
-Cohesion: 0.42
-Nodes (3): JerseyGeneratorObservabilityTest, DisplayName, Test
+Cohesion: 0.34
+Nodes (4): JerseyGeneratorObservabilityTest, BeforeEach, DisplayName, Test
 
 ### Community 150 - "Community 150"
 Cohesion: 0.24
@@ -792,12 +776,8 @@ Cohesion: 0.34
 Nodes (5): PythonSchemaCollector, Map, Object, PythonGenerationContext, String
 
 ### Community 153 - "Community 153"
-Cohesion: 0.33
-Nodes (8): AuthSelection, AuthSelector, AuthSelection, AuthSchemeHandler, Map, Object, Set, String
-
-### Community 154 - "Community 154"
-Cohesion: 0.28
-Nodes (5): JerseyBuildGenerator, JerseyGenerationContext, Map, Object, String
+Cohesion: 0.30
+Nodes (9): AuthSelection, AuthSelector, AuthSelection, AuthWiring, AuthSchemeHandler, Map, Object, Set (+1 more)
 
 ### Community 155 - "Community 155"
 Cohesion: 0.41
@@ -839,37 +819,17 @@ Nodes (4): OpenApiTestFixtures, Map, Object, String
 Cohesion: 0.40
 Nodes (3): ValidationException, String, Throwable
 
-### Community 166 - "Community 166"
-Cohesion: 0.28
-Nodes (5): JerseyGenerationContext, GeneratorConfig, Map, Object, String
-
 ### Community 167 - "Community 167"
 Cohesion: 0.54
 Nodes (3): JerseySchemaUtilsReferenceTest, DisplayName, Test
 
-### Community 168 - "Community 168"
-Cohesion: 0.28
-Nodes (6): LocalDateTime, LocalDateTimeValidationTest, TestObject, DisplayName, String, Test
-
-### Community 172 - "Community 172"
-Cohesion: 0.24
-Nodes (5): PathUtils, PathUtilsTest, Path, String, Test
-
 ### Community 174 - "Community 174"
-Cohesion: 0.30
+Cohesion: 0.28
 Nodes (7): PerformanceTestGenerator, Map, Object, Override, String, StringBuilder, TestConfig
-
-### Community 175 - "Community 175"
-Cohesion: 0.47
-Nodes (4): String, TestConfig, TestGenerator, TestGeneratorFactory
 
 ### Community 176 - "Community 176"
 Cohesion: 0.21
 Nodes (8): Formatter, Handler, LogFormatter, RotatingFileHandler, LogRecord, Override, Path, Throwable
-
-### Community 179 - "Community 179"
-Cohesion: 0.25
-Nodes (5): JerseyObservabilityGenerator, JerseyGenerationContext, Map, Object, String
 
 ### Community 180 - "Community 180"
 Cohesion: 0.31
@@ -883,29 +843,25 @@ Nodes (5): GenericExceptionMapper, Logger, Exception, Override, Response
 Cohesion: 0.52
 Nodes (3): NFRTestGeneratorTest, Path, Test
 
-### Community 188 - "Community 188"
-Cohesion: 0.50
-Nodes (3): JerseySchemaCollector, JerseyGenerationContext, JerseyTypeUtils
-
 ## Knowledge Gaps
-- **145 isolated node(s):** `String`, `String`, `String`, `Override`, `Override` (+140 more)
+- **148 isolated node(s):** `String`, `String`, `String`, `Override`, `Override` (+143 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **27 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **23 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `OASSDKException` connect `Community 58` to `Community 128`, `Community 129`, `Community 130`, `Community 131`, `Community 0`, `Community 1`, `Community 139`, `Community 13`, `Community 17`, `Community 28`, `Community 30`, `Community 31`, `Community 35`, `Community 165`, `Community 41`, `Community 43`, `Community 45`, `Community 51`, `Community 181`, `Community 182`, `Community 57`, `Community 63`, `Community 73`, `Community 74`, `Community 99`, `Community 100`, `Community 105`, `Community 108`, `Community 117`, `Community 123`, `Community 126`, `Community 127`?**
-  _High betweenness centrality (0.087) - this node is a cross-community bridge._
-- **Why does `LinkedHashSet` connect `Community 155` to `Community 2`, `Community 6`, `Community 72`, `Community 42`, `Community 141`, `Community 46`, `Community 82`, `Community 21`, `Community 22`, `Community 23`, `Community 153`, `Community 27`, `Community 29`?**
-  _High betweenness centrality (0.071) - this node is a cross-community bridge._
-- **Why does `OASValidator` connect `Community 4` to `Community 15`, `Community 31`?**
-  _High betweenness centrality (0.057) - this node is a cross-community bridge._
+- **Why does `OASSDKException` connect `Community 58` to `Community 128`, `Community 1`, `Community 129`, `Community 130`, `Community 131`, `Community 0`, `Community 9`, `Community 139`, `Community 13`, `Community 17`, `Community 30`, `Community 31`, `Community 35`, `Community 165`, `Community 41`, `Community 43`, `Community 45`, `Community 51`, `Community 181`, `Community 57`, `Community 63`, `Community 73`, `Community 74`, `Community 99`, `Community 100`, `Community 105`, `Community 108`, `Community 117`, `Community 123`, `Community 126`, `Community 127`?**
+  _High betweenness centrality (0.083) - this node is a cross-community bridge._
+- **Why does `LinkedHashSet` connect `Community 155` to `Community 2`, `Community 6`, `Community 72`, `Community 42`, `Community 141`, `Community 82`, `Community 21`, `Community 22`, `Community 23`, `Community 153`, `Community 27`, `Community 29`, `Community 62`?**
+  _High betweenness centrality (0.070) - this node is a cross-community bridge._
+- **Why does `AuthSchemeHandler` connect `Community 88` to `Community 96`, `Community 82`, `Community 91`, `Community 92`, `Community 93`, `Community 94`, `Community 95`?**
+  _High betweenness centrality (0.056) - this node is a cross-community bridge._
 - **What connects `String`, `String`, `String` to the rest of the system?**
-  _145 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _148 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.13663663663663664 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05013530836063239 - nodes in this community are weakly interconnected._
 - **Should `Community 3` be split into smaller, more focused modules?**
   _Cohesion score 0.055412371134020616 - nodes in this community are weakly interconnected._
 - **Should `Community 6` be split into smaller, more focused modules?**
-  _Cohesion score 0.08660785886126704 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06289308176100629 - nodes in this community are weakly interconnected._

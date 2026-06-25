@@ -220,7 +220,22 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         }
         appendParamMaps(sb, parameters);
         String bodyLiteral = jsonBodyLiteral(operation, spec);
-        appendRestAssuredWhenThen(sb, method, path, bodyLiteral, "        .then()\n            .statusCode(" + successMatcher + ");\n");
+        if ("POST".equals(method) && responses.containsKey("201")) {
+            appendRestAssuredWhenThenExtract(sb, method, path, bodyLiteral);
+            sb.append("        assertNotNull(response);\n");
+            sb.append("        assertTrue(response.getStatusCode() >= 200 && response.getStatusCode() < 300);\n");
+            String getPath = findGetByIdPath(spec, path);
+            if (getPath != null) {
+                sb.append("        UnitTestUtils.assertGetMatchesCreate(response, \"")
+                        .append(escapeJavaString(getPath)).append("\", ")
+                        .append(TestCodegenSupport.requestBodyBind(
+                                IntegrationScenarioSupport.escapeJavaString(
+                                        IntegrationScenarioSupport.generateRequestBodyFromSchemaRaw(operation, spec))))
+                        .append(");\n");
+            }
+        } else {
+            appendRestAssuredWhenThen(sb, method, path, bodyLiteral, "        .then()\n            .statusCode(" + successMatcher + ");\n");
+        }
         sb.append("    }\n\n");
 
         if (!smoke) {
@@ -584,9 +599,27 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             if (name.equals(missingName)) {
                 continue;
             }
-            sb.append("        queryParams.put(\"").append(escapeJavaString(name)).append("\", \"")
-                    .append(escapeJavaString(IntegrationScenarioSupport.getParameterExample(param))).append("\");\n");
+            sb.append("        queryParams.put(\"").append(escapeJavaString(name)).append("\", ")
+                    .append(TestCodegenSupport.paramValueExpression(name,
+                            IntegrationScenarioSupport.getParameterExample(param))).append(");\n");
         }
+    }
+
+    private String findGetByIdPath(Map<String, Object> spec, String collectionPath) {
+        Map<String, Object> paths = Util.asStringObjectMap(spec.get("paths"));
+        if (paths == null) {
+            return null;
+        }
+        for (String p : paths.keySet()) {
+            if (p.matches(".*\\{[^}]+}.*") && p.startsWith(collectionPath.replaceAll("/$", ""))) {
+                Map<String, Object> pathItem = Util.asStringObjectMap(paths.get(p));
+                if (pathItem != null && pathItem.containsKey("get")) {
+                    return p;
+                }
+            }
+        }
+        String candidate = collectionPath.endsWith("/") ? collectionPath + "{id}" : collectionPath + "/{id}";
+        return paths.containsKey(candidate) ? candidate : null;
     }
 
     private void appendParamMapsWithInvalidParameter(StringBuilder sb, List<Map<String, Object>> parameters,
@@ -875,15 +908,28 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                         if (taskUrl == null) {
                             return;
                         }
+                        String resolved = TestEnv.resolveSystemUrl(taskUrl);
                         long deadline = System.nanoTime() + 30_000_000_000L;
                         while (System.nanoTime() < deadline) {
-                            Response r = TestClient.givenAuth()
-                                    .get(taskUrl.startsWith("http") ? taskUrl : taskUrl);
+                            Response r;
+                            try {
+                                String sessionId = EgainAuth.sessionId();
+                                if (sessionId != null && !sessionId.isBlank()) {
+                                    r = given()
+                                            .header("X-egain-session", sessionId)
+                                            .header("Accept", "application/json")
+                                            .get(resolved);
+                                } else {
+                                    r = TestClient.givenAuth().get(resolved);
+                                }
+                            } catch (NoClassDefFoundError e) {
+                                r = TestClient.givenAuth().get(resolved);
+                            }
                             if (r.getStatusCode() == 200 || r.getStatusCode() == 204) {
                                 return;
                             }
                             try {
-                                Thread.sleep(1000);
+                                Thread.sleep(500);
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                                 return;
