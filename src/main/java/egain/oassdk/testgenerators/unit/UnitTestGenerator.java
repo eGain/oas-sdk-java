@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Unit test generator — emits JUnit 5 + RestAssured API tests from OpenAPI.
+ * Contract test generator — emits JUnit 5 + RestAssured API tests from OpenAPI.
  */
 public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerator {
 
@@ -41,7 +41,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         this.config = config;
 
         try {
-            Path outputPath = Paths.get(outputDir, "unit");
+            Path outputPath = Paths.get(outputDir, "contract");
             Files.createDirectories(outputPath);
 
             String basePackage = "com.example.api";
@@ -57,7 +57,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             generatePomXml(outputPath.toString(), basePackage);
 
         } catch (Exception e) {
-            throw new GenerationException("Failed to generate unit tests: " + e.getMessage(), e);
+            throw new GenerationException("Failed to generate contract tests: " + e.getMessage(), e);
         }
     }
 
@@ -147,7 +147,8 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         }
 
         sb.append("    private static String authToken() {\n");
-        sb.append("        return TestAuth.rawToken();\n");
+        sb.append("        String t = TestAuth.rawToken();\n");
+        sb.append("        return (t == null || t.isBlank()) ? \"\" : \"Bearer \" + t;\n");
         sb.append("    }\n\n");
 
         sb.append("    @AfterEach\n");
@@ -198,6 +199,9 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         String testMethodName = operationId != null
                 ? toMethodName(operationId)
                 : toMethodName(method + "_" + sanitizePath(path));
+        String operationTag = operationId != null && !operationId.isBlank()
+                ? operationId
+                : testMethodName;
 
         List<Map<String, Object>> parameters = operation.containsKey("parameters")
                 ? Util.asStringObjectMapList(operation.get("parameters"))
@@ -212,6 +216,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         boolean destructiveOp = "DELETE".equals(method);
 
         sb.append("    @Test\n");
+        sb.append("    @Tag(\"").append(escapeJavaString(operationTag)).append("\")\n");
         sb.append("    @DisplayName(\"").append(escapeJavaString(summary != null ? summary : method + " " + path))
                 .append(" - Valid Request\")\n");
         sb.append("    public void test").append(capitalize(testMethodName)).append("_ValidRequest() {\n");
@@ -219,7 +224,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             sb.append(TestCodegenSupport.destructiveGate());
         }
         appendParamMaps(sb, parameters);
-        String bodyLiteral = jsonBodyLiteral(operation, spec);
+        String bodyLiteral = jsonBodyLiteral(operationTag, operation, spec);
         if ("POST".equals(method) && responses.containsKey("201")) {
             appendRestAssuredWhenThenExtract(sb, method, path, bodyLiteral);
             sb.append("        assertNotNull(response);\n");
@@ -228,9 +233,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             if (getPath != null) {
                 sb.append("        UnitTestUtils.assertGetMatchesCreate(response, \"")
                         .append(escapeJavaString(getPath)).append("\", ")
-                        .append(TestCodegenSupport.requestBodyBind(
-                                IntegrationScenarioSupport.escapeJavaString(
-                                        IntegrationScenarioSupport.generateRequestBodyFromSchemaRaw(operation, spec))))
+                        .append(jsonBodyLiteral(operationTag, operation, spec))
                         .append(");\n");
             }
         } else {
@@ -246,6 +249,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
 
             if (Boolean.TRUE.equals(required) && "query".equals(paramIn)) {
                 sb.append("    @Test\n");
+                sb.append("    @Tag(\"").append(escapeJavaString(operationTag)).append("\")\n");
                 sb.append("    @DisplayName(\"").append(escapeJavaString(summary != null ? summary : method + " " + path))
                         .append(" - Missing Required Parameter: ").append(escapeJavaString(paramName)).append("\")\n");
                 sb.append("    public void test").append(capitalize(testMethodName)).append("_MissingRequiredParam_")
@@ -263,73 +267,26 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             if ("query".equals(paramIn)) {
                 List<String> invalidLiterals = buildInvalidQueryValueLiterals(schema);
                 if (invalidLiterals != null && !invalidLiterals.isEmpty()) {
-                    emitInvalidParameterTest(sb, testMethodName, summary, method, path, parameters, paramName, bodyLiteral,
+                    emitInvalidParameterTest(sb, testMethodName, operationTag, summary, method, path, parameters, paramName, bodyLiteral,
                             invalidLiterals, shouldEmitPatternAssertion(schema), (String) schema.get("pattern"));
                 }
             } else if ("path".equals(paramIn) && "string".equals(schema.get("type")) && schema.containsKey("pattern")) {
                 String pattern = (String) schema.get("pattern");
                 if (pattern != null && !pattern.isBlank()) {
                     List<String> pathPatternLiterals = List.of("invalid", "test123", "");
-                    emitInvalidParameterTest(sb, testMethodName, summary, method, path, parameters, paramName, bodyLiteral,
+                    emitInvalidParameterTest(sb, testMethodName, operationTag, summary, method, path, parameters, paramName, bodyLiteral,
                             pathPatternLiterals, shouldEmitPatternAssertion(schema), pattern);
                 }
             }
         }
         } // end !smoke param negatives
 
-        if (!smoke) {
-        for (String statusCode : responses.keySet()) {
-            if ("default".equals(statusCode)) {
-                continue;
-            }
-            sb.append("    @Test\n");
-            sb.append("    @DisplayName(\"").append(escapeJavaString(summary != null ? summary : method + " " + path))
-                    .append(" - Response Status ").append(statusCode).append("\")\n");
-            sb.append("    public void test").append(capitalize(testMethodName)).append("_Status").append(statusCode).append("() {\n");
-            appendParamMaps(sb, parameters);
-            appendRestAssuredWhenThenExtract(sb, method, path, bodyLiteral);
-
-            sb.append("        assertNotNull(response, \"Response should not be null\");\n");
-            sb.append("        assertEquals(").append(statusCode).append(", response.getStatusCode(), \"Response status should be ")
-                    .append(statusCode).append("\");\n");
-
-            Map<String, Object> responseObj = Util.asStringObjectMap(responses.get(statusCode));
-            Map<String, Object> content = responseObj != null ? Util.asStringObjectMap(responseObj.get("content")) : null;
-
-            if ("200".equals(statusCode) || "201".equals(statusCode)) {
-                sb.append("        assertNotNull(response.getBody(), \"Response body should not be null for ")
-                        .append(statusCode).append(" response\");\n");
-                sb.append("        assertFalse(response.getBody().asString().isEmpty(), \"Response body should not be empty for ")
-                        .append(statusCode).append(" response\");\n");
-            }
-
-            if (content != null) {
-                for (Map.Entry<String, Object> contentEntry : content.entrySet()) {
-                    String contentType = contentEntry.getKey();
-                    sb.append("        String ct = response.getContentType();\n");
-                    sb.append("        assertNotNull(ct, \"Response should have Content-Type\");\n");
-                    sb.append("        assertTrue(ct.contains(\"").append(escapeJavaString(contentType))
-                            .append("\"), \"Content-Type should contain ").append(escapeJavaString(contentType)).append("\");\n");
-
-                    Map<String, Object> mediaType = Util.asStringObjectMap(contentEntry.getValue());
-                    Map<String, Object> responseSchema = mediaType != null ? Util.asStringObjectMap(mediaType.get("schema")) : null;
-                    if (responseSchema != null) {
-                        List<String> requiredFields = Util.asStringList(responseSchema.get("required"));
-                        if (requiredFields != null && !requiredFields.isEmpty()) {
-                            sb.append("        String responseBody = response.getBody().asString();\n");
-                            for (String field : requiredFields) {
-                                sb.append("        assertTrue(responseBody.contains(\"\\\"")
-                                        .append(escapeJavaString(field)).append("\\\"\"),\n");
-                                sb.append("            \"Response JSON should contain required field ")
-                                        .append(escapeJavaString(field)).append("\");\n");
-                            }
-                        }
-                    }
-                }
-            }
-            sb.append("    }\n\n");
+        if (!smoke && responses.containsKey("401")) {
+            emitUnauthorizedScenarioTest(sb, testMethodName, operationTag, summary, method, path, parameters, bodyLiteral, "401");
         }
-        } // end !smoke status matrix
+        if (!smoke && !responses.containsKey("401") && responses.containsKey("403")) {
+            emitUnauthorizedScenarioTest(sb, testMethodName, operationTag, summary, method, path, parameters, bodyLiteral, "403");
+        }
 
         if (!smoke && ("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method))) {
             Map<String, Object> requestBody = operation.containsKey("requestBody")
@@ -337,6 +294,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                     : null;
 
             sb.append("    @Test\n");
+            sb.append("    @Tag(\"").append(escapeJavaString(operationTag)).append("\")\n");
             sb.append("    @DisplayName(\"").append(escapeJavaString(summary != null ? summary : method + " " + path))
                     .append(" - Empty Request Body\")\n");
             sb.append("    public void test").append(capitalize(testMethodName)).append("_EmptyRequestBody() {\n");
@@ -346,6 +304,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             sb.append("    }\n\n");
 
             sb.append("    @Test\n");
+            sb.append("    @Tag(\"").append(escapeJavaString(operationTag)).append("\")\n");
             sb.append("    @DisplayName(\"").append(escapeJavaString(summary != null ? summary : method + " " + path))
                     .append(" - Malformed JSON Request Body\")\n");
             sb.append("    public void test").append(capitalize(testMethodName)).append("_MalformedJsonBody() {\n");
@@ -374,16 +333,16 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                                     int minLen = ((Number) propSchema.get("minLength")).intValue();
                                     if (minLen > 0 && minLen - 1 <= MAX_BOUNDARY_STRING_LITERAL_LENGTH) {
                                         String tooShort = "a".repeat(Math.max(0, minLen - 1));
-                                        emitBoundaryBodyTest(sb, testMethodName, summary, method, path, parameters,
-                                                propName, "{\"\\\"" + propName + "\\\": \\\"" + tooShort + "\\\"}\"");
+                                        emitBoundaryBodyTest(sb, testMethodName, operationTag, summary, method, path, parameters,
+                                                propName, "MinLength", TestCodegenSupport.boundaryStringBodyExpr(propName, tooShort));
                                     }
                                 }
                                 if (propSchema.containsKey("maxLength")) {
                                     int maxLen = ((Number) propSchema.get("maxLength")).intValue();
                                     if (maxLen >= 0 && maxLen + 1 <= MAX_BOUNDARY_STRING_LITERAL_LENGTH) {
                                         String tooLong = "a".repeat(maxLen + 1);
-                                        emitBoundaryBodyTest(sb, testMethodName, summary, method, path, parameters,
-                                                propName, "{\"\\\"" + propName + "\\\": \\\"" + tooLong + "\\\"}\"");
+                                        emitBoundaryBodyTest(sb, testMethodName, operationTag, summary, method, path, parameters,
+                                                propName, "MaxLength", TestCodegenSupport.boundaryStringBodyExpr(propName, tooLong));
                                     }
                                 }
                             }
@@ -392,35 +351,36 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                                 if (propSchema.containsKey("minimum")) {
                                     Number min = (Number) propSchema.get("minimum");
                                     long belowMin = min.longValue() - 1;
-                                    emitBoundaryBodyTest(sb, testMethodName, summary, method, path, parameters,
-                                            propName, "{\"\\\"" + propName + "\\\": " + belowMin + "}");
+                                    emitBoundaryBodyTest(sb, testMethodName, operationTag, summary, method, path, parameters,
+                                            propName, "BelowMin", TestCodegenSupport.boundaryNumericBodyExpr(propName, belowMin));
                                 }
                                 if (propSchema.containsKey("maximum")) {
                                     Number max = (Number) propSchema.get("maximum");
                                     long aboveMax = max.longValue() + 1;
-                                    emitBoundaryBodyTest(sb, testMethodName, summary, method, path, parameters,
-                                            propName, "{\"\\\"" + propName + "\\\": " + aboveMax + "}");
+                                    emitBoundaryBodyTest(sb, testMethodName, operationTag, summary, method, path, parameters,
+                                            propName, "AboveMax", TestCodegenSupport.boundaryNumericBodyExpr(propName, aboveMax));
                                 }
                             }
                         }
                     }
                 }
 
-                String concurrentBody = jsonBodyLiteral(operation, spec);
+                String concurrentBody = jsonBodyLiteral(operationTag, operation, spec);
                 String helperName = "call" + capitalize(testMethodName) + "Request";
                 appendConcurrentHelper(sb, helperName, method, path, parameters, concurrentBody);
-                appendConcurrentTest(sb, testMethodName, summary, method, path, helperName);
+                appendConcurrentTest(sb, testMethodName, operationTag, summary, method, path, helperName);
             }
         }
     }
 
-    private void emitBoundaryBodyTest(StringBuilder sb, String testMethodName, String summary, String method, String path,
-                                      List<Map<String, Object>> parameters, String propName, String bodyJavaExpr) {
+    private void emitBoundaryBodyTest(StringBuilder sb, String testMethodName, String operationTag, String summary, String method, String path,
+                                      List<Map<String, Object>> parameters, String propName, String constraintKind, String bodyJavaExpr) {
         sb.append("    @Test\n");
+        sb.append("    @Tag(\"").append(escapeJavaString(operationTag)).append("\")\n");
         sb.append("    @DisplayName(\"").append(escapeJavaString(summary != null ? summary : method + " " + path))
-                .append(" - Boundary: ").append(escapeJavaString(propName)).append("\")\n");
-        sb.append("    public void test").append(capitalize(testMethodName)).append("_Boundary_")
-                .append(capitalize(toMethodName(propName))).append("_Constraint() {\n");
+                .append(" - Boundary body ").append(escapeJavaString(propName)).append(" ").append(escapeJavaString(constraintKind)).append("\")\n");
+        sb.append("    public void test").append(capitalize(testMethodName)).append("_Boundary_Body_")
+                .append(capitalize(toMethodName(propName))).append("_").append(constraintKind).append("() {\n");
         appendParamMaps(sb, parameters);
         appendRestAssuredWhenThen(sb, method, path, bodyJavaExpr,
                 "        .then()\n            .statusCode(equalTo(400));\n");
@@ -449,9 +409,10 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         sb.append("    }\n\n");
     }
 
-    private void appendConcurrentTest(StringBuilder sb, String testMethodName, String summary, String method, String path,
+    private void appendConcurrentTest(StringBuilder sb, String testMethodName, String operationTag, String summary, String method, String path,
                                       String helperName) {
         sb.append("    @Test\n");
+        sb.append("    @Tag(\"").append(escapeJavaString(operationTag)).append("\")\n");
         sb.append("    @DisplayName(\"").append(escapeJavaString(summary != null ? summary : method + " " + path))
                 .append(" - Concurrent requests\")\n");
         sb.append("    public void testConcurrent_").append(capitalize(testMethodName)).append("() throws InterruptedException {\n");
@@ -522,6 +483,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         }
         sb.append("        Response response = spec.when()\n");
         appendWhenVerb(sb, method, pathTemplate);
+        sb.append("        .then()\n");
         sb.append("        .extract().response();\n\n");
     }
 
@@ -774,13 +736,14 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         }
     }
 
-    private void emitInvalidParameterTest(StringBuilder sb, String testMethodName, String summary, String method, String path,
+    private void emitInvalidParameterTest(StringBuilder sb, String testMethodName, String operationTag, String summary, String method, String path,
                                           List<Map<String, Object>> parameters, String paramName, String bodyLiteral,
                                           List<String> valueLiterals, boolean emitPatternAssertion, String pattern) {
         if (valueLiterals == null || valueLiterals.isEmpty()) {
             return;
         }
         sb.append("    @ParameterizedTest\n");
+        sb.append("    @Tag(\"").append(escapeJavaString(operationTag)).append("\")\n");
         sb.append("    @ValueSource(strings = {");
         for (int i = 0; i < valueLiterals.size(); i++) {
             if (i > 0) {
@@ -803,9 +766,41 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         sb.append("    }\n\n");
     }
 
-    private String jsonBodyLiteral(Map<String, Object> operation, Map<String, Object> spec) {
+    private void emitUnauthorizedScenarioTest(StringBuilder sb, String testMethodName, String operationTag, String summary,
+                                              String method, String path, List<Map<String, Object>> parameters,
+                                              String bodyLiteral, String expectedStatus) {
+        sb.append("    @Test\n");
+        sb.append("    @Tag(\"").append(escapeJavaString(operationTag)).append("\")\n");
+        sb.append("    @DisplayName(\"").append(escapeJavaString(summary != null ? summary : method + " " + path))
+                .append(" - Unauthorized with invalid token\")\n");
+        sb.append("    public void test").append(capitalize(testMethodName)).append("_UnauthorizedInvalidToken() {\n");
+        appendParamMaps(sb, parameters);
+        sb.append("        RequestSpecification spec = given()\n");
+        sb.append("            .accept(ContentType.JSON)\n");
+        sb.append("            .header(\"Authorization\", TestAuth.invalidToken());\n");
+        sb.append("        for (Map.Entry<String, String> e : pathParams.entrySet()) {\n");
+        sb.append("            spec = spec.pathParam(e.getKey(), e.getValue());\n");
+        sb.append("        }\n");
+        sb.append("        for (Map.Entry<String, String> e : queryParams.entrySet()) {\n");
+        sb.append("            spec = spec.queryParam(e.getKey(), e.getValue());\n");
+        sb.append("        }\n");
+        if (needsRequestBody(method) && bodyLiteral != null) {
+            sb.append("        spec = spec.contentType(ContentType.JSON).body(").append(bodyLiteral).append(");\n");
+        }
+        sb.append("        Response response = spec.when()\n");
+        appendWhenVerb(sb, method, path);
+        sb.append("        .then()\n");
+        sb.append("        .extract().response();\n");
+        sb.append("        assertEquals(").append(expectedStatus).append(", response.getStatusCode());\n");
+        sb.append("    }\n\n");
+    }
+
+    private String jsonBodyLiteral(String operationTag, Map<String, Object> operation, Map<String, Object> spec) {
         if (!operation.containsKey("requestBody")) {
             return "\"{}\"";
+        }
+        if (operationTag != null && !operationTag.isBlank()) {
+            return "RequestBodyFactory.forOperation(\"" + escapeJavaString(operationTag) + "\").valid()";
         }
         String raw = IntegrationScenarioSupport.generateRequestBodyFromSchemaRaw(operation, spec);
         if (raw == null || raw.isBlank()) {
@@ -911,20 +906,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                         String resolved = TestEnv.resolveSystemUrl(taskUrl);
                         long deadline = System.nanoTime() + 30_000_000_000L;
                         while (System.nanoTime() < deadline) {
-                            Response r;
-                            try {
-                                String sessionId = EgainAuth.sessionId();
-                                if (sessionId != null && !sessionId.isBlank()) {
-                                    r = given()
-                                            .header("X-egain-session", sessionId)
-                                            .header("Accept", "application/json")
-                                            .get(resolved);
-                                } else {
-                                    r = TestClient.givenAuth().get(resolved);
-                                }
-                            } catch (NoClassDefFoundError e) {
-                                r = TestClient.givenAuth().get(resolved);
-                            }
+                            Response r = TestClient.givenAuth().get(resolved);
                             if (r.getStatusCode() == 200 || r.getStatusCode() == 204) {
                                 return;
                             }
@@ -943,7 +925,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                             return;
                         }
                         TestContext.trackCreatedId(createdId);
-                        String path = getPath.replaceAll("\\{[^}]+}", createdId);
+                        String path = getPath.replaceAll("\\\\{[^}]+}", createdId);
                         Response getResp = TestClient.givenAuth().get(path);
                         if (getResp.getStatusCode() < 200 || getResp.getStatusCode() >= 300) {
                             throw new AssertionError("GET after create failed: " + getResp.getStatusCode());
@@ -1003,9 +985,8 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
     }
 
     private void generatePomXml(String outputDir, String basePackage) throws IOException {
-        String pomContent = TestMavenSupport.pomHeader("api-unit-tests", basePackage)
-                + TestMavenSupport.junitDependency()
-                + TestMavenSupport.restAssuredDependencies()
+        String pomContent = TestMavenSupport.pomHeader("api-contract-tests", basePackage)
+                + TestMavenSupport.standardRestAssuredTestDependencies()
                 + TestMavenSupport.buildSectionWithTestSupport();
         Files.write(Paths.get(outputDir, "pom.xml"), pomContent.getBytes());
     }
@@ -1116,7 +1097,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
 
     @Override
     public String getName() {
-        return "Unit Test Generator";
+        return "Contract Test Generator";
     }
 
     @Override
@@ -1126,7 +1107,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
 
     @Override
     public String getTestType() {
-        return "unit";
+        return "contract";
     }
 
     @Override

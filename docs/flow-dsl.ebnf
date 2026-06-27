@@ -1,0 +1,26 @@
+(* Flow DSL 1.0 — normative grammar summary. See flow-dsl.md for semantics. *)
+
+flowFile      = [ versionLine ], flowDecl ;
+versionLine   = "# flow-dsl", number, newline ;
+flowDecl      = "flow", string, newline,
+                [ operationsLine, newline ],
+                { step, newline } ;
+operationsLine = "operations:", operationList ;
+operationList  = string, { ",", string } ;
+step          = callStep | extractStep | waitStep | pollStep ;
+callStep      = "call", string, { callOption } ;
+callOption    = pathBind | headerBind | poisonClause | expectClause ;
+pathBind      = indent, "path", ident, "=", ident, newline ;
+headerBind    = indent, "header", string, "=", ident, newline ;
+poisonClause  = indent, "poison", "body", string, poisonKind, newline ;
+poisonKind    = "null" | "missing" | "tooLong" | "tooShort" | "wrongType" | "badEnum" | "badPattern"
+                | "value", string ;
+expectClause  = indent, "expect", "status", string, newline ;
+extractStep   = "extract", ident, "from", "response", ".",
+                ( "header", string, [ "lastSegment" ]
+                | "body", string ), newline ;
+waitStep      = "wait", "status", string, newline ;
+pollStep      = "poll", ident, "from", "response.header", string,
+                "until", "status", string, [ "timeout", string ], newline ;
+
+(* lexical: string = '"', { character - '"' | '\"' }, '"' ; *)

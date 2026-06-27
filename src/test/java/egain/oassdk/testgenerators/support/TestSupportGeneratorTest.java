@@ -19,9 +19,21 @@ class TestSupportGeneratorTest {
 
     @Test
     void generate_emitsTestEnvAndSupportClasses() throws Exception {
+        Map<String, Object> bodySchema = Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "name", Map.of("type", "string"),
+                        "description", Map.of("type", "string")),
+                "required", List.of("name"));
         Map<String, Object> spec = Map.of(
-                "info", Map.of("title", "eGain API", "x-vendor", "egain"),
-                "servers", List.of(Map.of("url", "https://${API_DOMAIN}/v4"))
+                "info", Map.of("title", "Vendor Neutral API"),
+                "servers", List.of(Map.of("url", "https://${API_DOMAIN}/v4")),
+                "paths", Map.of(
+                        "/folders", Map.of(
+                                "post", Map.of(
+                                        "operationId", "createFolder",
+                                        "requestBody", Map.of("content", Map.of(
+                                                "application/json", Map.of("schema", bodySchema))))))
         );
         TestConfig config = new TestConfig();
         Map<String, Object> props = new HashMap<>();
@@ -29,26 +41,31 @@ class TestSupportGeneratorTest {
         config.setAdditionalProperties(props);
 
         new TestSupportGenerator().generate(spec, tempDir.toString(), config,
-                List.of("unit", "integration"));
+                List.of("contract", "integration"));
 
         assertThat(Files.exists(tempDir.resolve("test-env.properties"))).isTrue();
         assertThat(Files.readString(tempDir.resolve("test-env.properties")))
+                .contains("auth.provider=static")
                 .contains("auth.login.base")
+                .contains("auth.chain.1.url")
+                .contains("test.include.operations")
+                .contains("test.flows.dir")
                 .contains("schemathesis.include.operations");
         assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/TestEnv.java"))).isTrue();
         assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/RequestBodyEnv.java"))).isTrue();
-        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/EgainAuth.java"))).isTrue();
-        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/EgainAsyncTaskHelper.java"))).isTrue();
-        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/EgainInternalKbHelper.java"))).isTrue();
-        String egainAuth = Files.readString(tempDir.resolve("test-support/src/test/java/com/example/api/support/EgainAuth.java"));
-        assertThat(egainAuth).contains("public static void main(String[] args)");
-        assertThat(egainAuth).contains("sessionId()");
+        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/AuthProvider.java"))).isTrue();
+        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/StaticTokenAuth.java"))).isTrue();
+        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/CurlLoginAuth.java"))).isTrue();
+        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/HttpChainAuth.java"))).isTrue();
+        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/AuthChainExecutor.java"))).isTrue();
+        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/AuthTokenCli.java"))).isTrue();
+        assertThat(Files.exists(tempDir.resolve("test-support/src/test/java/com/example/api/support/RequestBodyFactory.java"))).isTrue();
+        assertThat(Files.exists(tempDir.resolve("test-support/src/test/resources/bodies/createFolder.json"))).isTrue();
         assertThat(Files.readString(tempDir.resolve("test-env.properties")))
-                .contains("test.verify.internal.kb")
                 .contains("test.topic.parent.folder.id");
         assertThat(Files.exists(tempDir.resolve("run-all.sh"))).isTrue();
         String pom = Files.readString(tempDir.resolve("pom.xml"));
-        assertThat(pom).contains("<module>unit</module>");
+        assertThat(pom).contains("<module>contract</module>");
         assertThat(pom).contains("<module>integration</module>");
         assertThat(pom).doesNotContain("sequence-java");
     }

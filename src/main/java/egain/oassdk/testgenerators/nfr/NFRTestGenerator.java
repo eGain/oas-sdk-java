@@ -304,8 +304,7 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
      */
     private void generatePomXml(String outputDir, String basePackage) throws IOException {
         String pom = TestMavenSupport.pomHeader("api-nfr-tests", basePackage)
-                + TestMavenSupport.junitDependency()
-                + TestMavenSupport.restAssuredDependencies()
+                + TestMavenSupport.standardRestAssuredTestDependencies()
                 + TestMavenSupport.buildSectionWithTestSupport();
         Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes());
     }

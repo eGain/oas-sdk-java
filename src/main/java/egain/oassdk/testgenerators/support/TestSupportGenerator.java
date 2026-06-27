@@ -6,8 +6,10 @@ import egain.oassdk.testgenerators.common.TestOutputLayout;
 import egain.oassdk.testgenerators.common.TestSpecUtils;
 
 import egain.oassdk.testgenerators.common.TestProfileSupport;
+import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,7 +24,7 @@ import java.util.Map;
 public class TestSupportGenerator {
 
     public void generate(Map<String, Object> spec, String outputDir, TestConfig config) throws GenerationException {
-        generate(spec, outputDir, config, List.of("unit", "integration", "nfr", "performance", "security", "sequence-java"));
+        generate(spec, outputDir, config, List.of("contract", "integration", "lifecycle", "nfr", "performance", "security"));
     }
 
     public void generate(Map<String, Object> spec, String outputDir, TestConfig config, List<String> testTypes)
@@ -31,35 +33,42 @@ public class TestSupportGenerator {
             String basePackage = resolvePackage(config);
             String supportPackage = TestOutputLayout.supportPackage(basePackage);
             String defaultBaseUrl = resolveTemplateBaseUrl(spec, config);
-            boolean egainAuth = TestSpecUtils.useEgainAuth(config, spec);
             List<String> modules = TestProfileSupport.aggregatorModules(testTypes);
 
             Path supportDir = Paths.get(TestOutputLayout.supportJavaDir(outputDir, basePackage));
             Files.createDirectories(supportDir);
+            pruneObsoleteSupportSources(supportDir);
+            Path supportResourcesDir = Paths.get(outputDir, "test-support", "src", "test", "resources", "bodies");
+            if (config == null || config.isMockData()) {
+                emitOperationBodies(spec, supportResourcesDir);
+            }
 
             write(supportDir.resolve("TestEnv.java"), testEnvSource(supportPackage, defaultBaseUrl));
-            write(supportDir.resolve("TestAuth.java"), testAuthSource(supportPackage, egainAuth));
+            write(supportDir.resolve("AuthProvider.java"), authProviderSource(supportPackage));
+            write(supportDir.resolve("StaticTokenAuth.java"), staticTokenAuthSource(supportPackage));
+            write(supportDir.resolve("CurlLoginAuth.java"), curlLoginAuthSource(supportPackage));
+            write(supportDir.resolve("HttpChainAuth.java"), httpChainAuthSource(supportPackage));
+            write(supportDir.resolve("AuthChainExecutor.java"), loadSupportSnippet("AuthChainExecutor.java", supportPackage));
+            write(supportDir.resolve("AuthTokenCli.java"), authTokenCliSource(supportPackage));
+            write(supportDir.resolve("RequestBodyFactory.java"), requestBodyFactorySource(supportPackage));
+            write(supportDir.resolve("TestAuth.java"), testAuthSource(supportPackage));
             write(supportDir.resolve("TestHttp.java"), testHttpSource(supportPackage));
             write(supportDir.resolve("TestClient.java"), testClientSource(supportPackage));
             write(supportDir.resolve("TestContext.java"), testContextSource(supportPackage));
             write(supportDir.resolve("RequestBodyEnv.java"), requestBodyEnvSource(supportPackage));
-            if (egainAuth) {
-                write(supportDir.resolve("EgainAuth.java"), egainAuthSource(supportPackage));
-                write(supportDir.resolve("EgainAsyncTaskHelper.java"), egainAsyncTaskHelperSource(supportPackage));
-                write(supportDir.resolve("EgainInternalKbHelper.java"), egainInternalKbHelperSource(supportPackage));
-            }
 
             Path testsRoot = Paths.get(outputDir);
             Files.createDirectories(testsRoot);
-            write(testsRoot.resolve("test-env.properties"), testEnvProperties(defaultBaseUrl, egainAuth));
-            write(testsRoot.resolve("test-env.local.properties.example"), testEnvLocalExample(egainAuth));
+            write(testsRoot.resolve("test-env.properties"), testEnvProperties(defaultBaseUrl));
+            write(testsRoot.resolve("test-env.local.properties.example"), testEnvLocalExample());
+            write(testsRoot.resolve("test-filter.sh"), testFilterScript());
             write(testsRoot.resolve("run-smoke.sh"), runSmokeScript());
             write(testsRoot.resolve("run-smoke.bat"), runSmokeBat());
             write(testsRoot.resolve("run-all.sh"), runAllScript(modules));
             write(testsRoot.resolve("run-all.bat"), runAllBat(modules));
-            write(testsRoot.resolve("fetch-token.sh"), fetchTokenScript(basePackage));
+            write(testsRoot.resolve("fetch-token.sh"), fetchTokenScript());
             write(testsRoot.resolve("pom.xml"), aggregatorPom(modules));
-            write(testsRoot.resolve("README-TESTS.md"), readmeTests(egainAuth));
+            write(testsRoot.resolve("README-TESTS.md"), readmeTests());
 
         } catch (IOException e) {
             throw new GenerationException("Failed to generate test support: " + e.getMessage(), e);
@@ -89,6 +98,50 @@ public class TestSupportGenerator {
 
     private static void write(Path path, String content) throws IOException {
         Files.writeString(path, content, StandardCharsets.UTF_8);
+    }
+
+    private static void pruneObsoleteSupportSources(Path supportDir) throws IOException {
+        for (String fileName : List.of("EgainAuth.java", "EgainAsyncTaskHelper.java", "EgainInternalKbHelper.java")) {
+            Files.deleteIfExists(supportDir.resolve(fileName));
+        }
+    }
+
+    private static void emitOperationBodies(Map<String, Object> spec, Path bodiesDir) throws IOException {
+        if (spec == null) {
+            return;
+        }
+        Map<String, Object> paths = egain.oassdk.Util.asStringObjectMap(spec.get("paths"));
+        if (paths == null || paths.isEmpty()) {
+            return;
+        }
+        Files.createDirectories(bodiesDir);
+        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+            Map<String, Object> pathItem = egain.oassdk.Util.asStringObjectMap(pathEntry.getValue());
+            if (pathItem == null) {
+                continue;
+            }
+            for (String method : List.of("get", "post", "put", "patch", "delete", "options", "head")) {
+                if (!pathItem.containsKey(method)) {
+                    continue;
+                }
+                Map<String, Object> operation = egain.oassdk.Util.asStringObjectMap(pathItem.get(method));
+                if (operation == null || !operation.containsKey("requestBody")) {
+                    continue;
+                }
+                String operationId = operationId(operation, method, pathEntry.getKey());
+                String raw = IntegrationScenarioSupport.generateRequestBodyFromSchemaRaw(operation, spec);
+                String body = (raw == null || raw.isBlank()) ? "{}" : raw;
+                write(bodiesDir.resolve(operationId + ".json"), body + "\n");
+            }
+        }
+    }
+
+    private static String operationId(Map<String, Object> operation, String method, String path) {
+        Object operationId = operation.get("operationId");
+        if (operationId != null && !operationId.toString().isBlank()) {
+            return operationId.toString().trim();
+        }
+        return (method + "_" + path).replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
     private static String testEnvSource(String pkg, String defaultBaseUrl) {
@@ -235,17 +288,38 @@ public class TestSupportGenerator {
                         return get("test.prompt.id", "1");
                     }
 
-                    public static String loginBase() {
-                        return get("auth.login.base", get("auth.login.url", ""));
-                    }
-
-                    public static String exchangePath() {
-                        return get("auth.exchange.path", "/authentication/user/advisor/oauth2/token");
-                    }
-
                     public static String schemathesisIncludeOperations() {
-                        return get("schemathesis.include.operations",
-                                "createFolder,getSubFolders,editFolder,getFolder");
+                        String include = get("schemathesis.include.operations", null);
+                        if (include != null && !include.isBlank()) {
+                            return include;
+                        }
+                        return String.join(",", includeOperations());
+                    }
+
+                    public static java.util.Set<String> includeOperations() {
+                        String include = get("test.include.operations", "");
+                        if (include == null || include.isBlank()) {
+                            include = get("schemathesis.include.operations", "");
+                        }
+                        java.util.LinkedHashSet<String> values = new java.util.LinkedHashSet<>();
+                        if (include == null || include.isBlank()) {
+                            return values;
+                        }
+                        for (String token : include.split(",")) {
+                            String trimmed = token.trim();
+                            if (!trimmed.isEmpty()) {
+                                values.add(trimmed);
+                            }
+                        }
+                        return values;
+                    }
+
+                    public static String flowsDir() {
+                        return get("test.flows.dir", "src/test/flows");
+                    }
+
+                    public static String flowsManifest() {
+                        return get("test.flows.manifest", "");
                     }
 
                     public static String pageNum() {
@@ -272,10 +346,6 @@ public class TestSupportGenerator {
                         return getBoolean("test.validateResponseSchema", false);
                     }
 
-                    public static boolean verifyInternalKb() {
-                        return getBoolean("test.verify.internal.kb", true);
-                    }
-
                     public static boolean bootstrapHierarchyEnabled() {
                         return getBoolean("test.bootstrap.hierarchy.enabled", false);
                     }
@@ -292,22 +362,12 @@ public class TestSupportGenerator {
                         return get("test.folder.no.create.permission.id", "");
                     }
 
-                    /**
-                     * Resolve absolute URL for /system/ws/... paths using auth.login.base; v4 paths use base.url.
-                     */
                     public static String resolveSystemUrl(String relativeOrAbsolute) {
                         if (relativeOrAbsolute == null || relativeOrAbsolute.isBlank()) {
                             return baseUrl();
                         }
                         if (relativeOrAbsolute.startsWith("http://") || relativeOrAbsolute.startsWith("https://")) {
                             return relativeOrAbsolute;
-                        }
-                        if (relativeOrAbsolute.startsWith("/system/ws/")) {
-                            String loginBase = loginBase();
-                            if (loginBase != null && !loginBase.isBlank()) {
-                                String lb = loginBase.endsWith("/") ? loginBase.substring(0, loginBase.length() - 1) : loginBase;
-                                return lb + relativeOrAbsolute.substring("/system/ws".length());
-                            }
                         }
                         String base = baseUrl();
                         if (base.endsWith("/") && relativeOrAbsolute.startsWith("/")) {
@@ -330,59 +390,346 @@ public class TestSupportGenerator {
                         }
                         return get("auth.token", "");
                     }
+
+                    public static java.util.Set<String> keysWithPrefix(String prefix) {
+                        java.util.TreeSet<String> keys = new java.util.TreeSet<>();
+                        if (prefix == null) {
+                            return keys;
+                        }
+                        for (String k : PROPS.stringPropertyNames()) {
+                            if (k.startsWith(prefix)) {
+                                keys.add(k);
+                            }
+                        }
+                        return keys;
+                    }
                 }
                 """.formatted(pkg, escapeJava(defaultBaseUrl));
     }
 
-    private static String testAuthSource(String pkg, boolean egainAuth) {
-        String egainCall = egainAuth
-                ? """
-                        String egain = EgainAuth.fetchBearerToken();
-                        if (egain != null && !egain.isBlank()) {
-                            cacheToken(egain);
-                            return egain;
+    private static String authProviderSource(String pkg) {
+        return """
+                package %s;
+
+                public interface AuthProvider {
+                    String getToken();
+
+                    default String getInvalidToken() {
+                        String token = getToken();
+                        if (token == null || token.isBlank()) {
+                            return "invalid-token";
                         }
-                        """
-                : "";
+                        int keep = Math.max(0, token.length() - 4);
+                        return token.substring(0, keep) + "XXXX-invalid";
+                    }
+                }
+                """.formatted(pkg);
+    }
+
+    private static String staticTokenAuthSource(String pkg) {
+        return """
+                package %s;
+
+                public final class StaticTokenAuth implements AuthProvider {
+                    @Override
+                    public String getToken() {
+                        String env = System.getenv("API_TOKEN");
+                        if (env != null && !env.isBlank()) {
+                            return env.trim();
+                        }
+                        env = System.getenv("API_BEARER_TOKEN");
+                        if (env != null && !env.isBlank()) {
+                            return env.trim();
+                        }
+                        return TestEnv.get("auth.token", "");
+                    }
+                }
+                """.formatted(pkg);
+    }
+
+    private static String curlLoginAuthSource(String pkg) {
         return """
                 package %s;
 
                 /**
-                 * Resolves bearer token: env override, property file, optional eGain login.
+                 * Alias for chain auth — runs {@code auth.chain.*} when configured, else static token.
+                 */
+                public final class CurlLoginAuth implements AuthProvider {
+                    private final HttpChainAuth chain = new HttpChainAuth();
+                    private final StaticTokenAuth fallback = new StaticTokenAuth();
+
+                    @Override
+                    public String getToken() {
+                        String token = chain.getToken();
+                        if (token != null && !token.isBlank()) {
+                            return token;
+                        }
+                        return fallback.getToken();
+                    }
+                }
+                """.formatted(pkg);
+    }
+
+    private static String httpChainAuthSource(String pkg) {
+        return """
+                package %s;
+
+                /**
+                 * Runs {@code auth.chain.N.*} HTTP steps from test-env properties.
+                 */
+                public final class HttpChainAuth implements AuthProvider {
+
+                    private final StaticTokenAuth fallback = new StaticTokenAuth();
+
+                    @Override
+                    public String getToken() {
+                        String token = AuthChainExecutor.run(TestEnvPropertySource.INSTANCE, TestHttp.client());
+                        if (token != null && !token.isBlank()) {
+                            return token.trim();
+                        }
+                        return fallback.getToken();
+                    }
+
+                    private static final class TestEnvPropertySource implements AuthChainExecutor.PropertySource {
+                        private static final TestEnvPropertySource INSTANCE = new TestEnvPropertySource();
+
+                        @Override
+                        public String get(String key, String defaultValue) {
+                            return TestEnv.get(key, defaultValue);
+                        }
+
+                        @Override
+                        public Iterable<String> keysWithPrefix(String prefix) {
+                            return TestEnv.keysWithPrefix(prefix);
+                        }
+                    }
+                }
+                """.formatted(pkg);
+    }
+
+    private static String authTokenCliSource(String pkg) {
+        return """
+                package %s;
+
+                /**
+                 * Prints bearer token from configured auth provider (for fetch-token.sh).
+                 */
+                public final class AuthTokenCli {
+
+                    private AuthTokenCli() {
+                    }
+
+                    public static void main(String[] args) {
+                        TestAuth.clearCache();
+                        String token = TestAuth.rawToken();
+                        if (token == null || token.isBlank()) {
+                            System.err.println("AuthTokenCli: could not obtain token — check auth.provider and chain settings");
+                            System.exit(1);
+                        }
+                        System.out.print(token);
+                    }
+                }
+                """.formatted(pkg);
+    }
+
+    private static String loadSupportSnippet(String fileName, String targetPackage) throws IOException {
+        String content;
+        Path devPath = Paths.get("src/main/java/egain/oassdk/testsupport/auth", fileName);
+        if (Files.isRegularFile(devPath)) {
+            content = Files.readString(devPath, StandardCharsets.UTF_8);
+        } else {
+            try (InputStream in = TestSupportGenerator.class.getResourceAsStream("/test-support-snippets/" + fileName)) {
+                if (in == null) {
+                    throw new IOException("Missing test-support snippet: " + fileName);
+                }
+                content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        }
+        return content.replaceFirst("package egain\\.oassdk\\.testsupport\\.auth;",
+                "package " + targetPackage + ";");
+    }
+
+    private static String requestBodyFactorySource(String pkg) {
+        return """
+                package %s;
+
+                import java.io.InputStream;
+                import java.nio.charset.StandardCharsets;
+
+                public final class RequestBodyFactory {
+                    private final String operationId;
+                    private String violationPath;
+                    private String violationKind;
+                    private String violationValue;
+
+                    private RequestBodyFactory(String operationId) {
+                        this.operationId = operationId;
+                    }
+
+                    public static RequestBodyFactory forOperation(String operationId) {
+                        return new RequestBodyFactory(operationId);
+                    }
+
+                    public String valid() {
+                        return build();
+                    }
+
+                    public RequestBodyFactory withViolation(String bodyPath, String kind, String value) {
+                        this.violationPath = bodyPath;
+                        this.violationKind = kind;
+                        this.violationValue = value;
+                        return this;
+                    }
+
+                    public String build() {
+                        String resource = "bodies/" + operationId + ".json";
+                        try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream(resource)) {
+                            if (in == null) {
+                                return "{}";
+                            }
+                            String json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                            String bound = RequestBodyEnv.bind(json);
+                            return applyViolation(bound);
+                        } catch (Exception e) {
+                            return "{}";
+                        }
+                    }
+
+                    private String applyViolation(String json) {
+                        if (violationPath == null || violationPath.isBlank() || violationKind == null || violationKind.isBlank()) {
+                            return json;
+                        }
+                        String field = simpleFieldName(violationPath);
+                        if (field == null || field.isBlank()) {
+                            return json;
+                        }
+                        String needle = "\\""+ field + "\\":";
+                        int idx = json.indexOf(needle);
+                        if (idx < 0) {
+                            return json;
+                        }
+                        int valueStart = idx + needle.length();
+                        int valueEnd = findValueEnd(json, valueStart);
+                        if (valueEnd <= valueStart) {
+                            return json;
+                        }
+                        String replacement = switch (violationKind) {
+                            case "NULL" -> "null";
+                            case "MISSING" -> null;
+                            case "TOO_LONG" -> "\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\"";
+                            case "TOO_SHORT" -> "\\"\\"";
+                            case "WRONG_TYPE" -> "12345";
+                            case "BAD_ENUM", "BAD_PATTERN" -> "\\"__INVALID__\\"";
+                            case "VALUE" -> violationValue == null ? "\\"\\"" : "\\""+ escapeJson(violationValue) + "\\"";
+                            default -> null;
+                        };
+                        if (replacement == null) {
+                            int commaStart = idx;
+                            while (commaStart > 0 && Character.isWhitespace(json.charAt(commaStart - 1))) {
+                                commaStart--;
+                            }
+                            if (commaStart > 0 && json.charAt(commaStart - 1) == ',') {
+                                commaStart--;
+                            }
+                            int removeStart = commaStart;
+                            int removeEnd = valueEnd;
+                            while (removeEnd < json.length() && Character.isWhitespace(json.charAt(removeEnd))) {
+                                removeEnd++;
+                            }
+                            if (removeEnd < json.length() && json.charAt(removeEnd) == ',') {
+                                removeEnd++;
+                            }
+                            return json.substring(0, removeStart) + json.substring(removeEnd);
+                        }
+                        return json.substring(0, valueStart) + replacement + json.substring(valueEnd);
+                    }
+
+                    private static String simpleFieldName(String bodyPath) {
+                        String normalized = bodyPath;
+                        int dot = normalized.lastIndexOf('.');
+                        if (dot >= 0 && dot + 1 < normalized.length()) {
+                            normalized = normalized.substring(dot + 1);
+                        }
+                        int bracket = normalized.indexOf('[');
+                        if (bracket > 0) {
+                            normalized = normalized.substring(0, bracket);
+                        }
+                        return normalized;
+                    }
+
+                    private static int findValueEnd(String json, int start) {
+                        int i = start;
+                        while (i < json.length() && Character.isWhitespace(json.charAt(i))) {
+                            i++;
+                        }
+                        if (i >= json.length()) {
+                            return start;
+                        }
+                        char c = json.charAt(i);
+                        if (c == '"') {
+                            i++;
+                            while (i < json.length()) {
+                                if (json.charAt(i) == '"' && json.charAt(i - 1) != '\\\\') {
+                                    return i + 1;
+                                }
+                                i++;
+                            }
+                            return json.length();
+                        }
+                        int depth = 0;
+                        while (i < json.length()) {
+                            char ch = json.charAt(i);
+                            if (ch == '{' || ch == '[') {
+                                depth++;
+                            } else if (ch == '}' || ch == ']') {
+                                if (depth == 0) {
+                                    return i;
+                                }
+                                depth--;
+                            } else if (ch == ',' && depth == 0) {
+                                return i;
+                            }
+                            i++;
+                        }
+                        return json.length();
+                    }
+
+                    private static String escapeJson(String value) {
+                        return value.replace("\\\\", "\\\\\\\\").replace("\\"", "\\\\\\"");
+                    }
+                }
+                """.formatted(pkg);
+    }
+
+    private static String testAuthSource(String pkg) {
+        return """
+                package %s;
+
+                /**
+                 * Resolves bearer token using configured AuthProvider.
                  */
                 public final class TestAuth {
 
                     private static volatile String cachedToken;
+                    private static volatile AuthProvider provider;
 
                     private TestAuth() {
                     }
 
                     public static void clearCache() {
                         cachedToken = null;
+                        provider = null;
                     }
 
                     public static String rawToken() {
                         if (cachedToken != null && !cachedToken.isBlank()) {
                             return cachedToken;
                         }
-                        String t = System.getenv("API_TOKEN");
-                        if (t != null && !t.isBlank()) {
-                            return t.trim();
-                        }
-                        t = System.getenv("API_BEARER_TOKEN");
-                        if (t != null && !t.isBlank()) {
-                            return t.trim();
-                        }
-                        t = System.getenv("INTEGRATION_TOKEN_CLIENT_APPLICATION");
-                        if (t != null && !t.isBlank()) {
-                            return t.trim();
-                        }
-                        t = TestEnv.get("auth.token", null);
+                        String t = authProvider().getToken();
                         if (t != null && !t.isBlank()) {
                             cachedToken = t.trim();
                             return cachedToken;
                         }
-                        %s
                         return "";
                     }
 
@@ -400,12 +747,29 @@ public class TestSupportGenerator {
                         }
                     }
 
+                    public static String invalidToken() {
+                        return authProvider().getInvalidToken();
+                    }
+
+                    private static AuthProvider authProvider() {
+                        if (provider != null) {
+                            return provider;
+                        }
+                        String configured = TestEnv.get("auth.provider", "static").toLowerCase(java.util.Locale.ROOT);
+                        provider = switch (configured) {
+                            case "chain" -> new HttpChainAuth();
+                            case "curl" -> new CurlLoginAuth();
+                            default -> new StaticTokenAuth();
+                        };
+                        return provider;
+                    }
+
                     public static String bearerHeader() {
                         String t = rawToken();
                         return t.isEmpty() ? "" : "Bearer " + t;
                     }
                 }
-                """.formatted(pkg, egainCall);
+                """.formatted(pkg);
     }
 
     private static String testHttpSource(String pkg) {
@@ -454,6 +818,7 @@ public class TestSupportGenerator {
                 package %s;
 
                 import io.restassured.RestAssured;
+                import io.restassured.builder.RequestSpecBuilder;
                 import io.restassured.specification.RequestSpecification;
 
                 import static io.restassured.RestAssured.given;
@@ -466,6 +831,9 @@ public class TestSupportGenerator {
                     public static void configureRestAssured() {
                         RestAssured.baseURI = TestEnv.baseUrl();
                         RestAssured.useRelaxedHTTPSValidation();
+                        RestAssured.requestSpecification = new RequestSpecBuilder()
+                                .addHeader("Accept-Language", TestEnv.acceptLanguage())
+                                .build();
                     }
 
                     public static RequestSpecification givenAuth() {
@@ -577,10 +945,21 @@ public class TestSupportGenerator {
                         bound = bound.replace("${test.department.id}", TestEnv.departmentId());
                         bound = replaceParentId(bound, TestEnv.parentFolderId());
                         bound = replacePermissionUserIds(bound);
+                        bound = uniqueArticleVersionNames(bound);
                         if (!bound.contains("\\"name\\"") && bound.contains("createFolder")) {
-                            bound = bound.replaceFirst("\\{", "{\\"name\\":\\"SDK-generated-folder\\",");
+                            bound = bound.replaceFirst("\\\\{", "{\\"name\\":\\"SDK-generated-folder\\",");
                         }
                         return bound;
+                    }
+
+                    private static String uniqueArticleVersionNames(String json) {
+                        if (!json.contains("\\"versions\\"") || !json.contains("\\"articleType\\"")) {
+                            return json;
+                        }
+                        long ts = System.currentTimeMillis();
+                        return json.replaceFirst(
+                                "(\\\\"name\\\\"\\\\s*:\\\\s*\\\\\\")([^\\\\\\"]*)(\\\\\\")",
+                                "$1$2-" + ts + "$3");
                     }
 
                     private static String replaceParentId(String json, String parentId) {
@@ -588,7 +967,7 @@ public class TestSupportGenerator {
                             return json;
                         }
                         return json.replaceAll(
-                                "\\"parent\\"\\\\s*:\\\\s*\\\\{[^}]*\\\\"id\\\\"\\\\s*:\\\\s*\\\\\\"[^\\\\\\"]*\\\\\\"",
+                                "\\"parent\\"\\\\s*:\\\\s*\\\\{[^}]*\\\\\\"id\\\\\\"\\\\s*:\\\\s*\\\\\\"[^\\\\\\"]*\\\\\\"",
                                 "\\"parent\\":{\\"id\\":\\"" + parentId + "\\"}");
                     }
 
@@ -601,12 +980,12 @@ public class TestSupportGenerator {
                         String result = json;
                         if (userId != null && !userId.isBlank()) {
                             result = result.replaceAll(
-                                    "(\\\\"user\\\\"\\\\s*:\\\\s*\\\\{[^}]*\\\\"id\\\\"\\\\s*:\\\\s*\\\\\\")[^\\\\\\"]*(\\\\\\")",
+                                    "(\\\\\\"user\\\\\\"\\\\s*:\\\\s*\\\\{[^}]*\\\\\\"id\\\\\\"\\\\s*:\\\\s*\\\\\\")[^\\\\\\"]*(\\\\\\")",
                                     "$1" + userId + "$2");
                         }
                         if (groupId != null && !groupId.isBlank()) {
                             result = result.replaceAll(
-                                    "(\\\\"group\\\\"\\\\s*:\\\\s*\\\\{[^}]*\\\\"id\\\\"\\\\s*:\\\\s*\\\\\\")[^\\\\\\"]*(\\\\\\")",
+                                    "(\\\\\\"group\\\\\\"\\\\s*:\\\\s*\\\\{[^}]*\\\\\\"id\\\\\\"\\\\s*:\\\\s*\\\\\\")[^\\\\\\"]*(\\\\\\")",
                                     "$1" + groupId + "$2");
                         }
                         return result;
@@ -994,11 +1373,10 @@ public class TestSupportGenerator {
                 """.formatted(pkg);
     }
 
-    private static String testEnvProperties(String defaultBaseUrl, boolean egainAuth) {
+    private static String testEnvProperties(String defaultBaseUrl) {
         StringBuilder sb = new StringBuilder();
         sb.append("# Generated test environment — copy test-env.local.properties.example for secrets\n");
         if (defaultBaseUrl == null || defaultBaseUrl.isBlank()) {
-            sb.append("# base.url must include /system/ws/... for eGain authoring hosts\n");
             sb.append("base.url=\n");
         } else {
             sb.append("base.url=").append(defaultBaseUrl).append("\n");
@@ -1023,33 +1401,49 @@ public class TestSupportGenerator {
         sb.append("test.bootstrap.hierarchy.enabled=false\n");
         sb.append("test.destructive.enabled=false\n");
         sb.append("test.validateResponseSchema=false\n");
-        sb.append("test.verify.internal.kb=true\n\n");
-        sb.append("schemathesis.include.operations=createFolder,getSubFolders,editFolder,getFolder\n\n");
-        sb.append("# Auth — optional manual token (CI secret store)\n");
+        sb.append("test.include.operations=\n");
+        sb.append("schemathesis.include.operations=\n");
+        sb.append("test.flows.dir=docs/examples\n");
+        sb.append("test.flows.manifest=\n\n");
+        sb.append("# Auth provider settings (static | chain | curl)\n");
+        sb.append("auth.provider=static\n");
         sb.append("auth.token=\n");
-        sb.append("auth.token.client_application=\n");
-        sb.append("auth.token.authenticated_customer=\n");
-        if (egainAuth) {
-            sb.append("auth.provider=egain\n");
-            sb.append("auth.login.base=\n");
-            sb.append("auth.exchange.path=/authentication/user/advisor/oauth2/token\n");
-            sb.append("auth.username=\n");
-            sb.append("auth.password=\n");
-        }
+        sb.append("auth.login.base=\n");
+        sb.append("auth.login.curl=\n");
+        sb.append("auth.token.header=Authorization\n");
+        sb.append("auth.token.body.path=access_token\n");
+        sb.append("auth.token.prefix=Bearer \n");
+        sb.append("auth.username=\n");
+        sb.append("auth.password=\n");
+        sb.append("# Multi-step chain (auth.provider=chain) — see examples/auth-profiles/\n");
+        sb.append("#auth.chain.1.url=${auth.login.base}/authentication/user/login?forceLogin=yes\n");
+        sb.append("#auth.chain.1.method=POST\n");
+        sb.append("#auth.chain.1.header.Content-Type=application/json\n");
+        sb.append("#auth.chain.1.body={\"userName\":\"${auth.username}\",\"password\":\"${auth.password}\"}\n");
+        sb.append("#auth.chain.1.extract.header=x-egain-session\n");
+        sb.append("#auth.chain.1.save=session\n");
+        sb.append("#auth.chain.2.url=${auth.login.base}/authentication/user/advisor/oauth2/token\n");
+        sb.append("#auth.chain.2.method=GET\n");
+        sb.append("#auth.chain.2.header.X-egain-session=${session}\n");
+        sb.append("#auth.chain.2.header.accept=application/json, text/plain, */*\n");
+        sb.append("#auth.chain.2.extract.json=access_token\n");
+        sb.append("#auth.chain.final=access_token\n");
         return sb.toString();
     }
 
-    private static String testEnvLocalExample(boolean egainAuth) {
+    private static String testEnvLocalExample() {
         StringBuilder sb = new StringBuilder();
         sb.append("# Local overrides — do not commit\n");
-        sb.append("base.url=https://YOUR-HOST/system/ws/knowledge/contentmgr/v4\n");
+        sb.append("base.url=https://api.example.com\n");
         sb.append("accept.language=en-US\n");
         sb.append("tls.verify=false\n\n");
-        if (egainAuth) {
-            sb.append("auth.login.base=https://YOUR-HOST/system/ws/v20\n");
-            sb.append("auth.username=your-user\n");
-            sb.append("auth.password=CHANGE_ME\n");
-        }
+        sb.append("auth.provider=static\n");
+        sb.append("auth.token=PUT_TOKEN_HERE\n");
+        sb.append("# Or use chain auth — copy from examples/auth-profiles/egain-v20-session-oauth.properties\n");
+        sb.append("#auth.provider=chain\n");
+        sb.append("#auth.login.base=https://host.example/system/ws/v20\n");
+        sb.append("#auth.username=\n");
+        sb.append("#auth.password=\n");
         sb.append("test.department.id=1001\n");
         sb.append("test.parent.folder.id=\n");
         sb.append("test.filter.parent.id=\n");
@@ -1060,8 +1454,51 @@ public class TestSupportGenerator {
         sb.append("test.bootstrap.enabled=false\n");
         sb.append("test.bootstrap.hierarchy.enabled=false\n");
         sb.append("test.destructive.enabled=false\n");
-        sb.append("test.verify.internal.kb=true\n");
+        sb.append("test.include.operations=\n");
+        sb.append("test.flows.dir=docs/examples\n");
+        sb.append("test.flows.manifest=\n");
         return sb.toString();
+    }
+
+    private static String testFilterScript() {
+        return """
+                #!/usr/bin/env bash
+                # Parse test.include.operations from property files for Surefire/JUnit tag filtering.
+                # Source from run-all.sh / run-smoke.sh after ROOT and TEST_ENV_FILE are set.
+                load_include_operations() {
+                  local file line key val result=""
+                  for file in "${TEST_ENV_FILE:-}" "$ROOT/test-env.properties" "$ROOT/test-env.local.properties"; do
+                    [[ -z "$file" || ! -f "$file" ]] && continue
+                    while IFS= read -r line || [[ -n "$line" ]]; do
+                      [[ "$line" =~ ^[[:space:]]*# ]] && continue
+                      [[ "$line" =~ ^[[:space:]]*test\\.include\\.operations[[:space:]]*= ]] || continue
+                      val="${line#*=}"
+                      val="$(echo "$val" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                      result="$val"
+                    done < "$file"
+                  done
+                  if [[ -z "$result" ]]; then
+                    for file in "${TEST_ENV_FILE:-}" "$ROOT/test-env.properties" "$ROOT/test-env.local.properties"; do
+                      [[ -z "$file" || ! -f "$file" ]] && continue
+                      while IFS= read -r line || [[ -n "$line" ]]; do
+                        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+                        [[ "$line" =~ ^[[:space:]]*schemathesis\\.include\\.operations[[:space:]]*= ]] || continue
+                        val="${line#*=}"
+                        val="$(echo "$val" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                        result="$val"
+                      done < "$file"
+                    done
+                  fi
+                  SUREFIRE_GROUPS="$result"
+                  export SUREFIRE_GROUPS
+                }
+
+                mvn_groups_args() {
+                  if [[ -n "${SUREFIRE_GROUPS:-}" ]]; then
+                    printf '%s' "-Dgroups=${SUREFIRE_GROUPS}"
+                  fi
+                }
+                """;
     }
 
     private static String runSmokeScript() {
@@ -1070,10 +1507,24 @@ public class TestSupportGenerator {
                 set -euo pipefail
                 ROOT="$(cd "$(dirname "$0")" && pwd)"
                 export TEST_ENV_FILE="${TEST_ENV_FILE:-$ROOT/test-env.properties}"
-                cd "$ROOT/unit"
-                mvn -q test -Dtest='FoldersApiTest#testGetSubFolders_ValidRequest' || true
-                cd "$ROOT/integration"
-                mvn -q test -Dtest='FoldersIntegrationTest#testGetSubFolders_Success_ClientApplication' || true
+                # shellcheck disable=SC1091
+                source "$ROOT/test-filter.sh"
+                load_include_operations
+                GROUPS_ARG="$(mvn_groups_args)"
+                if [[ -n "$GROUPS_ARG" ]]; then
+                  echo "Smoke filter: operations=$SUREFIRE_GROUPS"
+                  cd "$ROOT/contract"
+                  # shellcheck disable=SC2086
+                  mvn -q test $GROUPS_ARG || true
+                  cd "$ROOT/integration"
+                  # shellcheck disable=SC2086
+                  mvn -q test $GROUPS_ARG || true
+                else
+                  cd "$ROOT/contract"
+                  mvn -q test -Dtest='FoldersApiTest#testGetSubFolders_ValidRequest' || true
+                  cd "$ROOT/integration"
+                  mvn -q test -Dtest='FoldersIntegrationTest#testGetSubFolders_Success_ClientApplication' || true
+                fi
                 echo "Smoke tests finished (see output above)."
                 """;
     }
@@ -1083,7 +1534,7 @@ public class TestSupportGenerator {
                 @echo off
                 set ROOT=%~dp0
                 if not defined TEST_ENV_FILE set TEST_ENV_FILE=%ROOT%test-env.properties
-                cd /d %ROOT%unit
+                cd /d %ROOT%contract
                 call mvn -q test -Dtest=FoldersApiTest#testGetSubFolders_ValidRequest
                 cd /d %ROOT%integration
                 call mvn -q test -Dtest=FoldersIntegrationTest#testGetSubFolders_Success_ClientApplication
@@ -1114,24 +1565,45 @@ public class TestSupportGenerator {
 
     private static String runAllScript(List<String> modules) {
         String mvnModules = String.join(",", modules);
+        String taggedModules = modules.stream()
+                .filter(m -> !"lifecycle".equals(m))
+                .reduce((a, b) -> a + "," + b)
+                .orElse(mvnModules);
         return """
                 #!/usr/bin/env bash
                 set -euo pipefail
                 ROOT="$(cd "$(dirname "$0")" && pwd)"
                 export TEST_ENV_FILE="${TEST_ENV_FILE:-$ROOT/test-env.properties}"
-                if [[ -f "$ROOT/test-env.local.properties" ]]; then
-                  set -a
-                  # shellcheck disable=SC1091
-                  source "$ROOT/test-env.local.properties"
-                  set +a
-                fi
+                # shellcheck disable=SC1091
+                source "$ROOT/test-filter.sh"
+                load_include_operations
+                GROUPS_ARG="$(mvn_groups_args)"
                 PROFILE="${TEST_PROFILE:-smoke}"
                 echo "Running test profile: $PROFILE"
+                if [[ -n "${SUREFIRE_GROUPS:-}" ]]; then
+                  echo "Operation filter: $SUREFIRE_GROUPS"
+                fi
                 ./run-smoke.sh
                 if [[ "$PROFILE" != "smoke" ]]; then
-                  mvn -q test -pl __MVN_MODULES__
+                  if [[ -n "$GROUPS_ARG" ]]; then
+                    # shellcheck disable=SC2086
+                    mvn -q test -pl __TAGGED_MODULES__ $GROUPS_ARG
+                    if [[ ",__MVN_MODULES__," == *",lifecycle,"* ]]; then
+                      mvn -q test -pl lifecycle
+                    fi
+                  else
+                    mvn -q test -pl __MVN_MODULES__
+                  fi
                 else
-                  mvn -q test -pl integration
+                  if [[ -n "$GROUPS_ARG" ]]; then
+                    # shellcheck disable=SC2086
+                    mvn -q test -pl integration $GROUPS_ARG
+                    if [[ ",__MVN_MODULES__," == *",lifecycle,"* ]]; then
+                      mvn -q test -pl lifecycle
+                    fi
+                  else
+                    mvn -q test -pl integration
+                  fi
                 fi
                 if [[ -d "$ROOT/schemathesis" && -x "$ROOT/schemathesis/run-schemathesis.sh" ]]; then
                   (cd "$ROOT/schemathesis" && ./run-schemathesis.sh) || true
@@ -1140,7 +1612,9 @@ public class TestSupportGenerator {
                   ./run-tests.sh || true
                 fi
                 echo "run-all finished."
-                """.replace("__MVN_MODULES__", mvnModules);
+                """
+                .replace("__MVN_MODULES__", mvnModules)
+                .replace("__TAGGED_MODULES__", taggedModules);
     }
 
     private static String runAllBat(List<String> modules) {
@@ -1162,27 +1636,20 @@ public class TestSupportGenerator {
                 """.replace("__MVN_MODULES__", mvnModules);
     }
 
-    private static String fetchTokenScript(String basePackage) {
-        String supportClass = TestOutputLayout.supportPackage(basePackage) + ".EgainAuth";
+    private static String fetchTokenScript() {
         return """
                 #!/usr/bin/env bash
                 set -euo pipefail
                 ROOT="$(cd "$(dirname "$0")" && pwd)"
                 export TEST_ENV_FILE="${TEST_ENV_FILE:-$ROOT/test-env.properties}"
-                cd "$ROOT/test-support"
-                mvn -q -DskipTests compile test-compile
-                CP="target/test-classes:target/classes"
-                TOKEN=$(java -cp "$CP" -Dtest.env.file="$TEST_ENV_FILE" %s 2>/dev/null || true)
-                if [[ -n "${TOKEN:-}" ]]; then
-                  echo "TOKEN='Bearer $TOKEN'"
-                else
-                  echo "Could not fetch token — set auth.username/auth.password in test-env.local.properties" >&2
-                  exit 1
-                fi
-                """.formatted(supportClass);
+                cd "$ROOT/contract"
+                mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.5.0:java \\
+                  -Dexec.mainClass=com.example.api.support.AuthTokenCli \\
+                  -Dexec.classpathScope=test
+                """;
     }
 
-    private static String readmeTests(boolean egainAuth) {
+    private static String readmeTests() {
         return """
                 # Generated API Tests
 
@@ -1191,7 +1658,7 @@ public class TestSupportGenerator {
                 1. Copy `test-env.local.properties.example` to `test-env.local.properties` and fill in values.
                 2. Run all suites: `./run-all.sh` (or `run-all.bat` on Windows).
                 3. Smoke only: `./run-smoke.sh`.
-                4. Profile `smoke`: `TEST_PROFILE=smoke ./run-all.sh` (integration + schemathesis, no unit matrix).
+                4. Profile `smoke`: `TEST_PROFILE=smoke ./run-all.sh` (integration + schemathesis, no contract matrix).
 
                 ## Configuration
 
@@ -1203,16 +1670,21 @@ public class TestSupportGenerator {
 
                 | Suite | Role |
                 |-------|------|
-                | Integration (JUnit) | Business scenarios, bootstrap, create→verify |
-                | Unit (RestAssured) | Contract/param matrix against live API |
+                | Integration (JUnit) | Operation-level end-to-end checks |
+                | Lifecycle (Flow DSL) | Multi-step flow scripts from `test.flows.dir` |
+                | Contract (RestAssured) | Contract/param matrix against live API |
                 | Schemathesis | Contract fuzz / property-based exploration |
                 | Postman/Newman | Manual collection replay |
 
-                Use `TEST_PROFILE=smoke` to reduce duplicate coverage between unit and integration.
+                Use `TEST_PROFILE=smoke` to reduce duplicate coverage between contract and integration.
+                
+                Auth defaults to `auth.provider=static` and reads `auth.token`.
+                For multi-step login, set `auth.provider=chain` and configure `auth.chain.N.*` properties
+                (see `examples/auth-profiles/egain-v20-session-oauth.properties` in the SDK repo).
+                Run `./fetch-token.sh` to print a token from the configured provider.
+                Set `test.include.operations` to run only selected operationIds.
                 """
-                + (egainAuth
-                ? "\n\neGain auth: set `auth.login.base`, `auth.username`, `auth.password` — no manual JWT copy needed.\n"
-                : "\n\nSet `auth.token` or export `API_TOKEN` for bearer auth.\n");
+                + "\n\nSet `auth.token` or export `API_TOKEN` for static bearer auth.\n";
     }
 
     private static String escapeJava(String s) {
