@@ -14,7 +14,6 @@ A comprehensive Java SDK for generating production-ready applications with built
 - [Prerequisites](#-prerequisites)
 - [Project Structure](#-project-structure)
 - [Quick Start](#-quick-start)
-- [Phase I migration](#phase-i-migration-nebula-redesign)
 - [Configuration](#-configuration)
 - [Observability](#-built-in-observability)
 - [Documentation](#-documentation-generation)
@@ -1655,18 +1654,6 @@ public class MyClass {
 }
 ```
 
-## Phase I migration (Nebula redesign)
-
-Phase I makes generated tests **vendor-neutral** and adds the **lifecycle Flow DSL** module. See [MIGRATION-PHASE1.md](MIGRATION-PHASE1.md) and [Redesign-OSSDK.md](Redesign-OSSDK.md).
-
-**Auth:** Replace `useEgainAuth` / generated `EgainAuth` with `auth.provider=chain` and `auth.chain.N.*` properties ([example profile](examples/auth-profiles/egain-v20-session-oauth.properties)).
-
-**Mock data:** When `mockData=false` (default), `OASSDK.generateMockData()` is a no-op and `generateAll()` skips bulk `mock-data/`. When `mockData=true`, `TestSupportGenerator` emits one `bodies/{operationId}.json` per operation for `RequestBodyFactory` — contract/integration do not use the legacy schema JSON dump.
-
-**Modules:** `unit` → **`contract`**. Default `generateAll` uses **`lifecycle`** (Flow DSL) instead of **`sequence-java`**. The `sequence-java` generator remains registered for backward compatibility but is **deprecated** — use `lifecycle` + `.flow` files ([docs/flow-dsl.md](docs/flow-dsl.md)).
-
-**Lifecycle hooks:** If-Match edit still works in integration tests. Async poll and internal KB verify moved to lifecycle Flow DSL (no generated `EgainAsyncTaskHelper` / `EgainInternalKbHelper`).
-
 ## ⚙️ Configuration
 
 ### Generator Configuration
@@ -2009,9 +1996,6 @@ See the `examples/` directory for complete usage examples:
 
 - `HelloWorldExample.java` - Basic SDK usage
 - `CompleteExample.java` - Advanced configuration and customization
-- `RegenerateBundleExample.java` - Full bundle regen (app + tests + docs); env: `OAS_SPEC_PATH`, `OAS_OUTPUT_DIR`, `OAS_BASE_URL`
-
-**Note:** `egain.oassdk.Example` was removed from main sources; use `RegenerateBundleExample` instead.
 
 ### Test Resource Files
 

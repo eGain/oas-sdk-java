@@ -33,12 +33,14 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
 
     private TestConfig config;
     private LifecycleHookRegistry lifecycleHooks = new LifecycleHookRegistry();
+    private boolean egainLifecycle;
 
     @Override
     public void generate(Map<String, Object> spec, String outputDir, TestConfig config, String testFramework) throws GenerationException {
         this.config = config;
         this.lifecycleHooks = new LifecycleHookRegistry();
         this.lifecycleHooks.registerFromSpec(spec);
+        this.egainLifecycle = TestSpecUtils.useEgainAuth(config, spec);
 
         try {
             // Create output directory structure
@@ -266,6 +268,9 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append(", null");
         }
         sb.append(");\n");
+        if (egainLifecycle) {
+            sb.append("            EgainInternalKbHelper.assertFolderMatches(httpClient, createdId, requestBody, REQUEST_TIMEOUT);\n");
+        }
         sb.append("        }\n");
     }
 
@@ -277,6 +282,35 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         sb.append(requiresAuth ? "getTokenClientApplication()" : "null");
         sb.append(");\n");
         sb.append("        requestBuilder.header(\"If-Match\", ifMatchEtag != null ? ifMatchEtag : \"*\");\n");
+    }
+
+    private void appendDeletePollWhenNeeded(StringBuilder sb, String method, String operationId) {
+        if (!"DELETE".equals(method) || !egainLifecycle) {
+            return;
+        }
+        if (!lifecycleHooks.hasHook(operationId, LifecycleHookRegistry.Hook.V20_ASYNC_TASK_POLL)) {
+            return;
+        }
+        sb.append("        if (response.statusCode() == 202) {\n");
+        sb.append("            EgainAsyncTaskHelper.pollUntilComplete(httpClient, response, REQUEST_TIMEOUT);\n");
+        sb.append("            String deletedId = IntegrationTestUtils.folderIdFromUri(uri);\n");
+        sb.append("            if (deletedId != null) {\n");
+        sb.append("                EgainInternalKbHelper.assertFolderGone(httpClient, deletedId, REQUEST_TIMEOUT);\n");
+        sb.append("            }\n");
+        sb.append("        }\n");
+    }
+
+    private void appendEditInternalVerifyBlock(StringBuilder sb, String method, String operationId) {
+        if (!"PATCH".equals(method) || !egainLifecycle) {
+            return;
+        }
+        if (!lifecycleHooks.hasHook(operationId, LifecycleHookRegistry.Hook.V20_INTERNAL_KB_VERIFY)) {
+            return;
+        }
+        sb.append("        String editedId = IntegrationTestUtils.folderIdFromUri(uri);\n");
+        sb.append("        if (editedId != null) {\n");
+        sb.append("            EgainInternalKbHelper.assertFolderMatches(httpClient, editedId, requestBody, REQUEST_TIMEOUT);\n");
+        sb.append("        }\n");
     }
 
     private void appendSortLevelHierarchyAssume(StringBuilder sb, OperationInfo opInfo) {
@@ -401,10 +435,10 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
     }
 
     private void appendTaggedTest(StringBuilder sb, String operationId) {
-        sb.append("    @Test\n");
         if (operationId != null && !operationId.isBlank()) {
             sb.append("    @Tag(\"").append(IntegrationScenarioSupport.escapeJavaString(operationId)).append("\")\n");
         }
+        appendTaggedTest(sb, operationId);
     }
 
     /**
@@ -483,7 +517,9 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("        assertNotNull(response);\n");
             appendSuccessStatusAssertions(sb, responses);
             sb.append("        assertNotNull(response.body());\n");
+            appendDeletePollWhenNeeded(sb, method, operationId);
             appendCreateGetVerifyBlock(sb, method, path, opInfo, spec, requiresAuth);
+            appendEditInternalVerifyBlock(sb, method, operationId);
             sb.append("        // Validate response against schema\n");
             generateResponseSchemaValidation(sb, responses, spec);
             sb.append("    }\n\n");
@@ -513,7 +549,9 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("        assertNotNull(response);\n");
             appendSuccessStatusAssertions(sb, responses);
             sb.append("        assertNotNull(response.body());\n");
+            appendDeletePollWhenNeeded(sb, method, operationId);
             appendCreateGetVerifyBlock(sb, method, path, opInfo, spec, requiresAuth);
+            appendEditInternalVerifyBlock(sb, method, operationId);
             sb.append("        // Validate response against schema\n");
             generateResponseSchemaValidation(sb, responses, spec);
             sb.append("    }\n\n");
@@ -539,7 +577,9 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("        assertNotNull(response);\n");
             appendSuccessStatusAssertions(sb, responses);
             sb.append("        assertNotNull(response.body());\n");
+            appendDeletePollWhenNeeded(sb, method, operationId);
             appendCreateGetVerifyBlock(sb, method, path, opInfo, spec, requiresAuth);
+            appendEditInternalVerifyBlock(sb, method, operationId);
             sb.append("        // Validate response against schema\n");
             generateResponseSchemaValidation(sb, responses, spec);
             sb.append("    }\n\n");
