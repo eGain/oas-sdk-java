@@ -17,7 +17,7 @@ public final class TestProfileSupport {
     public static final String PROFILE_SMOKE = "smoke";
 
     private static final Set<String> JAVA_MODULES = Set.of(
-            "contract", "integration", "nfr", "performance", "security", "sequence-java", "lifecycle");
+            "unit", "integration", "nfr", "performance", "security", "sequence-java");
 
     private TestProfileSupport() {
     }
@@ -45,7 +45,7 @@ public final class TestProfileSupport {
         if (!isSmoke(config) || testTypes == null) {
             return testTypes;
         }
-        Set<String> allowed = Set.of("integration", "lifecycle", "schemathesis", "postman", "sequence-java", "sequence");
+        Set<String> allowed = Set.of("integration", "schemathesis", "postman", "sequence-java", "sequence");
         List<String> filtered = new ArrayList<>();
         for (String type : testTypes) {
             if (type != null && allowed.contains(type.toLowerCase(Locale.ROOT))) {
@@ -58,7 +58,7 @@ public final class TestProfileSupport {
     public static List<String> aggregatorModules(List<String> testTypes) {
         Set<String> modules = new LinkedHashSet<>();
         if (testTypes == null) {
-            return List.of("contract", "integration");
+            return List.of("unit", "integration");
         }
         for (String type : testTypes) {
             if (type == null) {

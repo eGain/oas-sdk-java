@@ -27,17 +27,6 @@ public final class TestCodegenSupport {
         return "RequestBodyEnv.bind(\"" + escapedJson + "\")";
     }
 
-    /** Java expression: minimal JSON object with one string property for boundary tests. */
-    public static String boundaryStringBodyExpr(String propName, String value) {
-        return "\"{\\\"\" + \"" + escapeJava(propName) + "\" + \"\\\":\\\"\" + \""
-                + escapeJava(value) + "\" + \"\\\"}\"";
-    }
-
-    /** Java expression: minimal JSON object with one numeric property for boundary tests. */
-    public static String boundaryNumericBodyExpr(String propName, long value) {
-        return "\"{\\\"\" + \"" + escapeJava(propName) + "\" + \"\\\":\" + " + value + " + \"}\"";
-    }
-
     public static String baseUrlField() {
         return """
                 private static String baseUrl() {

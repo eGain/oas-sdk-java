@@ -434,13 +434,6 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         return text.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    private void appendTaggedTest(StringBuilder sb, String operationId) {
-        if (operationId != null && !operationId.isBlank()) {
-            sb.append("    @Tag(\"").append(IntegrationScenarioSupport.escapeJavaString(operationId)).append("\")\n");
-        }
-        appendTaggedTest(sb, operationId);
-    }
-
     /**
      * Generate test methods for an operation
      */
@@ -490,7 +483,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
 
         if (requiresAuth) {
             order++;
-            appendTaggedTest(sb, operationId);
+            sb.append("    @Test\n");
             sb.append("    @Order(").append(order).append(")\n");
             sb.append("    @DisplayName(\"").append(displayBase).append(" - Successful request (client application)\")\n");
             sb.append("    void test").append(capitalize(testMethodName)).append("_Success_ClientApplication() throws Exception {\n");
@@ -525,7 +518,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("    }\n\n");
 
             order++;
-            appendTaggedTest(sb, operationId);
+            sb.append("    @Test\n");
             sb.append("    @Order(").append(order).append(")\n");
             sb.append("    @DisplayName(\"").append(displayBase).append(" - Successful request (authenticated customer)\")\n");
             sb.append("    void test").append(capitalize(testMethodName)).append("_Success_AuthenticatedCustomer() throws Exception {\n");
@@ -557,7 +550,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             sb.append("    }\n\n");
         } else {
             order++;
-            appendTaggedTest(sb, operationId);
+            sb.append("    @Test\n");
             sb.append("    @Order(").append(order).append(")\n");
             sb.append("    @DisplayName(\"").append(displayBase).append(" - Successful Request\")\n");
             sb.append("    void test").append(capitalize(testMethodName)).append("_Success() throws Exception {\n");
@@ -589,7 +582,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 jsonBody && !smoke ? IntegrationScenarioSupport.buildOneOfVariantBodies(requestBodySchema, spec) : List.of();
         for (IntegrationScenarioSupport.OneOfVariantBody variant : oneOfVariants) {
             order++;
-            appendTaggedTest(sb, operationId);
+            sb.append("    @Test\n");
             sb.append("    @Order(").append(order).append(")\n");
             sb.append("    @DisplayName(\"").append(displayBase).append(" - Success variant: ")
                     .append(escapeForDisplayName(variant.label())).append("\")\n");
@@ -623,7 +616,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                     IntegrationScenarioSupport.buildDeclaredErrorCases(operation, queryParams);
             for (IntegrationScenarioSupport.DeclaredErrorCase dec : declaredErrors) {
                 order++;
-                appendTaggedTest(sb, operationId);
+                sb.append("    @Test\n");
                 sb.append("    @Order(").append(order).append(")\n");
                 sb.append("    @DisplayName(\"").append(displayBase).append(" - Declared error: ")
                         .append(escapeForDisplayName(dec.label())).append("\")\n");
@@ -658,7 +651,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 IntegrationScenarioSupport.buildParamNegativeCases(path, operation, pathParams, queryParams, maxParam);
         for (IntegrationScenarioSupport.IntegrationParamNegativeCase nc : paramCases) {
             order++;
-            appendTaggedTest(sb, operationId);
+            sb.append("    @Test\n");
             sb.append("    @Order(").append(order).append(")\n");
             sb.append("    @DisplayName(\"").append(displayBase).append(" - Param negative: ")
                     .append(escapeForDisplayName(nc.name)).append("\")\n");
@@ -690,7 +683,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
 
         if (requiresAuth) {
             order++;
-            appendTaggedTest(sb, operationId);
+            sb.append("    @Test\n");
             sb.append("    @Order(").append(order).append(")\n");
             sb.append("    @DisplayName(\"").append(displayBase).append(" - Anonymous customer (no credentials)\")\n");
             sb.append("    void test").append(capitalize(testMethodName)).append("_AnonymousNoCredentials() throws Exception {\n");
@@ -715,7 +708,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         if (jsonBody && !smoke) {
             if (IntegrationScenarioSupport.isRequestBodyRequired(operation, spec)) {
                 order++;
-                appendTaggedTest(sb, operationId);
+                sb.append("    @Test\n");
                 sb.append("    @Order(").append(order).append(")\n");
                 sb.append("    @DisplayName(\"").append(displayBase).append(" - Missing request body\")\n");
                 sb.append("    void test").append(capitalize(testMethodName)).append("_EmptyBody() throws Exception {\n");
@@ -744,7 +737,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             String wrongTypesEsc = IntegrationScenarioSupport.escapeJavaString(wrongTypesRaw);
 
             order++;
-            appendTaggedTest(sb, operationId);
+            sb.append("    @Test\n");
             sb.append("    @Order(").append(order).append(")\n");
             sb.append("    @DisplayName(\"").append(displayBase).append(" - Invalid Request Body: Wrong Types\")\n");
             sb.append("    void test").append(capitalize(testMethodName)).append("_InvalidTypes() throws Exception {\n");
@@ -774,7 +767,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 String missingRaw = IntegrationScenarioSupport.generateMissingRequiredFieldsBodyRaw(requestBodySchema, spec);
                 String missingEsc = IntegrationScenarioSupport.escapeJavaString(missingRaw);
                 order++;
-                appendTaggedTest(sb, operationId);
+                sb.append("    @Test\n");
                 sb.append("    @Order(").append(order).append(")\n");
                 sb.append("    @DisplayName(\"").append(displayBase).append(" - Invalid Request Body: Missing Required Fields\")\n");
                 sb.append("    void test").append(capitalize(testMethodName)).append("_MissingRequiredFields() throws Exception {\n");
@@ -804,7 +797,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                     IntegrationScenarioSupport.buildPerFieldInvalidBodies(requestBodySchema, spec, maxBody);
             for (IntegrationScenarioSupport.PerFieldInvalidBody pf : perField) {
                 order++;
-                appendTaggedTest(sb, operationId);
+                sb.append("    @Test\n");
                 sb.append("    @Order(").append(order).append(")\n");
                 sb.append("    @DisplayName(\"").append(displayBase).append(" - Invalid field: ")
                         .append(escapeForDisplayName(pf.fieldName)).append("\")\n");
@@ -836,7 +829,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                     IntegrationScenarioSupport.buildOneOfXorNegativeBodies(requestBodySchema, spec);
             for (IntegrationScenarioSupport.OneOfXorNegativeBody xn : xorNegatives) {
                 order++;
-                appendTaggedTest(sb, operationId);
+                sb.append("    @Test\n");
                 sb.append("    @Order(").append(order).append(")\n");
                 sb.append("    @DisplayName(\"").append(displayBase).append(" - oneOf XOR negative: ")
                         .append(escapeForDisplayName(xn.label())).append("\")\n");
@@ -867,7 +860,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
 
         if (!smoke && "editFolder".equals(operationId) && lifecycleHooks.hasHook(operationId, LifecycleHookRegistry.Hook.IF_MATCH_EDIT)) {
             order++;
-            appendTaggedTest(sb, operationId);
+            sb.append("    @Test\n");
             sb.append("    @Order(").append(order).append(")\n");
             sb.append("    @DisplayName(\"").append(displayBase).append(" - Stale If-Match returns 412\")\n");
             sb.append("    void test").append(capitalize(testMethodName)).append("_StaleIfMatch() throws Exception {\n");
@@ -888,7 +881,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
 
         if (!smoke && "getFolder".equals(operationId)) {
             order++;
-            appendTaggedTest(sb, operationId);
+            sb.append("    @Test\n");
             sb.append("    @Order(").append(order).append(")\n");
             sb.append("    @DisplayName(\"").append(displayBase).append(" - ko-KR lang must not 500\")\n");
             sb.append("    void test").append(capitalize(testMethodName)).append("_KoKrLangRegression() throws Exception {\n");
@@ -1051,7 +1044,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
 
     private void generatePomXml(String outputDir, String basePackage) throws IOException {
         String pomContent = TestMavenSupport.pomHeader("api-integration-tests", basePackage)
-                + TestMavenSupport.standardTestSupportModuleDependencies()
+                + TestMavenSupport.junitDependency()
                 + TestMavenSupport.buildSectionWithTestSupport();
         Files.write(Paths.get(outputDir, "pom.xml"), pomContent.getBytes());
     }
@@ -1163,7 +1156,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                     public static void assertGetMatchesCreate(HttpClient client, String id, String getPathTemplate,
                                                               Duration timeout, String createBody, String token)
                             throws Exception {
-                        String path = getPathTemplate.replaceAll("\\\\{[^}]+}", id);
+                        String path = getPathTemplate.replaceAll("\\{[^}]+}", id);
                         HttpRequest.Builder b = HttpRequest.newBuilder()
                                 .uri(URI.create(TestEnv.baseUrl() + path))
                                 .timeout(timeout)
@@ -1284,28 +1277,40 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                         HttpResponse<String> resp = client.send(b.build(), HttpResponse.BodyHandlers.ofString());
                         if (resp.statusCode() == 202) {
                             pollAsyncDelete(client, resp, id, timeout);
+                        } else if (TestEnv.verifyInternalKb()) {
+                            try {
+                                EgainInternalKbHelper.syncDeleteFolder(client, id, timeout);
+                            } catch (Exception ignored) {
+                            }
                         }
                     }
 
                     private static void pollAsyncDelete(HttpClient client, HttpResponse<String> accepted, String folderId,
                                                         Duration timeout) throws Exception {
-                        String taskUrl = accepted.headers().firstValue("Location").orElse(null);
-                        if (taskUrl == null) {
-                            return;
-                        }
-                        long deadline = System.nanoTime() + timeout.toNanos();
-                        while (System.nanoTime() < deadline) {
-                            HttpRequest poll = HttpRequest.newBuilder()
-                                    .uri(URI.create(TestEnv.resolveSystemUrl(taskUrl)))
-                                    .timeout(Duration.ofSeconds(10))
-                                    .header("Accept", "application/json")
-                                    .GET()
-                                    .build();
-                            HttpResponse<String> r = client.send(poll, HttpResponse.BodyHandlers.ofString());
-                            if (r.statusCode() == 200 || r.statusCode() == 204) {
+                        try {
+                            EgainAsyncTaskHelper.pollUntilComplete(client, accepted, timeout);
+                            if (folderId != null) {
+                                EgainInternalKbHelper.assertFolderGone(client, folderId, timeout);
+                            }
+                        } catch (NoClassDefFoundError | Exception e) {
+                            String taskUrl = accepted.headers().firstValue("Location").orElse(null);
+                            if (taskUrl == null) {
                                 return;
                             }
-                            Thread.sleep(500);
+                            long deadline = System.nanoTime() + timeout.toNanos();
+                            while (System.nanoTime() < deadline) {
+                                HttpRequest poll = HttpRequest.newBuilder()
+                                        .uri(URI.create(TestEnv.resolveSystemUrl(taskUrl)))
+                                        .timeout(Duration.ofSeconds(10))
+                                        .header("Accept", "application/json")
+                                        .GET()
+                                        .build();
+                                HttpResponse<String> r = client.send(poll, HttpResponse.BodyHandlers.ofString());
+                                if (r.statusCode() == 200 || r.statusCode() == 204) {
+                                    return;
+                                }
+                                Thread.sleep(500);
+                            }
                         }
                     }
 

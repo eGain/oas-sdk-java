@@ -61,7 +61,7 @@ public class CompleteExample {
             
             // Step 5: Generate comprehensive test suite
             System.out.println("6. Generating test suite...");
-            sdk.generateTests(List.of("contract", "integration", "nfr", "performance", "security"), "junit5", "./generated/tests");
+            sdk.generateTests(List.of("unit", "integration", "nfr", "performance", "security"), "junit5", "./generated/tests");
             System.out.println("   ✓ Test suite generated");
             
             // Step 6: Generate Postman collection

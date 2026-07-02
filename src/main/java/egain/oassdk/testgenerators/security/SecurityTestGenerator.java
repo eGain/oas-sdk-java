@@ -619,7 +619,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
      */
     private void generatePomXml(String outputDir, String basePackage) throws IOException {
         String pom = TestMavenSupport.pomHeader("api-security-tests", basePackage)
-                + TestMavenSupport.standardTestSupportModuleDependencies()
+                + TestMavenSupport.junitDependency()
                 + TestMavenSupport.buildSectionWithTestSupport();
         Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes());
     }
