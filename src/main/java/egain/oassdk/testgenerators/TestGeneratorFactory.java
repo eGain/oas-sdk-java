@@ -2,7 +2,6 @@ package egain.oassdk.testgenerators;
 
 import egain.oassdk.config.TestConfig;
 import egain.oassdk.testgenerators.integration.IntegrationTestGenerator;
-import egain.oassdk.testgenerators.lifecycle.LifecycleTestGenerator;
 import egain.oassdk.testgenerators.mock.MockDataGenerator;
 import egain.oassdk.testgenerators.nfr.NFRTestGenerator;
 import egain.oassdk.testgenerators.nodejs.JestIntegrationTestGenerator;
@@ -15,7 +14,7 @@ import egain.oassdk.testgenerators.schemathesis.SchemathesisTestGenerator;
 import egain.oassdk.testgenerators.security.SecurityTestGenerator;
 import egain.oassdk.testgenerators.sequence.JavaSequenceChainTestGenerator;
 import egain.oassdk.testgenerators.sequence.SequenceChainTestGenerator;
-import egain.oassdk.testgenerators.unit.ContractTestGenerator;
+import egain.oassdk.testgenerators.unit.UnitTestGenerator;
 
 import java.util.Locale;
 
@@ -28,7 +27,7 @@ public class TestGeneratorFactory {
     /**
      * Get test generator for specific test type with language/framework awareness
      *
-     * @param testType Type of test (contract/unit, integration, nfr, performance, security, postman, schemathesis, sequence, mock_data)
+     * @param testType Type of test (unit, integration, nfr, performance, security, postman, schemathesis, sequence, mock_data)
      * @param config   Test configuration containing language and framework information
      * @return Test generator instance
      * @throws IllegalArgumentException if test type or language/framework combination is not supported
@@ -43,7 +42,6 @@ public class TestGeneratorFactory {
 
         TestGenerator generator;
         switch (testTypeLower) {
-            case "contract":
             case "unit":
                 generator = getUnitTestGenerator(language, framework, config);
                 break;
@@ -80,10 +78,6 @@ public class TestGeneratorFactory {
                 generator = new JavaSequenceChainTestGenerator();
                 break;
 
-            case "lifecycle":
-                generator = new LifecycleTestGenerator();
-                break;
-
             case "mock_data":
             case "mockdata":
                 generator = new MockDataGenerator();
@@ -107,7 +101,7 @@ public class TestGeneratorFactory {
     private TestGenerator getUnitTestGenerator(String language, String framework, TestConfig config) {
         switch (language) {
             case "java":
-                return new ContractTestGenerator();
+                return new UnitTestGenerator();
 
             case "python":
                 return new PytestUnitTestGenerator();
@@ -144,7 +138,7 @@ public class TestGeneratorFactory {
     /**
      * Get test generator for specific test type (legacy method for backwards compatibility)
      *
-     * @param testType Type of test (contract/unit, integration, nfr, performance, security, postman, schemathesis, sequence, mock_data)
+     * @param testType Type of test (unit, integration, nfr, performance, security, postman, schemathesis, sequence, mock_data)
      * @return Test generator instance
      * @throws IllegalArgumentException if test type is not supported
      */
@@ -164,7 +158,6 @@ public class TestGeneratorFactory {
      */
     public String[] getSupportedTestTypes() {
         return new String[]{
-                "contract",
                 "unit",
                 "integration",
                 "nfr",
@@ -173,7 +166,6 @@ public class TestGeneratorFactory {
                 "postman",
                 "schemathesis",
                 "sequence",
-                "lifecycle",
                 "mock_data"
         };
     }

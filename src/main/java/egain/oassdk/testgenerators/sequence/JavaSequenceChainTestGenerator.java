@@ -58,7 +58,7 @@ public class JavaSequenceChainTestGenerator implements TestGenerator, Configurab
             }
 
             String pom = TestMavenSupport.pomHeader("api-sequence-java-tests", basePackage)
-                    + TestMavenSupport.standardTestSupportModuleDependencies()
+                    + TestMavenSupport.junitDependency()
                     + TestMavenSupport.buildSectionWithTestSupport();
             Files.writeString(moduleDir.resolve("pom.xml"), pom, StandardCharsets.UTF_8);
 

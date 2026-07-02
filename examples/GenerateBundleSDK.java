@@ -36,7 +36,7 @@ public class GenerateBundleSDK {
             // Generate tests
             System.out.println("\n3. Generating tests...");
             String testOutputDir = "./generated-code/bundle-sdk-tests";
-            List<String> testTypes = List.of("contract", "integration", "nfr", "postman");
+            List<String> testTypes = List.of("unit", "integration", "nfr", "postman");
             System.out.println("   Test types: " + String.join(", ", testTypes));
             System.out.println("   Output: " + testOutputDir);
             sdk.generateTests(testTypes, testOutputDir);
@@ -53,7 +53,7 @@ public class GenerateBundleSDK {
             System.out.println("Generated SDK location: " + outputPath.toAbsolutePath());
             System.out.println("Generated Tests location: " + java.nio.file.Paths.get(testOutputDir).toAbsolutePath());
             System.out.println("\nNote: You can now implement the business logic in the TODO sections.");
-            System.out.println("      Tests (contract, integration, NFR, Postman) have been generated.");
+            System.out.println("      Tests (unit, integration, NFR, Postman) have been generated.");
             
         } catch (OASSDKException e) {
             System.err.println("\n❌ Error generating SDK: " + e.getMessage());

@@ -405,7 +405,7 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
      */
     private void generatePomXml(String outputDir, String basePackage) throws IOException {
         String pom = TestMavenSupport.pomHeader("api-performance-tests", basePackage)
-                + TestMavenSupport.standardTestSupportModuleDependencies()
+                + TestMavenSupport.junitDependency()
                 + TestMavenSupport.buildSectionWithTestSupport();
         Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes());
     }
