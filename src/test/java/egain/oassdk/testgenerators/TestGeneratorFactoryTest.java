@@ -26,7 +26,14 @@ public class TestGeneratorFactoryTest {
     public void testGetUnitTestGenerator() {
         TestGenerator generator = factory.getGenerator("unit");
         assertNotNull(generator);
-        assertTrue(generator instanceof egain.oassdk.testgenerators.unit.UnitTestGenerator);
+        assertTrue(generator instanceof egain.oassdk.testgenerators.unit.ContractTestGenerator);
+    }
+
+    @Test
+    public void testGetContractTestGenerator() {
+        TestGenerator generator = factory.getGenerator("contract");
+        assertNotNull(generator);
+        assertTrue(generator instanceof egain.oassdk.testgenerators.unit.ContractTestGenerator);
     }
     
     @Test
@@ -69,6 +76,13 @@ public class TestGeneratorFactoryTest {
         TestGenerator generator = factory.getGenerator("schemathesis");
         assertNotNull(generator);
         assertTrue(generator instanceof egain.oassdk.testgenerators.schemathesis.SchemathesisTestGenerator);
+    }
+
+    @Test
+    public void testGetLifecycleTestGenerator() {
+        TestGenerator generator = factory.getGenerator("lifecycle");
+        assertNotNull(generator);
+        assertTrue(generator instanceof egain.oassdk.testgenerators.lifecycle.LifecycleTestGenerator);
     }
     
     @Test
@@ -119,6 +133,7 @@ public class TestGeneratorFactoryTest {
         
         assertNotNull(types);
         assertTrue(types.length > 0);
+        assertTrue(java.util.Arrays.asList(types).contains("contract"));
         assertTrue(java.util.Arrays.asList(types).contains("unit"));
         assertTrue(java.util.Arrays.asList(types).contains("integration"));
         assertTrue(java.util.Arrays.asList(types).contains("nfr"));
@@ -126,18 +141,21 @@ public class TestGeneratorFactoryTest {
         assertTrue(java.util.Arrays.asList(types).contains("security"));
         assertTrue(java.util.Arrays.asList(types).contains("postman"));
         assertTrue(java.util.Arrays.asList(types).contains("schemathesis"));
+        assertTrue(java.util.Arrays.asList(types).contains("lifecycle"));
         assertTrue(java.util.Arrays.asList(types).contains("mock_data"));
     }
     
     @Test
     public void testIsSupported() {
         assertTrue(factory.isSupported("unit"));
+        assertTrue(factory.isSupported("contract"));
         assertTrue(factory.isSupported("integration"));
         assertTrue(factory.isSupported("nfr"));
         assertTrue(factory.isSupported("performance"));
         assertTrue(factory.isSupported("security"));
         assertTrue(factory.isSupported("postman"));
         assertTrue(factory.isSupported("schemathesis"));
+        assertTrue(factory.isSupported("lifecycle"));
         assertTrue(factory.isSupported("mock_data"));
         assertTrue(factory.isSupported("mockdata"));
         

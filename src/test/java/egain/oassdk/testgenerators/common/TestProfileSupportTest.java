@@ -19,14 +19,14 @@ class TestProfileSupportTest {
         config.setAdditionalProperties(props);
 
         List<String> filtered = TestProfileSupport.filterTestTypes(
-                List.of("unit", "integration", "nfr", "security"), config);
+                List.of("contract", "integration", "nfr", "security"), config);
 
         assertThat(filtered).containsExactly("integration");
     }
 
     @Test
     void aggregatorModules_reflectsGeneratedTypes() {
-        assertThat(TestProfileSupport.aggregatorModules(List.of("unit", "integration", "postman")))
-                .containsExactly("unit", "integration");
+        assertThat(TestProfileSupport.aggregatorModules(List.of("contract", "integration", "postman")))
+                .containsExactly("contract", "integration");
     }
 }

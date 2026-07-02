@@ -129,7 +129,7 @@ public class OASSDKCLI implements Callable<Integer> {
         private String output;
 
         @Option(names = {"-t", "--types"}, split = ",",
-                defaultValue = "unit,integration",
+                defaultValue = "contract,integration",
                 description = "Test types")
         private List<String> types;
 
@@ -269,7 +269,7 @@ public class OASSDKCLI implements Callable<Integer> {
         }
     }
 
-    @Command(name = "all", description = "Generate complete project from OpenAPI specification (application, unit/integration/NFR tests, mock data, docs)")
+    @Command(name = "all", description = "Generate complete project from OpenAPI specification (application, contract/integration/NFR tests, mock data, docs)")
     public static class AllCommand implements Callable<Integer> {
 
         @Parameters(index = "0", description = "Path to OpenAPI specification file")

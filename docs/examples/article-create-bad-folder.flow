@@ -1,0 +1,18 @@
+# flow-dsl 1.0
+flow "article-create-bad-folder"
+operations: "createArticle"
+
+# Curated negative: invalid folder.id on otherwise full body
+call "createArticle"
+  poison body "folder.id" null
+  expect status "400"
+
+# Explicit invalid literal
+call "createArticle"
+  poison body "folder.id" value "not-a-valid-folder-id"
+  expect status "400"
+
+# Schema violation kind (too long name in nested version)
+call "createArticle"
+  poison body "versions[0].name" tooLong
+  expect status "422"

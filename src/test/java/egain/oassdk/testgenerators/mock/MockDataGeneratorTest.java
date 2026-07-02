@@ -32,6 +32,8 @@ public class MockDataGeneratorTest {
         );
         generator.generate(spec, tempDir.toString(), new TestConfig(), "java");
         assertTrue(Files.exists(tempDir));
+        assertFalse(Files.exists(tempDir.resolve("sample-data.json")));
+        assertFalse(Files.exists(tempDir.resolve("User_1.json")));
     }
 
     @Test

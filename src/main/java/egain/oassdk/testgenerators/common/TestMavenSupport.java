@@ -30,6 +30,27 @@ public final class TestMavenSupport {
                 """.formatted(basePackage, artifactId);
     }
 
+    public static String dependenciesBlock(String innerDependencies) {
+        return """
+                    <dependencies>
+                """ + innerDependencies + """
+                    </dependencies>
+                """;
+    }
+
+    public static String standardRestAssuredTestDependencies() {
+        return dependenciesBlock(junitDependency() + restAssuredDependencies());
+    }
+
+    /** JUnit + RestAssured for modules that compile shared test-support (includes TestClient). */
+    public static String standardTestSupportModuleDependencies() {
+        return standardRestAssuredTestDependencies();
+    }
+
+    public static String junitOnlyTestDependencies() {
+        return dependenciesBlock(junitDependency());
+    }
+
     public static String junitDependency() {
         return """
                         <dependency>
@@ -93,6 +114,18 @@ public final class TestMavenSupport {
                                             <sources>
                                                 <source>../test-support/src/test/java</source>
                                             </sources>
+                                        </configuration>
+                                    </execution>
+                                    <execution>
+                                        <id>add-test-support-resources</id>
+                                        <phase>generate-test-resources</phase>
+                                        <goals><goal>add-test-resource</goal></goals>
+                                        <configuration>
+                                            <resources>
+                                                <resource>
+                                                    <directory>../test-support/src/test/resources</directory>
+                                                </resource>
+                                            </resources>
                                         </configuration>
                                     </execution>
                                 </executions>

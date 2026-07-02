@@ -266,6 +266,15 @@ public class OASSDKTest {
         OASSDK result = sdk.generateMockData(tempDir.toString());
         assertSame(sdk, result);
     }
+
+    @Test
+    public void testGenerateMockData_skippedWhenDisabled(@TempDir Path tempDir) throws OASSDKException {
+        TestConfig cfg = TestConfig.builder().mockData(false).build();
+        OASSDK configuredSDK = new OASSDK(null, cfg, null);
+        configuredSDK.loadSpec("src/test/resources/openapi.yaml");
+        configuredSDK.generateMockData(tempDir.toString());
+        assertFalse(Files.exists(tempDir.resolve("operations")));
+    }
     
     @Test
     public void testGenerateSLAEnforcementWithoutSpec() {
@@ -343,6 +352,18 @@ public class OASSDKTest {
         
         OASSDK result = configuredSDK.generateAll(tempDir.toString());
         assertSame(configuredSDK, result);
+    }
+
+    @Test
+    public void testGenerateAll_skipsMockDataWhenDisabled(@TempDir Path tempDir) throws OASSDKException {
+        GeneratorConfig genConfig = new GeneratorConfig();
+        genConfig.setLanguage("java");
+        genConfig.setFramework("jersey");
+        TestConfig testCfg = TestConfig.builder().mockData(false).build();
+        OASSDK configuredSDK = new OASSDK(genConfig, testCfg, null);
+        configuredSDK.loadSpec("src/test/resources/openapi.yaml");
+        configuredSDK.generateAll(tempDir.toString());
+        assertFalse(Files.exists(tempDir.resolve("mock-data")));
     }
     
     @Test

@@ -1,0 +1,14 @@
+# flow-dsl 1.0
+flow "folder-delete-async"
+operations: "deleteFolder"
+
+# Example: async delete — 202 + poll task from Location
+call "deleteFolder"
+  path folderID = folderId
+  expect status "202"
+
+wait status "202"
+extract taskUrl from response.header "Location" lastSegment
+poll task from response.header "Location" until status "200" timeout "60s"
+
+# folderId must be supplied via test-env bootstrap or a prior flow (document in README)

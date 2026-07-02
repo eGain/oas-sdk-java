@@ -393,7 +393,7 @@ public class OASSDK implements AutoCloseable {
     /**
      * Generate test suite
      *
-     * @param testTypes List of test types (unit, integration, nfr, performance, security, postman, schemathesis, sequence, mock_data, etc.)
+     * @param testTypes List of test types (contract/unit, integration, nfr, performance, security, postman, schemathesis, sequence, mock_data, etc.)
      * @param outputDir Output directory for generated tests
      * @return This SDK instance for method chaining
      * @throws OASSDKException if generation fails
@@ -480,6 +480,9 @@ public class OASSDK implements AutoCloseable {
         Objects.requireNonNull(outputDir, "Output directory cannot be null");
         if (spec == null) {
             throw new OASSDKException("No specification loaded. Call loadSpec() first.");
+        }
+        if (testConfig != null && !testConfig.isMockData()) {
+            return this;
         }
 
         try {
@@ -661,12 +664,14 @@ public class OASSDK implements AutoCloseable {
             // Generate tests
             if (testConfig != null) {
                 generateTests(
-                        List.of("unit", "integration", "nfr", "performance", "security", "postman", "schemathesis", "sequence", "sequence-java"),
+                        List.of("contract", "integration", "lifecycle", "nfr", "performance", "security", "postman", "schemathesis", "sequence"),
                         outputDir + "/tests"
                 );
 
-                // Generate mock data
-                generateMockData(outputDir + "/mock-data");
+                // Generate mock data only when enabled.
+                if (testConfig.isMockData()) {
+                    generateMockData(outputDir + "/mock-data");
+                }
             }
 
             // Generate SLA enforcement
