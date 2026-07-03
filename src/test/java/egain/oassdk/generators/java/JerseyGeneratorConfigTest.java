@@ -74,6 +74,34 @@ public class JerseyGeneratorConfigTest {
     }
 
     @Test
+    @DisplayName("modelsOnly generates wrapper types for optional numeric fields without explicit useBoxedPrimitives")
+    public void testModelsOnlyGeneratesBoxedOptionalNumericFields() throws Exception {
+        OASParser parser = new OASParser();
+        Map<String, Object> spec = parser.parse(OPENAPI_YAML);
+        Map<String, Object> resolvedSpec = parser.resolveReferences(spec, OPENAPI_YAML);
+
+        Path outputDir = tempDir.resolve("models-only-boxed");
+        GeneratorConfig config = GeneratorConfig.builder()
+                .modelsOnly(true)
+                .build();
+        config.setPackageName(PACKAGE_NAME);
+
+        JerseyGenerator generator = new JerseyGenerator();
+        generator.generate(resolvedSpec, outputDir.toString(), config, PACKAGE_NAME);
+
+        Path productJava;
+        try (Stream<Path> walk = Files.walk(outputDir)) {
+            productJava = walk
+                    .filter(p -> p.getFileName().toString().equals("Product.java"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Product.java not found under " + outputDir));
+        }
+        String content = Files.readString(productJava);
+        assertTrue(content.contains("private Double price"), "modelsOnly should emit boxed Double for optional number fields");
+        assertFalse(content.contains("private double price"), "modelsOnly must not emit primitive double for optional fields");
+    }
+
+    @Test
     @DisplayName("useBoxedPrimitives generates wrapper types in model fields")
     public void testUseBoxedPrimitivesGeneratesWrapperTypes() throws Exception {
         OASParser parser = new OASParser();
