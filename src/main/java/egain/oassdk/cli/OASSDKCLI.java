@@ -77,6 +77,10 @@ public class OASSDKCLI implements Callable<Integer> {
                         + "(JAXBBean, ValidationBuilder, ValidationError, etc.). Models implement only Serializable.")
         private boolean standaloneMode;
 
+        @Option(names = {"--boxed-primitives"},
+                description = "Use wrapper types (Integer, Long, Double, Float) instead of primitives in generated Java code")
+        private boolean useBoxedPrimitives;
+
         @Override
         public Integer call() {
             try {
@@ -88,7 +92,8 @@ public class OASSDKCLI implements Callable<Integer> {
                         .outputDir(output)
                         .searchPaths(searchPaths != null && !searchPaths.isEmpty() ? searchPaths : null)
                         .authorizationDataGenerationEnabled(authorizationData)
-                        .useJakartaNamespace(useJakartaNamespace);
+                        .useJakartaNamespace(useJakartaNamespace)
+                        .useBoxedPrimitives(useBoxedPrimitives);
                 if (specZipPath != null && !specZipPath.isEmpty()) {
                     configBuilder.specZipPath(specZipPath);
                 }
@@ -302,6 +307,10 @@ public class OASSDKCLI implements Callable<Integer> {
                         + "(JAXBBean, ValidationBuilder, ValidationError, etc.). Models implement only Serializable.")
         private boolean standaloneMode;
 
+        @Option(names = {"--boxed-primitives"},
+                description = "Use wrapper types (Integer, Long, Double, Float) instead of primitives in generated Java code")
+        private boolean useBoxedPrimitives;
+
         @Override
         public Integer call() {
             try {
@@ -311,7 +320,8 @@ public class OASSDKCLI implements Callable<Integer> {
                         .packageName(packageName)
                         .outputDir(output)
                         .searchPaths(searchPaths != null && !searchPaths.isEmpty() ? searchPaths : null)
-                        .useJakartaNamespace(useJakartaNamespace);
+                        .useJakartaNamespace(useJakartaNamespace)
+                        .useBoxedPrimitives(useBoxedPrimitives);
                 if (standaloneMode) {
                     Map<String, Object> extra = new HashMap<>();
                     extra.put("standaloneMode", "true");
