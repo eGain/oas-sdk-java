@@ -37,6 +37,17 @@ public class GeneratorConfigTest {
         config.setModelsOnly(false);
         assertFalse(config.isModelsOnly());
     }
+
+    @Test
+    public void testUseBoxedPrimitivesDefaultAndBuilder() {
+        GeneratorConfig config = new GeneratorConfig();
+        assertFalse(config.isUseBoxedPrimitives());
+        config.setUseBoxedPrimitives(true);
+        assertTrue(config.isUseBoxedPrimitives());
+
+        GeneratorConfig built = GeneratorConfig.builder().useBoxedPrimitives(true).build();
+        assertTrue(built.isUseBoxedPrimitives());
+    }
     
     @Test
     public void testSpecZipPathGetterAndSetter() {

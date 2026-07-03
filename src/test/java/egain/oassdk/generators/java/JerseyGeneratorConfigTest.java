@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -19,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class JerseyGeneratorConfigTest {
 
     private static final String TEST_YAML = "src/test/resources/openapi3.yaml";
+    private static final String OPENAPI_YAML = "src/test/resources/openapi.yaml";
     private static final String PACKAGE_NAME = "com.test.api";
 
     @TempDir
@@ -69,6 +71,35 @@ public class JerseyGeneratorConfigTest {
         Path resourcesDir = outputDir.resolve("src/main/java/" + packagePath + "/resources");
         assertFalse(Files.exists(mainApp), "MainApplication should not be generated when modelsOnly is true");
         assertFalse(Files.exists(resourcesDir), "Resources directory should not be generated when modelsOnly is true");
+    }
+
+    @Test
+    @DisplayName("useBoxedPrimitives generates wrapper types in model fields")
+    public void testUseBoxedPrimitivesGeneratesWrapperTypes() throws Exception {
+        OASParser parser = new OASParser();
+        Map<String, Object> spec = parser.parse(OPENAPI_YAML);
+        Map<String, Object> resolvedSpec = parser.resolveReferences(spec, OPENAPI_YAML);
+
+        Path outputDir = tempDir.resolve("boxed-primitives");
+        GeneratorConfig config = GeneratorConfig.builder()
+                .modelsOnly(true)
+                .useBoxedPrimitives(true)
+                .build();
+        config.setPackageName(PACKAGE_NAME);
+
+        JerseyGenerator generator = new JerseyGenerator();
+        generator.generate(resolvedSpec, outputDir.toString(), config, PACKAGE_NAME);
+
+        Path productJava;
+        try (Stream<Path> walk = Files.walk(outputDir)) {
+            productJava = walk
+                    .filter(p -> p.getFileName().toString().equals("Product.java"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Product.java not found under " + outputDir));
+        }
+        String content = Files.readString(productJava);
+        assertTrue(content.contains("private Double price"), "Expected boxed Double for number field");
+        assertFalse(content.contains("private double price"), "Must not emit primitive double when boxed mode is on");
     }
 
     @Test

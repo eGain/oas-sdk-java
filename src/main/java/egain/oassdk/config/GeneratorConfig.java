@@ -54,6 +54,12 @@ public class GeneratorConfig {
      */
     private boolean legacyXorNestedIdAsserts;
 
+    /**
+     * When true, OpenAPI integer/number fields map to wrapper types ({@code Integer}, {@code Long},
+     * {@code Double}, {@code Float}) instead of Java primitives in generated Jersey code.
+     */
+    private boolean useBoxedPrimitives;
+
     // Observability configuration (OpenTelemetry + Micrometer)
     private ObservabilityConfig observabilityConfig;
 
@@ -78,6 +84,7 @@ public class GeneratorConfig {
         this.useJakartaNamespace = false;
         this.jsonOnlyResourceMediaTypes = false;
         this.legacyXorNestedIdAsserts = false;
+        this.useBoxedPrimitives = false;
         this.observabilityConfig = new ObservabilityConfig();
     }
 
@@ -104,6 +111,7 @@ public class GeneratorConfig {
         this.useJakartaNamespace = false;
         this.jsonOnlyResourceMediaTypes = false;
         this.legacyXorNestedIdAsserts = false;
+        this.useBoxedPrimitives = false;
         this.observabilityConfig = new ObservabilityConfig();
     }
 
@@ -186,6 +194,14 @@ public class GeneratorConfig {
 
     public void setLegacyXorNestedIdAsserts(boolean legacyXorNestedIdAsserts) {
         this.legacyXorNestedIdAsserts = legacyXorNestedIdAsserts;
+    }
+
+    public boolean isUseBoxedPrimitives() {
+        return useBoxedPrimitives;
+    }
+
+    public void setUseBoxedPrimitives(boolean useBoxedPrimitives) {
+        this.useBoxedPrimitives = useBoxedPrimitives;
     }
 
     public String getDefaultAuthorizationDataExtends() {
@@ -301,6 +317,7 @@ public class GeneratorConfig {
         private boolean useJakartaNamespace = false;
         private boolean jsonOnlyResourceMediaTypes = false;
         private boolean legacyXorNestedIdAsserts = false;
+        private boolean useBoxedPrimitives = false;
         private ObservabilityConfig observabilityConfig = new ObservabilityConfig();
 
         public Builder language(String language) {
@@ -400,6 +417,11 @@ public class GeneratorConfig {
             return this;
         }
 
+        public Builder useBoxedPrimitives(boolean useBoxedPrimitives) {
+            this.useBoxedPrimitives = useBoxedPrimitives;
+            return this;
+        }
+
         public Builder observabilityConfig(ObservabilityConfig observabilityConfig) {
             this.observabilityConfig = observabilityConfig;
             return this;
@@ -423,6 +445,7 @@ public class GeneratorConfig {
             config.setUseJakartaNamespace(useJakartaNamespace);
             config.setJsonOnlyResourceMediaTypes(jsonOnlyResourceMediaTypes);
             config.setLegacyXorNestedIdAsserts(legacyXorNestedIdAsserts);
+            config.setUseBoxedPrimitives(useBoxedPrimitives);
             config.setObservabilityConfig(observabilityConfig);
             return config;
         }
@@ -458,6 +481,7 @@ public class GeneratorConfig {
                 ", useJakartaNamespace=" + useJakartaNamespace +
                 ", jsonOnlyResourceMediaTypes=" + jsonOnlyResourceMediaTypes +
                 ", legacyXorNestedIdAsserts=" + legacyXorNestedIdAsserts +
+                ", useBoxedPrimitives=" + useBoxedPrimitives +
                 ", observabilityConfig=" + observabilityConfig +
                 '}';
     }

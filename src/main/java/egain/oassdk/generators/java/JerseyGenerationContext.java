@@ -143,6 +143,11 @@ public final class JerseyGenerationContext {
                 && "true".equals(String.valueOf(config.getAdditionalProperties().get("standaloneMode")));
     }
 
+    /** When true, integer/number OpenAPI types map to wrapper classes instead of primitives. */
+    boolean isUseBoxedPrimitives() {
+        return config != null && config.isUseBoxedPrimitives();
+    }
+
     /**
      * Helper to check if observability generation is enabled.
      */
