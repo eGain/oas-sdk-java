@@ -28,7 +28,7 @@ public class HelloWorldExample {
             sdk.generateApplication("java", "jersey", "com.example.api", "./generated-app");
             
             // Generate tests
-            sdk.generateTests(List.of("contract", "integration", "nfr"), "junit5", "./generated-tests");
+            sdk.generateTests(List.of("unit", "integration", "nfr"), "junit5", "./generated-tests");
             
             // Generate Postman collection
             sdk.generateTests(List.of("postman"), null, "./generated-postman");

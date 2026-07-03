@@ -1,5 +1,6 @@
 package egain.oassdk.generators.java;
 
+import egain.oassdk.config.GeneratorConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,6 +25,12 @@ class JerseyTypeUtilsTest {
 
     private JerseyTypeUtils createTypeUtils() {
         return createTypeUtils(null);
+    }
+
+    private JerseyTypeUtils createTypeUtils(boolean useBoxedPrimitives) {
+        GeneratorConfig config = GeneratorConfig.builder().useBoxedPrimitives(useBoxedPrimitives).build();
+        JerseyGenerationContext ctx = new JerseyGenerationContext(Map.of(), null, config, null);
+        return new JerseyTypeUtils(ctx);
     }
 
     // -----------------------------------------------------------------------
@@ -290,6 +297,38 @@ class JerseyTypeUtilsTest {
     void getJavaType_float() {
         Map<String, Object> schema = Map.of("type", "number", "format", "float");
         assertEquals("float", createTypeUtils().getJavaType(schema));
+    }
+
+    // -----------------------------------------------------------------------
+    //  getJavaType - useBoxedPrimitives
+    // -----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("getJavaType returns Integer when useBoxedPrimitives is true")
+    void getJavaType_integer_boxed() {
+        Map<String, Object> schema = Map.of("type", "integer");
+        assertEquals("Integer", createTypeUtils(true).getJavaType(schema));
+    }
+
+    @Test
+    @DisplayName("getJavaType returns Long when useBoxedPrimitives is true for int64")
+    void getJavaType_long_boxed() {
+        Map<String, Object> schema = Map.of("type", "integer", "format", "int64");
+        assertEquals("Long", createTypeUtils(true).getJavaType(schema));
+    }
+
+    @Test
+    @DisplayName("getJavaType returns Double when useBoxedPrimitives is true")
+    void getJavaType_number_boxed() {
+        Map<String, Object> schema = Map.of("type", "number");
+        assertEquals("Double", createTypeUtils(true).getJavaType(schema));
+    }
+
+    @Test
+    @DisplayName("getJavaType returns Float when useBoxedPrimitives is true for float format")
+    void getJavaType_float_boxed() {
+        Map<String, Object> schema = Map.of("type", "number", "format", "float");
+        assertEquals("Float", createTypeUtils(true).getJavaType(schema));
     }
 
     // -----------------------------------------------------------------------

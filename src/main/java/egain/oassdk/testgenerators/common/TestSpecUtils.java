@@ -89,8 +89,13 @@ public final class TestSpecUtils {
     }
 
     public static boolean useEgainAuth(TestConfig config, Map<String, Object> spec) {
-        // Phase 1 foundation is vendor-neutral; eGain-specific generation is disabled in core.
-        return false;
+        if (config != null && config.getAdditionalProperties() != null) {
+            Object provider = config.getAdditionalProperties().get("auth.provider");
+            if (provider != null) {
+                return "egain".equalsIgnoreCase(provider.toString());
+            }
+        }
+        return isEgainSpec(spec);
     }
 
     private static String defaultFromConfig(TestConfig config) {

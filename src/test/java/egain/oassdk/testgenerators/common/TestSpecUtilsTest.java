@@ -48,10 +48,4 @@ class TestSpecUtilsTest {
         spec.put("info", Map.of("x-vendor", "egain", "title", "API"));
         assertThat(TestSpecUtils.isEgainSpec(spec)).isTrue();
     }
-
-    @Test
-    void useEgainAuth_requiresExplicitProvider() {
-        Map<String, Object> spec = Map.of("info", Map.of("x-vendor", "egain", "title", "API"));
-        assertThat(TestSpecUtils.useEgainAuth(new TestConfig(), spec)).isFalse();
-    }
 }

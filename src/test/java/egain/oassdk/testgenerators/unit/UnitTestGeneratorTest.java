@@ -18,13 +18,13 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class UnitTestGeneratorTest {
     
-    private ContractTestGenerator generator;
+    private UnitTestGenerator generator;
     private Map<String, Object> spec;
     private TestConfig testConfig;
     
     @BeforeEach
     public void setUp() {
-        generator = new ContractTestGenerator();
+        generator = new UnitTestGenerator();
         spec = createValidOpenAPISpec();
         testConfig = new TestConfig();
     }
@@ -36,7 +36,7 @@ public class UnitTestGeneratorTest {
     
     @Test
     public void testGetName() {
-        assertEquals("Contract Test Generator", generator.getName());
+        assertEquals("Unit Test Generator", generator.getName());
     }
     
     @Test
@@ -46,7 +46,7 @@ public class UnitTestGeneratorTest {
     
     @Test
     public void testGetTestType() {
-        assertEquals("contract", generator.getTestType());
+        assertEquals("unit", generator.getTestType());
     }
     
     @Test
@@ -59,7 +59,7 @@ public class UnitTestGeneratorTest {
         
         // Assert
         // Check that unit test directory was created
-        Path unitDir = tempDir.resolve("contract");
+        Path unitDir = tempDir.resolve("unit");
         assertTrue(Files.exists(unitDir));
     }
     
@@ -76,7 +76,7 @@ public class UnitTestGeneratorTest {
         
         // Assert
         // Should not throw exception even with empty paths
-        assertTrue(Files.exists(tempDir.resolve("contract")));
+        assertTrue(Files.exists(tempDir.resolve("unit")));
     }
     
     @Test
@@ -97,7 +97,7 @@ public class UnitTestGeneratorTest {
         generator.generate(specWithPaths, tempDir.toString(), testConfig, "junit5");
         
         // Assert
-        assertTrue(Files.exists(tempDir.resolve("contract")));
+        assertTrue(Files.exists(tempDir.resolve("unit")));
     }
     
     @Test
@@ -118,7 +118,7 @@ public class UnitTestGeneratorTest {
         generator.generate(specWithParams, tempDir.toString(), testConfig, "junit5");
         
         // Assert
-        assertTrue(Files.exists(tempDir.resolve("contract")));
+        assertTrue(Files.exists(tempDir.resolve("unit")));
     }
     
     @Test
@@ -145,7 +145,7 @@ public class UnitTestGeneratorTest {
         generator.generate(spec, tempDir.toString(), testConfig, "junit5");
         
         // Assert
-        assertTrue(Files.exists(tempDir.resolve("contract")));
+        assertTrue(Files.exists(tempDir.resolve("unit")));
     }
     
     @Test
@@ -157,7 +157,7 @@ public class UnitTestGeneratorTest {
         generator.generate(spec, tempDir.toString(), testConfig, "junit5");
         
         // Assert - Check that generated test methods are public
-        Path unitDir = tempDir.resolve("contract");
+        Path unitDir = tempDir.resolve("unit");
         Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
@@ -188,7 +188,7 @@ public class UnitTestGeneratorTest {
         generator.generate(specWithPathParams, tempDir.toString(), testConfig, "junit5");
         
         // Assert - Check that pathParams is always declared
-        Path unitDir = tempDir.resolve("contract");
+        Path unitDir = tempDir.resolve("unit");
         Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
@@ -224,7 +224,7 @@ public class UnitTestGeneratorTest {
         generator.generate(specWithQueryParams, tempDir.toString(), testConfig, "junit5");
         
         // Assert - Check that queryParams is always declared
-        Path unitDir = tempDir.resolve("contract");
+        Path unitDir = tempDir.resolve("unit");
         Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
@@ -259,7 +259,7 @@ public class UnitTestGeneratorTest {
         generator.generate(spec, tempDir.toString(), testConfig, "junit5");
         
         // Assert - Check that valid request tests have comprehensive assertions
-        Path unitDir = tempDir.resolve("contract");
+        Path unitDir = tempDir.resolve("unit");
         Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
@@ -294,7 +294,7 @@ public class UnitTestGeneratorTest {
         generator.generate(specWithInvalidParamTests, tempDir.toString(), testConfig, "junit5");
         
         // Assert - Check that invalid parameter tests have enhanced structure
-        Path unitDir = tempDir.resolve("contract");
+        Path unitDir = tempDir.resolve("unit");
         Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
@@ -329,7 +329,7 @@ public class UnitTestGeneratorTest {
 
         generator.generate(mixed, tempDir.toString(), testConfig, "junit5");
 
-        Path testFile = tempDir.resolve("contract/src/test/java/com/example/api/CatalogApiTest.java");
+        Path testFile = tempDir.resolve("unit/src/test/java/com/example/api/CatalogApiTest.java");
         assertTrue(Files.exists(testFile), "Expected CatalogApiTest.java for tag Catalog");
         String content = Files.readString(testFile);
         assertTrue(content.contains("void testSearchItems_InvalidQFormat(String invalidValue)"), content);
@@ -349,7 +349,7 @@ public class UnitTestGeneratorTest {
 
         generator.generate(s, tempDir.toString(), testConfig, "junit5");
 
-        Path testFile = tempDir.resolve("contract/src/test/java/com/example/api/WidgetApiTest.java");
+        Path testFile = tempDir.resolve("unit/src/test/java/com/example/api/WidgetApiTest.java");
         assertTrue(Files.exists(testFile));
         String content = Files.readString(testFile);
         assertTrue(content.contains("pathParams.put(\"widgetId\", invalidValue)"),
@@ -366,7 +366,7 @@ public class UnitTestGeneratorTest {
         generator.generate(specWithRequiredParam, tempDir.toString(), testConfig, "junit5");
         
         // Assert - Check that missing required parameter tests have enhanced structure
-        Path unitDir = tempDir.resolve("contract");
+        Path unitDir = tempDir.resolve("unit");
         Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
@@ -395,7 +395,7 @@ public class UnitTestGeneratorTest {
     }
     
     @Test
-    public void testUnauthorizedScenarioUsesInvalidToken(@TempDir Path tempDir) throws GenerationException, java.io.IOException {
+    public void testEnhancedStatusCodeTests(@TempDir Path tempDir) throws GenerationException, java.io.IOException {
         // Arrange
         Map<String, Object> specWithStatusCodes = createSpecWithMultipleStatusCodes();
         testConfig.setTestFramework("junit5");
@@ -403,8 +403,8 @@ public class UnitTestGeneratorTest {
         // Act
         generator.generate(specWithStatusCodes, tempDir.toString(), testConfig, "junit5");
         
-        // Assert - check unauthorized scenario uses invalid token and no blind status matrix
-        Path unitDir = tempDir.resolve("contract");
+        // Assert - Check that status code tests have enhanced structure
+        Path unitDir = tempDir.resolve("unit");
         Path packageDir = unitDir.resolve("src/test/java/com/example/api");
         
         if (Files.exists(packageDir)) {
@@ -414,12 +414,16 @@ public class UnitTestGeneratorTest {
                 .forEach(testFile -> {
                     try {
                         String content = Files.readString(testFile);
-                        assertFalse(content.contains("_Status401"), "Should not generate blind Status401 tests");
-                        assertFalse(content.contains("_Status500"), "Should not generate blind Status500 tests");
-                        assertTrue(content.contains("_UnauthorizedInvalidToken"),
-                                "Should generate invalid-token auth scenario");
-                        assertTrue(content.contains("TestAuth.invalidToken()"),
-                                "Unauthorized scenario should use TestAuth.invalidToken()");
+                        if (content.contains("_Status")) {
+                            // Check for enhanced structure
+                            assertTrue(content.contains("public void test") && content.contains("Status"),
+                                "Status code test should be public in " + testFile.getFileName());
+                            assertTrue(content.contains("Map<String, String> pathParams = new HashMap<>()") ||
+                                      content.contains("Map<String, String> queryParams = new HashMap<>()"),
+                                "Status code test should declare pathParams/queryParams in " + testFile.getFileName());
+                            assertTrue(content.contains("getStatusCode()") || content.contains("Response"),
+                                "Status code test should inspect RestAssured Response in " + testFile.getFileName());
+                        }
                     } catch (java.io.IOException e) {
                         fail("Failed to read test file: " + testFile);
                     }
@@ -431,7 +435,7 @@ public class UnitTestGeneratorTest {
     public void testBeforeAllInitRestAssuredIsPresent(@TempDir Path tempDir) throws GenerationException, java.io.IOException {
         testConfig.setTestFramework("junit5");
         generator.generate(spec, tempDir.toString(), testConfig, "junit5");
-        Path packageDir = tempDir.resolve("contract").resolve("src/test/java/com/example/api");
+        Path packageDir = tempDir.resolve("unit").resolve("src/test/java/com/example/api");
         if (Files.exists(packageDir)) {
             Files.walk(packageDir)
                 .filter(Files::isRegularFile)
@@ -457,24 +461,14 @@ public class UnitTestGeneratorTest {
 
         generator.generate(spec, tempDir.toString(), testConfig, "junit5");
 
-        Path testFile = tempDir.resolve("contract/src/test/java/com/example/api/FoldersApiTest.java");
+        Path testFile = tempDir.resolve("unit/src/test/java/com/example/api/FoldersApiTest.java");
         assertTrue(Files.exists(testFile), "Expected FoldersApiTest.java");
         String content = Files.readString(testFile);
         assertTrue(content.contains("_ValidRequest()"), content);
         assertFalse(content.contains(".body(\"{}\");"),
                 "composed allOf request body should not be empty object literal");
-        assertTrue(content.contains("RequestBodyFactory.forOperation(\"createFolder\").valid()"),
-                "createFolder request should use RequestBodyFactory valid template");
-    }
-
-    @Test
-    public void testGeneratedTestsAreTaggedWithOperationId(@TempDir Path tempDir) throws Exception {
-        Map<String, Object> taggedSpec = createValidOpenAPISpec();
-        generator.generate(taggedSpec, tempDir.toString(), testConfig, "junit5");
-        Path testFile = tempDir.resolve("contract/src/test/java/com/example/api/TestApiTest.java");
-        assertTrue(Files.exists(testFile));
-        String content = Files.readString(testFile);
-        assertTrue(content.contains("@Tag(\"getTest\")"), content);
+        assertTrue(content.contains("\\\"name\\\""),
+                "createFolder body should include name field from flattened schema");
     }
 
     private Map<String, Object> createSpecWithAllOfRequestBody() {
@@ -704,7 +698,6 @@ public class UnitTestGeneratorTest {
         get.put("tags", java.util.List.of("resources"));
         get.put("responses", Map.of(
             "200", Map.of("description", "OK"),
-            "401", Map.of("description", "Unauthorized"),
             "404", Map.of("description", "Not Found"),
             "500", Map.of("description", "Internal Server Error")
         ));

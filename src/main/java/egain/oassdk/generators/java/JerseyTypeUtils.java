@@ -174,28 +174,16 @@ public final class JerseyTypeUtils {
             }
             case "integer" -> {
                 if ("int64".equals(format)) {
-                    if(schema.containsKey("default") || nullable)
-                        return "Long";
-                     else
-                        return "long";
+                    return resolveNumericType("long", "Long", schema, nullable);
                 } else {
-                    if(schema.containsKey("default") || nullable)
-                        return "Integer";
-                    else
-                        return "int";
+                    return resolveNumericType("int", "Integer", schema, nullable);
                 }
             }
             case "number" -> {
                 if ("float".equals(format)) {
-                    if(schema.containsKey("default") || nullable)
-                        return "Float";
-                    else
-                        return "float";
+                    return resolveNumericType("float", "Float", schema, nullable);
                 } else {
-                    if(schema.containsKey("default") || nullable)
-                        return "Double";
-                    else
-                        return "double";
+                    return resolveNumericType("double", "Double", schema, nullable);
                 }
             }
             case "boolean" -> {
@@ -717,6 +705,13 @@ public final class JerseyTypeUtils {
             return JerseyNamingUtils.toJavaClassName(JerseyNamingUtils.capitalize(propertyName));
         }
         return "Inline";
+    }
+
+    private String resolveNumericType(String primitive, String wrapper, Map<String, Object> schema, boolean nullable) {
+        if (ctx.isUseBoxedPrimitives() || schema.containsKey("default") || nullable) {
+            return wrapper;
+        }
+        return primitive;
     }
 
     // ---------------------------------------------------------------------------
