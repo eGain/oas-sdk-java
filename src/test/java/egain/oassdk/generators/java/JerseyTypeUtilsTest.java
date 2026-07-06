@@ -33,6 +33,12 @@ class JerseyTypeUtilsTest {
         return new JerseyTypeUtils(ctx);
     }
 
+    private JerseyTypeUtils createTypeUtilsModelsOnly() {
+        GeneratorConfig config = GeneratorConfig.builder().modelsOnly(true).build();
+        JerseyGenerationContext ctx = new JerseyGenerationContext(Map.of(), null, config, null);
+        return new JerseyTypeUtils(ctx);
+    }
+
     // -----------------------------------------------------------------------
     //  getJavaType - simple types
     // -----------------------------------------------------------------------
@@ -329,6 +335,20 @@ class JerseyTypeUtilsTest {
     void getJavaType_float_boxed() {
         Map<String, Object> schema = Map.of("type", "number", "format", "float");
         assertEquals("Float", createTypeUtils(true).getJavaType(schema));
+    }
+
+    @Test
+    @DisplayName("getJavaType returns Integer when modelsOnly is true without useBoxedPrimitives")
+    void getJavaType_integer_modelsOnly() {
+        Map<String, Object> schema = Map.of("type", "integer");
+        assertEquals("Integer", createTypeUtilsModelsOnly().getJavaType(schema));
+    }
+
+    @Test
+    @DisplayName("getJavaType returns Double when modelsOnly is true without useBoxedPrimitives")
+    void getJavaType_number_modelsOnly() {
+        Map<String, Object> schema = Map.of("type", "number");
+        assertEquals("Double", createTypeUtilsModelsOnly().getJavaType(schema));
     }
 
     // -----------------------------------------------------------------------

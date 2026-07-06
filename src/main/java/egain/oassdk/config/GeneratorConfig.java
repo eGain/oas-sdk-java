@@ -57,6 +57,9 @@ public class GeneratorConfig {
     /**
      * When true, OpenAPI integer/number fields map to wrapper types ({@code Integer}, {@code Long},
      * {@code Double}, {@code Float}) instead of Java primitives in generated Jersey code.
+     * <p>
+     * When {@link #modelsOnly} is true, numeric fields are always boxed regardless of this flag,
+     * so JAXB {@code isSetXxx()} can distinguish absent optional fields from zero.
      */
     private boolean useBoxedPrimitives;
 

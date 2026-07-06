@@ -143,9 +143,13 @@ public final class JerseyGenerationContext {
                 && "true".equals(String.valueOf(config.getAdditionalProperties().get("standaloneMode")));
     }
 
-    /** When true, integer/number OpenAPI types map to wrapper classes instead of primitives. */
+    /**
+     * When true, integer/number OpenAPI types map to wrapper classes instead of primitives.
+     * {@link egain.oassdk.config.GeneratorConfig#isModelsOnly() modelsOnly} generation (JAXB bindings)
+     * always uses boxed types so optional numeric fields support {@code isSetXxx()} via null checks.
+     */
     boolean isUseBoxedPrimitives() {
-        return config != null && config.isUseBoxedPrimitives();
+        return modelsOnly || (config != null && config.isUseBoxedPrimitives());
     }
 
     /**
