@@ -198,6 +198,12 @@ public final class OpenApiSchemaUtils {
      */
     public static Map<String, Object> mergePropertyDefinitionsForComposition(Map<String, Object> earlier,
                                                                         Map<String, Object> later) {
+        return mergePropertyDefinitionsForComposition(earlier, later, null);
+    }
+
+    public static Map<String, Object> mergePropertyDefinitionsForComposition(Map<String, Object> earlier,
+                                                                        Map<String, Object> later,
+                                                                        Map<String, Object> spec) {
         if (later == null || later.isEmpty()) {
             return earlier != null ? new LinkedHashMap<>(earlier) : new LinkedHashMap<>();
         }
@@ -207,12 +213,33 @@ public final class OpenApiSchemaUtils {
         Map<String, Object> out;
         if (!definesOwnPropertyType(later) && definesOwnPropertyType(earlier)) {
             out = new LinkedHashMap<>(earlier);
-            applyPropertyOverlayOnBase(out, earlier, later);
+            applyPropertyOverlayOnBase(out, earlier, later, spec);
         } else {
             out = new LinkedHashMap<>(later);
-            mergeEarlierIntoLaterPropertyBase(out, earlier, later);
+            mergeEarlierIntoLaterPropertyBase(out, earlier, later, spec);
         }
         return out;
+    }
+
+    /**
+     * Resolve nested {@code properties} for a property schema, following {@code $ref} and {@code allOf}
+     * when direct {@code properties} are absent (e.g. {@code allOf: [desc, $ref: FolderSummary]}).
+     */
+    private static Map<String, Object> resolveEffectivePropertyProperties(Map<String, Object> propertySchema,
+                                                                            Map<String, Object> spec) {
+        if (propertySchema == null) {
+            return null;
+        }
+        Map<String, Object> direct = Util.asStringObjectMap(propertySchema.get("properties"));
+        if (direct != null && !direct.isEmpty()) {
+            return direct;
+        }
+        if (spec == null) {
+            return null;
+        }
+        Map<String, Object> resolved = resolveRefInSchema(propertySchema, spec);
+        Map<String, Object> effective = resolveCompositionToEffectiveSchema(resolved, spec);
+        return effective != null ? Util.asStringObjectMap(effective.get("properties")) : null;
     }
 
     /**
@@ -254,7 +281,8 @@ public final class OpenApiSchemaUtils {
     /** Apply a constraint/nested overlay ({@code later}) onto a typed base ({@code out} copied from {@code earlier}). */
     private static void applyPropertyOverlayOnBase(Map<String, Object> out,
                                                    Map<String, Object> earlier,
-                                                   Map<String, Object> later) {
+                                                   Map<String, Object> later,
+                                                   Map<String, Object> spec) {
         List<Map<String, Object>> earlierAllOf = Util.asStringObjectMapList(earlier.get("allOf"));
         List<Map<String, Object>> laterAllOf = Util.asStringObjectMapList(later.get("allOf"));
         if (earlierAllOf != null && !earlierAllOf.isEmpty()
@@ -293,7 +321,7 @@ public final class OpenApiSchemaUtils {
             Map<String, Object> overlaySub = Util.asStringObjectMap(pe.getValue());
             Map<String, Object> baseSub = Util.asStringObjectMap(baseProps.get(pk));
             if (baseSub != null && overlaySub != null) {
-                baseProps.put(pk, mergePropertyDefinitionsForComposition(baseSub, overlaySub));
+                baseProps.put(pk, mergePropertyDefinitionsForComposition(baseSub, overlaySub, spec));
             } else {
                 baseProps.put(pk, pe.getValue());
             }
@@ -303,7 +331,8 @@ public final class OpenApiSchemaUtils {
     /** Merge {@code earlier} constraints into a {@code later}-typed property base ({@code out}). */
     private static void mergeEarlierIntoLaterPropertyBase(Map<String, Object> out,
                                                           Map<String, Object> earlier,
-                                                          Map<String, Object> later) {
+                                                          Map<String, Object> later,
+                                                          Map<String, Object> spec) {
         List<Map<String, Object>> earlierAllOf = Util.asStringObjectMapList(earlier.get("allOf"));
         List<Map<String, Object>> laterAllOf = Util.asStringObjectMapList(later.get("allOf"));
         if (earlierAllOf != null && !earlierAllOf.isEmpty()
@@ -325,27 +354,28 @@ public final class OpenApiSchemaUtils {
             out.put("writeOnly", true);
         }
         Map<String, Object> laterProps = Util.asStringObjectMap(later.get("properties"));
-        Map<String, Object> earlierProps = Util.asStringObjectMap(earlier.get("properties"));
-        if (earlierProps != null && !earlierProps.isEmpty()) {
-            Map<String, Object> mergedProps = new LinkedHashMap<>();
-            if (laterProps != null) {
-                mergedProps.putAll(laterProps);
-            }
-            for (Map.Entry<String, Object> pe : earlierProps.entrySet()) {
-                String pk = pe.getKey();
-                Map<String, Object> eSub = Util.asStringObjectMap(pe.getValue());
-                if (!mergedProps.containsKey(pk)) {
-                    mergedProps.put(pk, pe.getValue());
-                } else {
+        Map<String, Object> earlierProps = resolveEffectivePropertyProperties(earlier, spec);
+        if (earlierProps == null || earlierProps.isEmpty()) {
+            earlierProps = Util.asStringObjectMap(earlier.get("properties"));
+        }
+        if (laterProps != null && !laterProps.isEmpty()) {
+            Map<String, Object> mergedProps = new LinkedHashMap<>(laterProps);
+            if (earlierProps != null && !earlierProps.isEmpty()) {
+                for (Map.Entry<String, Object> pe : earlierProps.entrySet()) {
+                    String pk = pe.getKey();
+                    if (!mergedProps.containsKey(pk)) {
+                        continue;
+                    }
+                    Map<String, Object> eSub = Util.asStringObjectMap(pe.getValue());
                     Map<String, Object> lSub = Util.asStringObjectMap(mergedProps.get(pk));
                     if (eSub != null && lSub != null) {
-                        mergedProps.put(pk, mergePropertyDefinitionsForComposition(eSub, lSub));
-                    } else {
-                        mergedProps.put(pk, pe.getValue());
+                        mergedProps.put(pk, mergePropertyDefinitionsForComposition(eSub, lSub, spec));
                     }
                 }
             }
             out.put("properties", mergedProps);
+        } else if (earlierProps != null && !earlierProps.isEmpty()) {
+            out.put("properties", new LinkedHashMap<>(earlierProps));
         }
     }
 
@@ -355,6 +385,12 @@ public final class OpenApiSchemaUtils {
      */
     public static void mergePropertiesIntoAll(Map<String, Object> allProperties,
                                                Map<String, Object> properties) {
+        mergePropertiesIntoAll(allProperties, properties, null);
+    }
+
+    public static void mergePropertiesIntoAll(Map<String, Object> allProperties,
+                                               Map<String, Object> properties,
+                                               Map<String, Object> spec) {
         if (properties == null) {
             return;
         }
@@ -371,7 +407,7 @@ public final class OpenApiSchemaUtils {
             if (existing == null || incoming == null) {
                 allProperties.put(name, incomingObj);
             } else {
-                allProperties.put(name, mergePropertyDefinitionsForComposition(existing, incoming));
+                allProperties.put(name, mergePropertyDefinitionsForComposition(existing, incoming, spec));
             }
         }
     }
@@ -420,7 +456,7 @@ public final class OpenApiSchemaUtils {
         if (schema.containsKey("properties")) {
             // Schema has properties - use them directly (even if $ref also exists)
             Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
-            mergePropertiesIntoAll(allProperties, properties);
+            mergePropertiesIntoAll(allProperties, properties, spec);
             // Merge required fields
             if (schema.containsKey("required")) {
                 List<String> required = Util.asStringList(schema.get("required"));
@@ -480,7 +516,7 @@ public final class OpenApiSchemaUtils {
         // Merge direct properties (this handles schemas that were resolved and have properties)
         if (schema.containsKey("properties")) {
             Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
-            mergePropertiesIntoAll(allProperties, properties);
+            mergePropertiesIntoAll(allProperties, properties, spec);
             // Merge required fields
             if (schema.containsKey("required")) {
                 List<String> required = Util.asStringList(schema.get("required"));
@@ -523,7 +559,7 @@ public final class OpenApiSchemaUtils {
         // Merge direct properties
         if (schema.containsKey("properties")) {
             Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
-            mergePropertiesIntoAll(allProperties, properties);
+            mergePropertiesIntoAll(allProperties, properties, spec);
         }
 
         // Merge required fields

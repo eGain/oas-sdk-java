@@ -260,6 +260,58 @@ class JerseyModelGeneratorFolderYamlParityTest {
                 "Inner User.id should have a public setter");
     }
 
+    @Test
+    @DisplayName("Bundled Folder.yaml CreateFolder oneOf nested Parent and Department ids have pattern validation")
+    void createFolderOneOfNestedIdsHavePatternValidation() throws OASSDKException, IOException {
+        Path specPath = Path.of("src/test/resources/folder_contentmgr_bundle/knowledge/models/contentmgr/v4/Folder.yaml")
+                .toAbsolutePath();
+        Path bundleRoot = Path.of("src/test/resources/folder_contentmgr_bundle").toAbsolutePath();
+        Path outputDir = tempOutputDir.resolve("create-folder-pattern-validation");
+
+        GeneratorConfig config = GeneratorConfig.builder()
+                .modelsOnly(true)
+                .packageName("com.egain.bindings.ws.model.xsds.common.v4.content")
+                .outputDir(outputDir.toString())
+                .searchPaths(List.of(bundleRoot.toString()))
+                .build();
+
+        try (OASSDK sdk = new OASSDK(config, null, null)) {
+            sdk.loadSpec(specPath.toString());
+            sdk.generateApplication("java", "jersey", config.getPackageName(), outputDir.toString());
+        }
+
+        Path createFolderJava;
+        try (Stream<Path> walk = Files.walk(outputDir)) {
+            createFolderJava = walk
+                    .filter(p -> p.getFileName().toString().equals("CreateFolder.java"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("CreateFolder.java not found under " + outputDir));
+        }
+
+        String generated = Files.readString(createFolderJava, StandardCharsets.UTF_8);
+        String parentIdBlock = extractInnerClassIdFieldBlock(generated, "Parent");
+        assertTrue(parentIdBlock.contains("@Pattern(regexp = \"^[1-9][0-9]{13}$\")"),
+                "Parent.id should inherit FolderSummary pattern");
+        assertTrue(parentIdBlock.contains("@Size(min = 14, max = 14)"),
+                "Parent.id should inherit FolderSummary length constraints");
+
+        String departmentIdBlock = extractInnerClassIdFieldBlock(generated, "Department");
+        assertTrue(departmentIdBlock.contains("@Pattern(regexp = \"^[1-9][0-9]{13}$\")"),
+                "Department.id should inherit Department pattern");
+        assertTrue(departmentIdBlock.contains("@Size(min = 14, max = 14)"),
+                "Department.id should inherit Department length constraints");
+    }
+
+    static String extractInnerClassIdFieldBlock(String javaSource, String innerClassName) {
+        String marker = "public static class " + innerClassName;
+        int classIdx = javaSource.indexOf(marker);
+        assertTrue(classIdx > 0, "Inner class " + innerClassName + " not found");
+        String innerClass = javaSource.substring(classIdx, Math.min(javaSource.length(), classIdx + 3000));
+        int idFieldIdx = innerClass.indexOf("private String id;");
+        assertTrue(idFieldIdx > 0, innerClassName + " should declare private String id field");
+        return innerClass.substring(Math.max(0, idFieldIdx - 300), idFieldIdx + 30);
+    }
+
     private static String readResource(String classpathPath) throws IOException {
         try (InputStream in = JerseyModelGeneratorFolderYamlParityTest.class.getResourceAsStream(classpathPath)) {
             Objects.requireNonNull(in, "Missing classpath resource: " + classpathPath);
