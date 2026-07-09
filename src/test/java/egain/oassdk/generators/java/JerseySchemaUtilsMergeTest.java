@@ -588,6 +588,94 @@ class JerseySchemaUtilsMergeTest {
     }
 
     @Test
+    @DisplayName("mergePropertyDefinitionsForComposition type:object overlay over $ref backfills nested id constraints")
+    void mergePropertyDefinitions_typeObjectOverlayOverRef_backfillsNestedIdConstraints() {
+        Map<String, Object> folderSummaryId = new LinkedHashMap<>();
+        folderSummaryId.put("type", "string");
+        folderSummaryId.put("pattern", "^[1-9][0-9]{13}$");
+        folderSummaryId.put("minLength", 14);
+        folderSummaryId.put("maxLength", 14);
+        folderSummaryId.put("readOnly", true);
+
+        Map<String, Object> folderSummary = new LinkedHashMap<>();
+        folderSummary.put("type", "object");
+        folderSummary.put("properties", Map.of("id", folderSummaryId));
+
+        Map<String, Object> earlier = new LinkedHashMap<>();
+        earlier.put("allOf", List.of(
+                Map.of("description", "Parent folder"),
+                Map.of("$ref", "#/components/schemas/FolderSummary")));
+
+        Map<String, Object> laterId = new LinkedHashMap<>();
+        laterId.put("type", "string");
+        laterId.put("writeOnly", true);
+        laterId.put("readOnly", false);
+
+        Map<String, Object> later = new LinkedHashMap<>();
+        later.put("type", "object");
+        later.put("required", List.of("id"));
+        later.put("properties", Map.of("id", laterId));
+
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of("FolderSummary", folderSummary)));
+
+        Map<String, Object> merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(earlier, later, spec);
+
+        assertEquals("object", merged.get("type"));
+        assertFalse(merged.containsKey("$ref"));
+        Map<String, Object> props = Util.asStringObjectMap(merged.get("properties"));
+        assertNotNull(props);
+        assertEquals(1, props.size(), "overlay object shape must not gain base-only properties");
+        Map<String, Object> idSchema = Util.asStringObjectMap(props.get("id"));
+        assertNotNull(idSchema);
+        assertEquals("^[1-9][0-9]{13}$", idSchema.get("pattern"));
+        assertEquals(14, idSchema.get("minLength"));
+        assertEquals(14, idSchema.get("maxLength"));
+        assertTrue(JerseySchemaUtils.isSchemaFlagTrue(idSchema, "writeOnly"));
+        assertFalse(JerseySchemaUtils.isSchemaFlagTrue(idSchema, "readOnly"));
+    }
+
+    @Test
+    @DisplayName("mergeSchemaProperties bundled Folder.yaml createFolder oneOf nested ids inherit ref constraints")
+    void mergeSchemaProperties_createFolder_oneOf_nestedIdsInheritRefConstraints() throws OASSDKException {
+        Path specPath = Path.of("src/test/resources/folder_contentmgr_bundle/knowledge/models/contentmgr/v4/Folder.yaml")
+                .toAbsolutePath();
+        Path bundleRoot = Path.of("src/test/resources/folder_contentmgr_bundle").toAbsolutePath();
+        OASParser parser = new OASParser(List.of(bundleRoot.toString()));
+        Map<String, Object> spec = parser.parse(specPath.toString());
+        spec = parser.resolveReferences(spec, specPath.toString());
+
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
+        Map<String, Object> createFolder = Util.asStringObjectMap(schemas.get("createFolder"));
+
+        Map<String, Object> allProps = new LinkedHashMap<>();
+        List<String> allRequired = new ArrayList<>();
+        JerseySchemaUtils.mergeAllOfBranchesIntoProperties(
+                Util.asStringObjectMapList(createFolder.get("allOf")), allProps, allRequired, spec);
+
+        assertNestedIdHasFolderConstraints(allProps.get("parent"), spec, true);
+        assertNestedIdHasFolderConstraints(allProps.get("department"), spec, false);
+    }
+
+    private static void assertNestedIdHasFolderConstraints(Object propertySchema,
+                                                           Map<String, Object> spec,
+                                                           boolean expectWriteOnly) {
+        Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(
+                Util.asStringObjectMap(propertySchema), spec);
+        assertNotNull(effective);
+        Map<String, Object> props = Util.asStringObjectMap(effective.get("properties"));
+        assertNotNull(props);
+        Map<String, Object> idSchema = Util.asStringObjectMap(props.get("id"));
+        assertNotNull(idSchema);
+        assertEquals("^[1-9][0-9]{13}$", idSchema.get("pattern"));
+        assertEquals(14, idSchema.get("minLength"));
+        assertEquals(14, idSchema.get("maxLength"));
+        if (expectWriteOnly) {
+            assertTrue(JerseySchemaUtils.isSchemaFlagTrue(idSchema, "writeOnly"));
+        }
+    }
+
+    @Test
     @DisplayName("mergeSchemaProperties bundled Folder.yaml editFolder preserves typed overlay fields")
     void mergeSchemaProperties_editFolderFromBundledYaml_preservesTypedFields() throws OASSDKException {
         Path specPath = Path.of("src/test/resources/folder_contentmgr_bundle/knowledge/models/contentmgr/v4/Folder.yaml")

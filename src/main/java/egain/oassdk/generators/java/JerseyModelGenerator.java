@@ -921,7 +921,7 @@ class JerseyModelGenerator {
             }
             Map<String, Object> envelopeProps = Util.asStringObjectMap(innerSchema.get("properties"));
             if (envelopeProps != null && !envelopeProps.isEmpty()) {
-                JerseySchemaUtils.mergePropertiesIntoAll(allProperties, envelopeProps);
+                JerseySchemaUtils.mergePropertiesIntoAll(allProperties, envelopeProps, spec);
             }
         } else if (innerSchema.containsKey("oneOf") || innerSchema.containsKey("anyOf")) {
             List<Map<String, Object>> schemasList = Util.asStringObjectMapList(

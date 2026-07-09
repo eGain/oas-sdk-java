@@ -53,12 +53,24 @@ public final class JerseySchemaUtils {
         return OpenApiSchemaUtils.mergePropertyDefinitionsForComposition(earlier, later);
     }
 
+    public static Map<String, Object> mergePropertyDefinitionsForComposition(Map<String, Object> earlier,
+                                                                             Map<String, Object> later,
+                                                                             Map<String, Object> spec) {
+        return OpenApiSchemaUtils.mergePropertyDefinitionsForComposition(earlier, later, spec);
+    }
+
     static boolean definesOwnPropertyType(Map<String, Object> schema) {
         return OpenApiSchemaUtils.definesOwnPropertyType(schema);
     }
 
     public static void mergePropertiesIntoAll(Map<String, Object> allProperties, Map<String, Object> properties) {
         OpenApiSchemaUtils.mergePropertiesIntoAll(allProperties, properties);
+    }
+
+    public static void mergePropertiesIntoAll(Map<String, Object> allProperties,
+                                              Map<String, Object> properties,
+                                              Map<String, Object> spec) {
+        OpenApiSchemaUtils.mergePropertiesIntoAll(allProperties, properties, spec);
     }
 
     public static void mergeSchemaProperties(Map<String, Object> schema, Map<String, Object> allProperties,
