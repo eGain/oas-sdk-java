@@ -74,6 +74,42 @@ public class JerseyGeneratorConfigTest {
     }
 
     @Test
+    @DisplayName("modelsOnly generates wrapper types for optional numeric fields without explicit useBoxedPrimitives")
+    public void testModelsOnlyGeneratesBoxedOptionalNumericFields() throws Exception {
+        OASParser parser = new OASParser();
+        Map<String, Object> spec = parser.parse(OPENAPI_YAML);
+        Map<String, Object> resolvedSpec = parser.resolveReferences(spec, OPENAPI_YAML);
+
+        Path outputDir = tempDir.resolve("models-only-boxed");
+        GeneratorConfig config = GeneratorConfig.builder()
+                .modelsOnly(true)
+                .build();
+        config.setPackageName(PACKAGE_NAME);
+
+        JerseyGenerator generator = new JerseyGenerator();
+        generator.generate(resolvedSpec, outputDir.toString(), config, PACKAGE_NAME);
+
+        Path orderJava;
+        try (Stream<Path> walk = Files.walk(outputDir)) {
+            orderJava = walk
+                    .filter(p -> p.getFileName().toString().equals("Order.java"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Order.java not found under " + outputDir));
+        }
+        String content = Files.readString(orderJava);
+        assertTrue(content.contains("private Double totalAmount"),
+                "modelsOnly should emit boxed Double for optional number fields");
+        assertFalse(content.contains("private double totalAmount"),
+                "modelsOnly must not emit primitive double for optional fields");
+        assertTrue(content.contains("isSetTotalAmount()"),
+                "modelsOnly should generate isSetTotalAmount for optional numeric field");
+        assertTrue(content.contains("totalAmount != null"),
+                "isSetTotalAmount should use null check for boxed optional numeric field");
+        assertFalse(content.contains("isSetTotalAmount() {\n        return true;"),
+                "isSetTotalAmount must not always return true for optional numeric field");
+    }
+
+    @Test
     @DisplayName("useBoxedPrimitives generates wrapper types in model fields")
     public void testUseBoxedPrimitivesGeneratesWrapperTypes() throws Exception {
         OASParser parser = new OASParser();
