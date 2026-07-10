@@ -435,6 +435,75 @@ public class JerseyGeneratorValidationTest {
         assertFalse(pattern.matcher("(en-US)").matches(), "Regex should not match literal \"(en-US)\"");
         assertFalse(pattern.matcher("en-USx").matches(), "Regex should not match \"en-USx\" (anchored)");
     }
+
+    @Test
+    @DisplayName("Array-of-string items.enum emits List<@Pattern(...) String> on field; getters stay List<String>")
+    public void testArrayOfStringEnumUsesTypeUsePattern() throws OASSDKException, IOException {
+        Path outputDir = tempOutputDir.resolve("array-enum-pattern-test");
+        String packageName = "com.test.api";
+
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Array enum pattern test
+              version: "1.0.0"
+            servers:
+              - url: https://api.example.com
+            paths:
+              /export:
+                post:
+                  operationId: createExport
+                  requestBody:
+                    required: true
+                    content:
+                      application/json:
+                        schema:
+                          $ref: '#/components/schemas/KnowledgeExport'
+                  responses:
+                    '202':
+                      description: Accepted
+            components:
+              schemas:
+                KnowledgeExport:
+                  type: object
+                  required:
+                    - resourceTypes
+                  properties:
+                    resourceTypes:
+                      type: array
+                      items:
+                        type: string
+                        enum:
+                          - articles
+                          - topics
+                          - portals
+                          - all
+            """;
+        Path specFile = tempOutputDir.resolve("array-enum-pattern-spec.yaml");
+        Files.writeString(specFile, yamlContent);
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(specFile.toString());
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path modelFile = outputDir.resolve("src/main/java").resolve(TEST_PACKAGE_PATH)
+            .resolve("model").resolve("KnowledgeExport.java");
+        assertTrue(Files.exists(modelFile), "KnowledgeExport model should be generated");
+
+        String generated = Files.readString(modelFile);
+        assertTrue(generated.contains("List<@Pattern(regexp = \""),
+            "Field should use type-use @Pattern on List element: " + generated);
+        assertTrue(generated.contains("(articles)|(topics)|(portals)|(all)"),
+            "Pattern should include all enum values: " + generated);
+        assertTrue(generated.contains("private List<@Pattern") && generated.contains("String> resourceTypes"),
+            "Private field should be List<@Pattern(...) String> resourceTypes");
+        assertTrue(generated.contains("public List<String> getResourceTypes()"),
+            "Getter should remain List<String>");
+        assertTrue(generated.contains("= new ArrayList<String>()"),
+            "Lazy init should use plain ArrayList<String>");
+        assertFalse(generated.contains("public List<@Pattern"),
+            "Getter/setter signatures must not use type-use @Pattern");
+    }
     
     @Test
     @DisplayName("Test AllowedParameterValidator structure")

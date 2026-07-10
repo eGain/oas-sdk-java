@@ -477,6 +477,111 @@ public final class JerseyTypeUtils {
     }
 
     /**
+     * Build an XJC-style enum alternation regex: {@code (v1)|(v2)|...}, with regex metacharacters escaped per value.
+     * Returns null if enumValues is null or empty.
+     */
+    static String buildEnumPatternRegexp(List<?> enumValues) {
+        if (enumValues == null || enumValues.isEmpty()) {
+            return null;
+        }
+        StringBuilder enumPattern = new StringBuilder();
+        for (int i = 0; i < enumValues.size(); i++) {
+            if (i > 0) {
+                enumPattern.append("|");
+            }
+            String enumValue = enumValues.get(i).toString();
+            enumValue = enumValue.replace("\\", "\\\\")
+                    .replace("^", "\\^")
+                    .replace("$", "\\$")
+                    .replace(".", "\\.")
+                    .replace("|", "\\|")
+                    .replace("?", "\\?")
+                    .replace("*", "\\*")
+                    .replace("+", "\\+")
+                    .replace("(", "\\(")
+                    .replace(")", "\\)")
+                    .replace("[", "\\[")
+                    .replace("]", "\\]")
+                    .replace("{", "\\{")
+                    .replace("}", "\\}")
+                    .replace("\"", "\\\"");
+            enumPattern.append("(").append(enumValue).append(")");
+        }
+        return enumPattern.toString();
+    }
+
+    /**
+     * Build a type-use {@code @Pattern} annotation for a string schema with {@code enum} or {@code pattern}.
+     * Enum takes precedence over pattern. Returns empty string when no constraint applies (or for temporal formats).
+     */
+    String buildStringPatternTypeUseAnnotation(Map<String, Object> stringSchema) {
+        if (stringSchema == null) {
+            return "";
+        }
+        Map<String, Object> schema = stringSchema;
+        if (schema.containsKey("allOf") || schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+            Map<String, Object> effective = JerseySchemaUtils.resolveCompositionToEffectiveSchema(schema, ctx.spec);
+            if (effective != null && effective != schema) {
+                schema = effective;
+            }
+        }
+        if (!"string".equals(schema.get("type"))) {
+            return "";
+        }
+        String format = (String) schema.get("format");
+        if (isOpenApiStringTemporalFormat(format)) {
+            return "";
+        }
+        List<?> enumValues = schema.get("enum") instanceof List<?> list ? list : null;
+        String regexp = buildEnumPatternRegexp(enumValues);
+        if (regexp == null) {
+            Object patternObj = schema.get("pattern");
+            if (patternObj == null) {
+                return "";
+            }
+            regexp = patternObj.toString();
+        }
+        String escaped = JerseyNamingUtils.escapePatternForJavaStringLiteral(regexp);
+        return "@Pattern(regexp = \"" + escaped + "\")";
+    }
+
+    /**
+     * Field declaration type for a model property. For {@code List&lt;String&gt;} with string-item
+     * {@code enum} or {@code pattern}, returns a type-use annotated form such as
+     * {@code List&lt;@Pattern(regexp = "(a)|(b)") String&gt;} so Bean Validation constrains each element.
+     * Getters/setters should keep using the plain {@code fieldType}.
+     *
+     * @param fieldType plain Java type from {@link #getFieldTypeForModelProperty}
+     * @param fieldSchema property schema (array schema for object properties; items schema when
+     *                    {@code isArrayTypeWrapperItemsField} is true)
+     * @param isArrayTypeWrapperItemsField true when generating the synthetic {@code items} field of a
+     *                                     top-level array schema wrapper class
+     */
+    String getListFieldDeclarationType(String fieldType, Map<String, Object> fieldSchema,
+                                       boolean isArrayTypeWrapperItemsField) {
+        if (fieldType == null || !"List<String>".equals(fieldType) || fieldSchema == null) {
+            return fieldType;
+        }
+        Map<String, Object> itemsSchema;
+        if (isArrayTypeWrapperItemsField) {
+            itemsSchema = fieldSchema;
+        } else {
+            if (!"array".equals(fieldSchema.get("type")) && !fieldSchema.containsKey("items")) {
+                return fieldType;
+            }
+            itemsSchema = Util.asStringObjectMap(fieldSchema.get("items"));
+            if (itemsSchema == null) {
+                return fieldType;
+            }
+        }
+        String patternAnnotation = buildStringPatternTypeUseAnnotation(itemsSchema);
+        if (patternAnnotation.isEmpty()) {
+            return fieldType;
+        }
+        return "List<" + patternAnnotation + " String>";
+    }
+
+    /**
      * Generate validation annotations based on OpenAPI schema constraints.
      */
     String generateValidationAnnotations(Map<String, Object> schema, boolean isRequired) {
@@ -519,45 +624,10 @@ public final class JerseyTypeUtils {
                         annotations.append("@Email\n    ");
                     }
 
-                    // Enum validation - must be checked before pattern to avoid conflicts
-                    List<?> enumValues = schema.get("enum") instanceof List<?> list ? list : null;
-                    boolean hasEnum = enumValues != null && !enumValues.isEmpty();
-
-                    if (hasEnum && enumValues != null) {
-                        StringBuilder enumPattern = new StringBuilder();
-                        for (int i = 0; i < enumValues.size(); i++) {
-                            if (i > 0) {
-                                enumPattern.append("|");
-                            }
-                            String enumValue = enumValues.get(i).toString();
-                            enumValue = enumValue.replace("\\", "\\\\")
-                                    .replace("^", "\\^")
-                                    .replace("$", "\\$")
-                                    .replace(".", "\\.")
-                                    .replace("|", "\\|")
-                                    .replace("?", "\\?")
-                                    .replace("*", "\\*")
-                                    .replace("+", "\\+")
-                                    .replace("(", "\\(")
-                                    .replace(")", "\\)")
-                                    .replace("[", "\\[")
-                                    .replace("]", "\\]")
-                                    .replace("{", "\\{")
-                                    .replace("}", "\\}")
-                                    .replace("\"", "\\\"");
-                            enumPattern.append("(").append(enumValue).append(")");
-                        }
-                        String enumPatternStr = JerseyNamingUtils.escapePatternForJavaStringLiteral(enumPattern.toString());
-                        annotations.append("@Pattern(regexp = \"").append(enumPatternStr).append("\")\n    ");
-                    }
-
-                    // Pattern validation (only if enum is not present, as enum takes precedence)
-                    if (!hasEnum) {
-                        Object patternObj = schema.get("pattern");
-                        if (patternObj != null) {
-                            String pattern = patternObj.toString();
-                            annotations.append("@Pattern(regexp = \"").append(JerseyNamingUtils.escapePatternForJavaStringLiteral(pattern)).append("\")\n    ");
-                        }
+                    // Enum / pattern validation (enum takes precedence)
+                    String patternAnnotation = buildStringPatternTypeUseAnnotation(schema);
+                    if (!patternAnnotation.isEmpty()) {
+                        annotations.append(patternAnnotation).append("\n    ");
                     }
 
                     // Min and max length together (preferred)
