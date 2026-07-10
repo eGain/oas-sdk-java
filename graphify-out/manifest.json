@@ -40,7 +40,7 @@
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/config/GeneratorConfig.java": {
-    "mtime": 1783310913.6163704,
+    "mtime": 1783311382.5766041,
     "ast_hash": "65b96851feef869d82c06160134adee1",
     "semantic_hash": ""
   },
@@ -270,7 +270,7 @@
     "semantic_hash": "8c7402b811ffe5918cfed19dc5f0863c"
   },
   "src/main/java/egain/oassdk/generators/java/JerseyGenerationContext.java": {
-    "mtime": 1783310902.3765368,
+    "mtime": 1783311382.5766041,
     "ast_hash": "e1eea08223b95186a553900e912ef889",
     "semantic_hash": ""
   },
@@ -280,8 +280,8 @@
     "semantic_hash": "c7a67dfc8f45d3530509d386c9081596"
   },
   "src/main/java/egain/oassdk/generators/java/JerseyModelGenerator.java": {
-    "mtime": 1782113822.927976,
-    "ast_hash": "8f0308c16b14ffb23f5e8706bafd6a4a",
+    "mtime": 1783662045.6933303,
+    "ast_hash": "cfe10208fae2fb0674e212c6c974eea1",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/java/JerseyNamingUtils.java": {
@@ -315,13 +315,13 @@
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/java/JerseySchemaUtils.java": {
-    "mtime": 1782107185.5877202,
-    "ast_hash": "ee7240d9aa6f4ac57a285ee1c6fcfba3",
+    "mtime": 1783579074.4779463,
+    "ast_hash": "fb13a6846d15ea8768a5e158450ec1d5",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/java/JerseyTypeUtils.java": {
-    "mtime": 1783058289.7491777,
-    "ast_hash": "720a4cd3c43fdb1af4be352feadbdb23",
+    "mtime": 1783662029.8998888,
+    "ast_hash": "7baddef7d908871e495bcaf9fa824bf6",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/java/JerseyValidationFrameworkGenerator.java": {
@@ -815,7 +815,7 @@
     "semantic_hash": "b02a806004f412b24bbf9553c2f32aa4"
   },
   "src/test/java/egain/oassdk/generators/java/JerseyGeneratorConfigTest.java": {
-    "mtime": 1783310908.8229747,
+    "mtime": 1783311382.589367,
     "ast_hash": "b63811a07b047782661a6ac208a4e2ea",
     "semantic_hash": ""
   },
@@ -830,13 +830,13 @@
     "semantic_hash": "7a57a1c022688a0ea92a9dc68df8c6ef"
   },
   "src/test/java/egain/oassdk/generators/java/JerseyGeneratorValidationTest.java": {
-    "mtime": 1781086386.9594538,
-    "ast_hash": "2e4095fb4809cd6cba45e5af8fea1d4c",
-    "semantic_hash": "2e4095fb4809cd6cba45e5af8fea1d4c"
+    "mtime": 1783662076.8689172,
+    "ast_hash": "1a284c7af5e5734cdf5439701e8b6e64",
+    "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/java/JerseyModelGeneratorFolderYamlParityTest.java": {
-    "mtime": 1782113822.9479756,
-    "ast_hash": "cae4656ec8bfb2e8b9d80bd28d3aa44d",
+    "mtime": 1783579074.489002,
+    "ast_hash": "7e49abc821cf81efa1f05be84d8ec6fd",
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/java/JerseyModelGeneratorOneOfXorTest.java": {
@@ -855,8 +855,8 @@
     "semantic_hash": "4a888d0ffc003c2153e6ed8f8bdf159a"
   },
   "src/test/java/egain/oassdk/generators/java/JerseyTypeUtilsTest.java": {
-    "mtime": 1783310922.0233364,
-    "ast_hash": "ef83b3e7eae7925ba72d762a431a6381",
+    "mtime": 1783662076.8320463,
+    "ast_hash": "97b5463272d8eced22364c6f80d0ac59",
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/nodejs/ExpressGeneratorTest.java": {
@@ -1015,8 +1015,8 @@
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/common/OpenApiSchemaUtils.java": {
-    "mtime": 1781870665.545808,
-    "ast_hash": "6224f841c38ec8be4cd4aea9970bd6f9",
+    "mtime": 1783579074.4543,
+    "ast_hash": "ee7fe7d2633fbe0e9aca99f50744c5f1",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/common/PathOperation.java": {
@@ -1110,8 +1110,8 @@
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/java/JerseySchemaUtilsMergeTest.java": {
-    "mtime": 1781861154.5568101,
-    "ast_hash": "e90d4fe59ec16392eb64c189bdda94e0",
+    "mtime": 1783579074.5000536,
+    "ast_hash": "e593115c86b23f1984ffa798614aff05",
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/java/JerseySchemaUtilsRefTest.java": {

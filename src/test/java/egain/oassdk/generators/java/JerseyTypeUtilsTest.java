@@ -526,6 +526,91 @@ class JerseyTypeUtilsTest {
         assertFalse(annotations.contains("@Size"));
     }
 
+    // -----------------------------------------------------------------------
+    //  getListFieldDeclarationType (array-of-string enum / pattern)
+    // -----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("getListFieldDeclarationType adds type-use @Pattern for items.enum")
+    void getListFieldDeclarationType_itemsEnum() {
+        Map<String, Object> items = new LinkedHashMap<>();
+        items.put("type", "string");
+        items.put("enum", List.of("articles", "topics", "portals", "all"));
+        Map<String, Object> arraySchema = new LinkedHashMap<>();
+        arraySchema.put("type", "array");
+        arraySchema.put("items", items);
+
+        String declared = createTypeUtils().getListFieldDeclarationType("List<String>", arraySchema, false);
+        assertTrue(declared.startsWith("List<@Pattern(regexp = \""), "Should use type-use @Pattern: " + declared);
+        assertTrue(declared.contains("(articles)|(topics)|(portals)|(all)"), "Should contain enum alternation: " + declared);
+        assertTrue(declared.endsWith(" String>"), "Should end with String>: " + declared);
+    }
+
+    @Test
+    @DisplayName("getListFieldDeclarationType adds type-use @Pattern for items.pattern")
+    void getListFieldDeclarationType_itemsPattern() {
+        Map<String, Object> items = new LinkedHashMap<>();
+        items.put("type", "string");
+        items.put("pattern", "^[a-z]+$");
+        Map<String, Object> arraySchema = new LinkedHashMap<>();
+        arraySchema.put("type", "array");
+        arraySchema.put("items", items);
+
+        String declared = createTypeUtils().getListFieldDeclarationType("List<String>", arraySchema, false);
+        assertTrue(declared.contains("@Pattern(regexp = \""), "Should use type-use @Pattern: " + declared);
+        assertTrue(declared.contains("^[a-z]+$") || declared.contains("^[a-z]+$".replace("\\", "\\\\")),
+            "Should contain pattern: " + declared);
+    }
+
+    @Test
+    @DisplayName("getListFieldDeclarationType leaves plain List<String> unchanged without item constraints")
+    void getListFieldDeclarationType_noConstraints() {
+        Map<String, Object> items = Map.of("type", "string");
+        Map<String, Object> arraySchema = new LinkedHashMap<>();
+        arraySchema.put("type", "array");
+        arraySchema.put("items", items);
+
+        assertEquals("List<String>",
+            createTypeUtils().getListFieldDeclarationType("List<String>", arraySchema, false));
+    }
+
+    @Test
+    @DisplayName("getListFieldDeclarationType for array-wrapper items field uses schema as items")
+    void getListFieldDeclarationType_arrayWrapperItemsField() {
+        Map<String, Object> itemsSchema = new LinkedHashMap<>();
+        itemsSchema.put("type", "string");
+        itemsSchema.put("enum", List.of("a", "b"));
+
+        String declared = createTypeUtils().getListFieldDeclarationType("List<String>", itemsSchema, true);
+        assertTrue(declared.contains("@Pattern(regexp = \""), "Should annotate wrapper items field: " + declared);
+        assertTrue(declared.contains("(a)|(b)"), "Should contain enum values: " + declared);
+    }
+
+    @Test
+    @DisplayName("getListFieldDeclarationType leaves non-List<String> types unchanged")
+    void getListFieldDeclarationType_nonStringList() {
+        Map<String, Object> items = new LinkedHashMap<>();
+        items.put("type", "string");
+        items.put("enum", List.of("x"));
+        Map<String, Object> arraySchema = new LinkedHashMap<>();
+        arraySchema.put("type", "array");
+        arraySchema.put("items", items);
+
+        assertEquals("List<Integer>",
+            createTypeUtils().getListFieldDeclarationType("List<Integer>", arraySchema, false));
+        assertEquals("String",
+            createTypeUtils().getListFieldDeclarationType("String", arraySchema, false));
+    }
+
+    @Test
+    @DisplayName("buildEnumPatternRegexp builds XJC-style grouping alternation")
+    void buildEnumPatternRegexp_grouping() {
+        assertEquals("(articles)|(topics)",
+            JerseyTypeUtils.buildEnumPatternRegexp(List.of("articles", "topics")));
+        assertNull(JerseyTypeUtils.buildEnumPatternRegexp(List.of()));
+        assertNull(JerseyTypeUtils.buildEnumPatternRegexp(null));
+    }
+
     @Test
     @DisplayName("isEligibleForCascadingValidation returns false for XMLGregorianCalendar")
     void isEligibleForCascadingValidation_xmlGregorianCalendar() {

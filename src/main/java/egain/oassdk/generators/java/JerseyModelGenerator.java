@@ -438,8 +438,10 @@ class JerseyModelGenerator {
                 content.append("@Valid\n    ");
             }
 
-            // Add field type and name
-            content.append("private ").append(fieldType).append(" ").append(javaFieldName).append(";\n\n");
+            // Add field type and name (type-use @Pattern on List<String> elements when items have enum/pattern)
+            String declaredType = typeUtils.getListFieldDeclarationType(
+                    fieldType, fieldSchema, isArrayType && "items".equals(fieldName));
+            content.append("private ").append(declaredType).append(" ").append(javaFieldName).append(";\n\n");
 
             if (oneOfXorAssertBlock != null && fieldName.equals(injectXorAssertsAfterField)) {
                 content.append(oneOfXorAssertBlock);
@@ -980,7 +982,8 @@ class JerseyModelGenerator {
             if (typeUtils.isEligibleForCascadingValidation(fieldType)) {
                 content.append("@Valid\n").append(indentBody);
             }
-            content.append("private ").append(fieldType).append(" ").append(javaFieldName).append(";\n\n");
+            String declaredType = typeUtils.getListFieldDeclarationType(fieldType, fieldSchema, false);
+            content.append("private ").append(declaredType).append(" ").append(javaFieldName).append(";\n\n");
         }
 
         content.append(indentBody).append("public ").append(innerClassName).append("() {\n");
