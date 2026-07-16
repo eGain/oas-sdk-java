@@ -156,12 +156,21 @@ class JerseyQueryParamValidatorGenerator {
             Map<String, Object> schema = Util.asStringObjectMap(param.get("schema"));
             boolean isRequired = param.containsKey("required") ? (Boolean) param.get("required") : false;
 
-            if (name == null || in == null || schema == null) continue;
+            if (name == null || in == null) continue;
 
-            // Skip header parameters
+            // Opt-in required Accept header only; all other headers stay framework-owned
             if ("header".equals(in)) {
+                if ("Accept".equalsIgnoreCase(name) && isRequired) {
+                    sb.append("    List<String> arguments").append(getNextArgCounter())
+                            .append(" = List.of(\"Accept\");\n");
+                    sb.append("    v.add(new RequiredHeaderValidator(\"Accept\", \"L10N_HEADER_CANNOT_BE_EMPTY\", arguments")
+                            .append(getCurrentArgCounter())
+                            .append(", Collections.emptyList()));\n");
+                }
                 continue;
             }
+
+            if (schema == null) continue;
 
             // Add to allowed parameters list for query params
             if ("query".equals(in)) {
@@ -444,6 +453,7 @@ class JerseyQueryParamValidatorGenerator {
         content.append("import ").append(validationPackage).append(".NumericMaxValidator;\n");
         content.append("import ").append(validationPackage).append(".NumericMinValidator;\n");
         content.append("import ").append(validationPackage).append(".PatternValidator;\n");
+        content.append("import ").append(validationPackage).append(".RequiredHeaderValidator;\n");
         content.append("import java.lang.String;\n");
         content.append("import java.util.Collections;\n");
         content.append("import java.util.List;\n\n");
@@ -497,7 +507,7 @@ class JerseyQueryParamValidatorGenerator {
         content.append("   * \n");
         content.append("   * @param path The request path\n");
         content.append("   * @param httpMethod The HTTP method (GET, POST, PUT, DELETE, PATCH)\n");
-        content.append("   * @param requestInfo The RequestInfo object containing path and query parameters\n");
+        content.append("   * @param requestInfo The RequestInfo object containing path, query, and header parameters\n");
         content.append("   * @return ValidationError if validation fails, null if validation passes\n");
         content.append("   */\n");
         content.append("  public static egain.framework.validation.ValidationError validate(\n");

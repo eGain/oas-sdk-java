@@ -48,7 +48,8 @@ public class JerseyGeneratorValidationTest {
         "ArrayUniqueItemsValidators",
         "ArraySimpleStyleValidator",
         "IsAllowEmptyValueValidator",
-        "IsAllowReservedValidator"
+        "IsAllowReservedValidator",
+        "RequiredHeaderValidator"
     );
     
     @Test
@@ -702,6 +703,8 @@ public class JerseyGeneratorValidationTest {
             "Should import IsRequiredValidator from package " + VALIDATION_PACKAGE);
         assertTrue(content.contains("import " + VALIDATION_PACKAGE + ".PatternValidator;"),
             "Should import PatternValidator from package " + VALIDATION_PACKAGE);
+        assertTrue(content.contains("import " + VALIDATION_PACKAGE + ".RequiredHeaderValidator;"),
+            "Should import RequiredHeaderValidator from package " + VALIDATION_PACKAGE);
         assertFalse(content.contains("import egain.ws.oas.Validation."),
             "Should not import from uppercase Validation package");
     }
