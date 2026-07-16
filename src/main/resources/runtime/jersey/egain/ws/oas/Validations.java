@@ -147,6 +147,12 @@ public class Validations
 		paramName) -> holder.queryParameters().get(paramName).stream().findFirst().orElse(null);
 	public static final BiFunction<RequestInfo, String, String> getPathParameterValue = (holder,
 		paramName) -> holder.pathParameters().get(paramName).stream().findFirst().orElse(null);
+	public static final BiFunction<RequestInfo, String, String> getHeaderParameterValue = (holder,
+		paramName) -> {
+		if (holder.headerParameters() == null)
+			return null;
+		return holder.headerParameters().get(paramName).stream().findFirst().orElse(null);
+	};
 	
 	public record ParameterValidatorMapKey(String url, String httpMethod) {
 		@Override

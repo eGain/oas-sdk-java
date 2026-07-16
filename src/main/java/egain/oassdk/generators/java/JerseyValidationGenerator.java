@@ -53,6 +53,60 @@ class JerseyValidationGenerator {
         generateArraySimpleStyleValidator(validationDir, VALIDATION_PACKAGE);
         generateIsAllowEmptyValueValidator(validationDir, VALIDATION_PACKAGE);
         generateIsAllowReservedValidator(validationDir, VALIDATION_PACKAGE);
+        generateRequiredHeaderValidator(validationDir, VALIDATION_PACKAGE);
+    }
+
+    /**
+     * Generate RequiredHeaderValidator — presence and non-empty first value for required headers (e.g. Accept).
+     */
+    private void generateRequiredHeaderValidator(String outputDir, String packageName) throws IOException {
+        String content = String.format("""
+                package %s;
+
+                import java.util.ArrayList;
+                import java.util.List;
+
+                import egain.framework.validation.ValidationError;
+                import egain.framework.validation.ValidationErrorHelper;
+                import egain.framework.validation.ValidatorAction;
+
+                import egain.ws.oas.RequestInfo;
+
+                public class RequiredHeaderValidator implements ValidatorAction<RequestInfo>
+                {
+                    private final String headerName;
+                    private final String l10nKey;
+                    private final List<String> arguments;
+                    private final List<String> localizedArgs;
+
+                    public RequiredHeaderValidator(String headerName, String l10nKey, List<String> arguments,
+                        List<String> localizedArguments)
+                    {
+                        this.headerName = headerName;
+                        this.l10nKey = l10nKey;
+                        this.arguments = new ArrayList<>(arguments);
+                        this.localizedArgs = new ArrayList<>(localizedArguments);
+                    }
+
+                    @Override
+                    public ValidationError call(RequestInfo val)
+                    {
+                        if (val.headerParameters() == null || !val.headerParameters().containsKey(headerName))
+                        {
+                            return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
+                        }
+                        List<String> values = new ArrayList<>(val.headerParameters().get(headerName));
+                        String first = (values != null && !values.isEmpty()) ? values.get(0) : "";
+                        if (first == null || first.isEmpty())
+                        {
+                            return ValidationErrorHelper.createValidationError("", l10nKey, arguments, localizedArgs);
+                        }
+                        return null;
+                    }
+                }
+                """, packageName);
+
+        writeFile(outputDir + "/RequiredHeaderValidator.java", content);
     }
 
     /**
