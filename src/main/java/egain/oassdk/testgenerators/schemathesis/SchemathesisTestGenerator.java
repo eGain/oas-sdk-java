@@ -23,6 +23,10 @@ import java.util.Objects;
  * (paths and CI placeholders such as {@code %HUB%}, {@code %BASEURL%}, {@code %TOKEN%}),
  * {@code schemathesis.toml} (Schemathesis CLI coverage and check defaults),
  * and {@code run-schemathesis.sh} wrapping {@code st run}.
+ * <p>Defaults include {@code CHECKS=all} and coverage {@code unexpected-methods}. Product policy for
+ * eGain v4 APIs (CBD-8621 / CBD-8622 / CBD-8624): do <strong>not</strong> document or require
+ * HTTP 405/414 in OpenAPI solely to silence Schemathesis — those are container/server behaviors
+ * and are Won't Fix for shared folder paths.
  * <p>Optional {@link TestConfig#getAdditionalProperties()} keys:
  * <ul>
  *   <li>{@code schemathesis.bundleDir} (String, default {@code schemathesis}) — subdirectory under
@@ -40,6 +44,10 @@ import java.util.Objects;
  */
 public class SchemathesisTestGenerator implements TestGenerator, ConfigurableTestGenerator {
 
+    /**
+     * Default TOML. Keeps unexpected-methods coverage and missing required header → 400.
+     * Do not add documented 405/414 expectations here (CBD-8621/8622/8624 product Won't Fix).
+     */
     private static final String DEFAULT_SCHEMATHESIS_TOML = """
             [phases.coverage]
             unexpected-methods = ["GET", "PUT", "POST", "DELETE", "OPTIONS", "PATCH"]

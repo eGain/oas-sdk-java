@@ -322,6 +322,35 @@ public class UnitTestGeneratorTest {
     }
 
     @Test
+    public void testEmptyAcceptHeaderNegativeGenerated(@TempDir Path tempDir)
+            throws GenerationException, java.io.IOException {
+        Map<String, Object> acceptSpec = createSpecWithRequiredAcceptHeader();
+        testConfig.setTestFramework("junit5");
+
+        generator.generate(acceptSpec, tempDir.toString(), testConfig, "junit5");
+
+        Path unitDir = tempDir.resolve("unit");
+        Path packageDir = unitDir.resolve("src/test/java/com/example/api");
+        assertTrue(Files.exists(packageDir), "Generated unit test package should exist");
+
+        boolean found = Files.walk(packageDir)
+                .filter(Files::isRegularFile)
+                .filter(p -> p.toString().endsWith("Test.java"))
+                .anyMatch(testFile -> {
+                    try {
+                        String content = Files.readString(testFile);
+                        return content.contains("_EmptyAcceptHeader()")
+                                && content.contains(".header(\"Accept\", \"\")")
+                                && content.contains("equalTo(400)");
+                    } catch (java.io.IOException e) {
+                        fail("Failed to read test file: " + testFile);
+                        return false;
+                    }
+                });
+        assertTrue(found, "Generated unit tests should include empty Accept header negative (CBD-8608)");
+    }
+
+    @Test
     public void testInvalidQueryValuesGeneratedForAllConstrainedQueryParams(@TempDir Path tempDir)
             throws GenerationException, java.io.IOException {
         Map<String, Object> mixed = createSpecWithMixedQueryInvalidParameters();
@@ -581,6 +610,29 @@ public class UnitTestGeneratorTest {
         return spec;
     }
     
+    private Map<String, Object> createSpecWithRequiredAcceptHeader() {
+        Map<String, Object> spec = new HashMap<>();
+        spec.put("openapi", "3.0.0");
+        spec.put("info", Map.of("title", "Accept API", "version", "1.0.0"));
+
+        Map<String, Object> get = new HashMap<>();
+        get.put("operationId", "getAsyncJobStatus");
+        get.put("summary", "Get async job status");
+        get.put("tags", java.util.List.of("async"));
+        get.put("parameters", java.util.List.of(
+                Map.of("name", "Accept", "in", "header", "required", true,
+                        "schema", Map.of("type", "string", "minLength", 1)),
+                Map.of("name", "jobID", "in", "path", "required", true,
+                        "schema", Map.of("type", "string", "minLength", 1))
+        ));
+        get.put("responses", Map.of("200", Map.of("description", "OK")));
+
+        Map<String, Object> pathItem = new HashMap<>();
+        pathItem.put("get", get);
+        spec.put("paths", Map.of("/async/job/{jobID}", pathItem));
+        return spec;
+    }
+
     /**
      * Helper method to create spec with pattern parameter
      */

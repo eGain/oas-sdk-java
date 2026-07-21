@@ -479,6 +479,179 @@ public class OASValidatorTest {
         });
     }
     
+    @Test
+    public void testPatternWithoutMinOrMaxLength_flagsPathParam() {
+        Map<String, Object> spec = createValidOpenAPISpec();
+        Map<String, Object> paths = getPaths(spec);
+        Map<String, Object> pathItem = new HashMap<>();
+        Map<String, Object> get = new HashMap<>();
+        get.put("operationId", "getFolder");
+        get.put("responses", Map.of("200", Map.of("description", "OK")));
+        Map<String, Object> param = new HashMap<>();
+        param.put("name", "folderID");
+        param.put("in", "path");
+        param.put("required", true);
+        param.put("schema", Map.of(
+                "type", "string",
+                "pattern", "^[1-9]\\d{13,19}$"));
+        get.put("parameters", List.of(param));
+        pathItem.put("get", get);
+        paths.put("/folders/{folderID}", pathItem);
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> validator.validate(spec));
+        assertTrue(ex.getMessage().contains("has pattern but neither minLength nor maxLength"),
+                ex.getMessage());
+    }
+
+    @Test
+    public void testPatternWithMinLength_passes() {
+        Map<String, Object> spec = createValidOpenAPISpec();
+        Map<String, Object> paths = getPaths(spec);
+        Map<String, Object> pathItem = new HashMap<>();
+        Map<String, Object> get = new HashMap<>();
+        get.put("operationId", "getFolder");
+        get.put("responses", Map.of("200", Map.of("description", "OK")));
+        Map<String, Object> schema = new HashMap<>();
+        schema.put("type", "string");
+        schema.put("pattern", "^[1-9]\\d{13,19}$");
+        schema.put("minLength", 14);
+        schema.put("maxLength", 20);
+        Map<String, Object> param = new HashMap<>();
+        param.put("name", "folderID");
+        param.put("in", "path");
+        param.put("required", true);
+        param.put("schema", schema);
+        get.put("parameters", List.of(param));
+        pathItem.put("get", get);
+        paths.put("/folders/{folderID}", pathItem);
+
+        assertDoesNotThrow(() -> validator.validate(spec));
+    }
+
+    @Test
+    public void testBlankableStringPaginationQueryParam_flags() {
+        Map<String, Object> spec = createValidOpenAPISpec();
+        Map<String, Object> paths = getPaths(spec);
+        Map<String, Object> pathItem = new HashMap<>();
+        Map<String, Object> get = new HashMap<>();
+        get.put("operationId", "getFolders");
+        get.put("responses", Map.of("200", Map.of("description", "OK")));
+        Map<String, Object> param = new HashMap<>();
+        param.put("name", "$pagesize");
+        param.put("in", "query");
+        param.put("schema", Map.of("type", "string"));
+        get.put("parameters", List.of(param));
+        pathItem.put("get", get);
+        paths.put("/folders", pathItem);
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> validator.validate(spec));
+        assertTrue(ex.getMessage().contains("blankable string"), ex.getMessage());
+    }
+
+    @Test
+    public void testIntegerPaginationQueryParam_passes() {
+        Map<String, Object> spec = createValidOpenAPISpec();
+        Map<String, Object> paths = getPaths(spec);
+        Map<String, Object> pathItem = new HashMap<>();
+        Map<String, Object> get = new HashMap<>();
+        get.put("operationId", "getFolders");
+        get.put("responses", Map.of("200", Map.of("description", "OK")));
+        Map<String, Object> schema = new HashMap<>();
+        schema.put("type", "integer");
+        schema.put("minimum", 1);
+        schema.put("maximum", 75);
+        Map<String, Object> param = new HashMap<>();
+        param.put("name", "$pagesize");
+        param.put("in", "query");
+        param.put("schema", schema);
+        get.put("parameters", List.of(param));
+        pathItem.put("get", get);
+        paths.put("/folders", pathItem);
+
+        assertDoesNotThrow(() -> validator.validate(spec));
+    }
+
+    @Test
+    public void testJsonRequestBodyMustBeObject_flagsScalarType() {
+        Map<String, Object> spec = createValidOpenAPISpec();
+        Map<String, Object> paths = getPaths(spec);
+        Map<String, Object> pathItem = new HashMap<>();
+        Map<String, Object> post = new HashMap<>();
+        post.put("operationId", "createFolder");
+        post.put("responses", Map.of("201", Map.of("description", "Created")));
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("required", true);
+        requestBody.put("content", Map.of(
+                "application/json", Map.of("schema", Map.of("type", "string"))));
+        post.put("requestBody", requestBody);
+        pathItem.put("post", post);
+        paths.put("/folders", pathItem);
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> validator.validate(spec));
+        assertTrue(ex.getMessage().contains("must use an object schema"), ex.getMessage());
+    }
+
+    @Test
+    public void testJsonRequestBodyObjectType_passes() {
+        Map<String, Object> spec = createValidOpenAPISpec();
+        Map<String, Object> paths = getPaths(spec);
+        Map<String, Object> pathItem = new HashMap<>();
+        Map<String, Object> post = new HashMap<>();
+        post.put("operationId", "createFolder");
+        post.put("responses", Map.of("201", Map.of("description", "Created")));
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("required", true);
+        requestBody.put("content", Map.of(
+                "application/json", Map.of("schema", Map.of(
+                        "type", "object",
+                        "properties", Map.of("name", Map.of("type", "string"))))));
+        post.put("requestBody", requestBody);
+        pathItem.put("post", post);
+        paths.put("/folders", pathItem);
+
+        assertDoesNotThrow(() -> validator.validate(spec));
+    }
+
+    @Test
+    public void testErrorDeveloperMessageMaxLengthFloor_flags() {
+        Map<String, Object> spec = createValidOpenAPISpec();
+        Map<String, Object> components = new HashMap<>();
+        Map<String, Object> schemas = new HashMap<>();
+        Map<String, Object> errorSchema = new HashMap<>();
+        errorSchema.put("type", "object");
+        errorSchema.put("properties", Map.of(
+                "developerMessage", Map.of(
+                        "type", "string",
+                        "minLength", 0,
+                        "maxLength", 255)));
+        schemas.put("WSErrorCommon", errorSchema);
+        components.put("schemas", schemas);
+        spec.put("components", components);
+
+        ValidationException ex = assertThrows(ValidationException.class, () -> validator.validate(spec));
+        assertTrue(ex.getMessage().contains("developerMessage maxLength"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("1024"), ex.getMessage());
+    }
+
+    @Test
+    public void testErrorDeveloperMessageMaxLengthFloor_passesAt2048() {
+        Map<String, Object> spec = createValidOpenAPISpec();
+        Map<String, Object> components = new HashMap<>();
+        Map<String, Object> schemas = new HashMap<>();
+        Map<String, Object> errorSchema = new HashMap<>();
+        errorSchema.put("type", "object");
+        errorSchema.put("properties", Map.of(
+                "developerMessage", Map.of(
+                        "type", "string",
+                        "minLength", 0,
+                        "maxLength", 2048)));
+        schemas.put("WSErrorCommon", errorSchema);
+        components.put("schemas", schemas);
+        spec.put("components", components);
+
+        assertDoesNotThrow(() -> validator.validate(spec));
+    }
+
     /**
      * Helper method to create a valid OpenAPI specification
      */
@@ -495,6 +668,11 @@ public class OASValidatorTest {
         paths.put("/test", pathItem);
         spec.put("paths", paths);
         return spec;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getPaths(Map<String, Object> spec) {
+        return (Map<String, Object>) spec.get("paths");
     }
 }
 

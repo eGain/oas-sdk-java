@@ -305,7 +305,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
 
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("method", method.toUpperCase());
-        requestMap.put("header", generateHeaders(operation));
+        requestMap.put("header", applyHeaderOverrides(generateHeaders(operation), nc.headerOverrides));
         requestMap.put("url", PostmanParameterSupport.buildUrlObject(path, resolvedPath, nc.queryEntries));
         requestMap.put("body", generateBody(operation, spec));
         requestMap.put("description", escapedDescription);
@@ -314,6 +314,48 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         int expected = nc.expectedStatusOverride != null ? nc.expectedStatusOverride : default4xx;
         item.put("event", generateNegativeTests(operation, expected));
         return item;
+    }
+
+    /**
+     * Applies negative-case header overrides (match by key, case-insensitive).
+     */
+    private List<Map<String, Object>> applyHeaderOverrides(List<Map<String, Object>> headers,
+                                                           Map<String, String> overrides) {
+        if (overrides == null || overrides.isEmpty()) {
+            return headers;
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        Set<String> applied = new java.util.HashSet<>();
+        for (Map<String, Object> h : headers) {
+            if (h == null) {
+                continue;
+            }
+            Object keyObj = h.get("key");
+            String key = keyObj != null ? keyObj.toString() : null;
+            if (key != null) {
+                String override = null;
+                for (Map.Entry<String, String> e : overrides.entrySet()) {
+                    if (key.equalsIgnoreCase(e.getKey())) {
+                        override = e.getValue();
+                        applied.add(e.getKey().toLowerCase(Locale.ROOT));
+                        break;
+                    }
+                }
+                if (override != null) {
+                    Map<String, Object> copy = new LinkedHashMap<>(h);
+                    copy.put("value", override);
+                    out.add(copy);
+                    continue;
+                }
+            }
+            out.add(h);
+        }
+        for (Map.Entry<String, String> e : overrides.entrySet()) {
+            if (!applied.contains(e.getKey().toLowerCase(Locale.ROOT))) {
+                out.add(Map.of("key", e.getKey(), "value", e.getValue() != null ? e.getValue() : ""));
+            }
+        }
+        return out;
     }
 
     private Map<String, Object> buildHappyPathUrl(String path, Map<String, Object> operation) {

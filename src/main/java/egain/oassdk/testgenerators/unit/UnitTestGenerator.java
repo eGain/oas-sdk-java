@@ -273,6 +273,10 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                     emitInvalidParameterTest(sb, testMethodName, summary, method, path, parameters, paramName, bodyLiteral,
                             pathPatternLiterals, shouldEmitPatternAssertion(schema), pattern);
                 }
+            } else if (Boolean.TRUE.equals(required) && "header".equals(paramIn)
+                    && "Accept".equalsIgnoreCase(paramName)) {
+                // CBD-8608: empty Accept must be rejected with 400
+                emitEmptyAcceptHeaderTest(sb, testMethodName, summary, method, path, parameters, bodyLiteral);
             }
         }
         } // end !smoke param negatives
@@ -484,6 +488,36 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         sb.append("        }\n");
         sb.append("        executor.shutdown();\n");
         sb.append("        assertTrue(ok > 0, \"Expected at least one successful response under concurrency\");\n");
+        sb.append("    }\n\n");
+    }
+
+    /**
+     * Emits a negative test that sends an empty Accept header (CBD-8608).
+     */
+    private void emitEmptyAcceptHeaderTest(StringBuilder sb, String testMethodName, String summary,
+                                           String method, String path, List<Map<String, Object>> parameters,
+                                           String bodyLiteral) {
+        sb.append("    @Test\n");
+        sb.append("    @DisplayName(\"").append(escapeJavaString(summary != null ? summary : method + " " + path))
+                .append(" - Empty Accept header\")\n");
+        sb.append("    public void test").append(capitalize(testMethodName)).append("_EmptyAcceptHeader() {\n");
+        appendParamMaps(sb, parameters);
+        boolean withBody = needsRequestBody(method) && bodyLiteral != null;
+        sb.append("        RequestSpecification spec = given()\n");
+        sb.append("            .header(\"Accept\", \"\")\n");
+        sb.append("            .header(\"Authorization\", authToken());\n");
+        sb.append("        for (Map.Entry<String, String> e : pathParams.entrySet()) {\n");
+        sb.append("            spec = spec.pathParam(e.getKey(), e.getValue());\n");
+        sb.append("        }\n");
+        sb.append("        for (Map.Entry<String, String> e : queryParams.entrySet()) {\n");
+        sb.append("            spec = spec.queryParam(e.getKey(), e.getValue());\n");
+        sb.append("        }\n");
+        if (withBody) {
+            sb.append("        spec = spec.contentType(ContentType.JSON).body(").append(bodyLiteral).append(");\n");
+        }
+        sb.append("        spec.when()\n");
+        appendWhenVerb(sb, method, path);
+        sb.append("        .then()\n            .statusCode(anyOf(equalTo(400), equalTo(422)));\n");
         sb.append("    }\n\n");
     }
 

@@ -224,15 +224,16 @@ class JerseyQueryParamValidatorGenerator {
         String type = (String) schema.get("type");
         if (type == null) return;
 
-        // String validations
+        // String validations — pattern before min/max length so invalid format
+        // reports pattern message first (CBD-8606 / CBD-8480 / CBD-8550).
         if ("string".equals(type)) {
-            // Max length
-            if (schema.containsKey("maxLength")) {
-                Object maxLength = schema.get("maxLength");
-                String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_MORE_THAN_MAX_LEN";
+            // Pattern
+            if (schema.containsKey("pattern")) {
+                String pattern = (String) schema.get("pattern");
+                String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_PATTERN";
                 sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(paramName)
-                        .append("\", \"").append(maxLength).append("\");\n");
-                sb.append("    v.add(new MaxLengthValidator(\"").append(paramName).append("\", \"").append(maxLength)
+                        .append("\", \"").append(escapePatternForJavaStringLiteral(pattern)).append("\");\n");
+                sb.append("    v.add(new PatternValidator(\"").append(paramName).append("\", \"").append(escapePatternForJavaStringLiteral(pattern))
                         .append("\", \"").append(errorCode).append("\", arguments").append(getCurrentArgCounter())
                         .append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
             }
@@ -248,13 +249,13 @@ class JerseyQueryParamValidatorGenerator {
                         .append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
             }
 
-            // Pattern
-            if (schema.containsKey("pattern")) {
-                String pattern = (String) schema.get("pattern");
-                String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_PATTERN";
+            // Max length
+            if (schema.containsKey("maxLength")) {
+                Object maxLength = schema.get("maxLength");
+                String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_MORE_THAN_MAX_LEN";
                 sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(paramName)
-                        .append("\", \"").append(escapePatternForJavaStringLiteral(pattern)).append("\");\n");
-                sb.append("    v.add(new PatternValidator(\"").append(paramName).append("\", \"").append(escapePatternForJavaStringLiteral(pattern))
+                        .append("\", \"").append(maxLength).append("\");\n");
+                sb.append("    v.add(new MaxLengthValidator(\"").append(paramName).append("\", \"").append(maxLength)
                         .append("\", \"").append(errorCode).append("\", arguments").append(getCurrentArgCounter())
                         .append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
             }

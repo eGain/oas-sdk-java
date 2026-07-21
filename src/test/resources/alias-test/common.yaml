@@ -320,6 +320,8 @@ components:
       required: false
       schema:
         type: string
+        minLength: 1
+        pattern: '^[1-9]\d*$'
         example: '1'
     pagesize:
       name: "$pagesize"
@@ -327,8 +329,10 @@ components:
       description: 'Pagination parameter that specifies the number of results per page. This is used in conjunction with $pagenum.<br>_Default value_: 25'
       required: false
       schema:
-        type: string      
-        example: '25'  
+        type: string
+        minLength: 1
+        pattern: '^[1-9]\d*$'
+        example: '25'
     rangestart:
       name: "$rangestart"
       in: query

@@ -26,15 +26,26 @@ public final class PostmanNegativeRequestFactory {
         public final Map<String, String> pathLiterals;
         public final List<Map<String, Object>> queryEntries;
         public final Integer expectedStatusOverride;
+        /** Optional header key→value overrides (e.g. empty Accept for CBD-8608). */
+        public final Map<String, String> headerOverrides;
 
         public NegativeCase(String name,
                             Map<String, String> pathLiterals,
                             List<Map<String, Object>> queryEntries,
                             Integer expectedStatusOverride) {
+            this(name, pathLiterals, queryEntries, expectedStatusOverride, Map.of());
+        }
+
+        public NegativeCase(String name,
+                            Map<String, String> pathLiterals,
+                            List<Map<String, Object>> queryEntries,
+                            Integer expectedStatusOverride,
+                            Map<String, String> headerOverrides) {
             this.name = name;
             this.pathLiterals = pathLiterals != null ? pathLiterals : Map.of();
             this.queryEntries = queryEntries;
             this.expectedStatusOverride = expectedStatusOverride;
+            this.headerOverrides = headerOverrides != null ? headerOverrides : Map.of();
         }
     }
 
@@ -119,6 +130,31 @@ public final class PostmanNegativeRequestFactory {
                 continue;
             }
             addPathNegatives(cases, maxCases, pathName, schema, default4xx, pathNames, positiveQueryList);
+        }
+
+        // CBD-8608: required Accept header with empty value must yield 4xx
+        if (cases.size() < maxCases) {
+            for (Map<String, Object> p : parameters) {
+                if (p == null) {
+                    continue;
+                }
+                if (!"header".equals(p.get("in"))) {
+                    continue;
+                }
+                if (!Boolean.TRUE.equals(p.get("required"))) {
+                    continue;
+                }
+                String headerName = (String) p.get("name");
+                if (headerName != null && "Accept".equalsIgnoreCase(headerName)) {
+                    cases.add(new NegativeCase(
+                            "Empty Accept header",
+                            Map.of(),
+                            deepCopyQuery(positiveQueryList),
+                            default4xx,
+                            Map.of("Accept", "")));
+                    break;
+                }
+            }
         }
 
         return cases;

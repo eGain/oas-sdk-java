@@ -2,6 +2,7 @@ package egain.oassdk.generators.java;
 
 import egain.oassdk.OASSDK;
 import egain.oassdk.core.exceptions.OASSDKException;
+import egain.oassdk.testgenerators.postman.PostmanNegativeRequestFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -9,6 +10,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -192,6 +195,25 @@ public class JerseyAcceptHeaderValidationTest {
             "Non-Accept required headers must not appear in QueryParamValidators");
         assertTrue(content.contains("filter") || content.contains("AllowedParameterValidator"),
             "Query params should still be validated");
+    }
+
+    @Test
+    @DisplayName("Postman negatives include empty Accept when Accept is required (CBD-8608)")
+    public void testPostmanEmptyAcceptNegativeCase() {
+        Map<String, Object> operation = Map.of(
+                "operationId", "getAsyncJobStatus",
+                "parameters", List.of(
+                        Map.of("name", "Accept", "in", "header", "required", true,
+                                "schema", Map.of("type", "string", "minLength", 1))),
+                "responses", Map.of("200", Map.of("description", "OK")));
+
+        List<PostmanNegativeRequestFactory.NegativeCase> cases =
+                PostmanNegativeRequestFactory.buildCases("/async/job/{jobID}", operation, List.of(), 50, 400);
+
+        assertTrue(cases.stream().anyMatch(c ->
+                        "Empty Accept header".equals(c.name)
+                                && "".equals(c.headerOverrides.get("Accept"))),
+                "Should emit Empty Accept header negative case");
     }
 
     @Test
