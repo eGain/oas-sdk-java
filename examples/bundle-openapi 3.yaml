@@ -5161,6 +5161,8 @@ components:
       schema:
         type: string
         pattern: ^[1-9]\d{14}$
+        minLength: 15
+        maxLength: 15
         example: '202201000000002'
       description: The numerical ID of the Casebase Release for which details is to be fetched.
     filterCasebaseRelease:
@@ -5617,6 +5619,8 @@ components:
         type: string
         format: uuid
         pattern: \b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b
+        minLength: 36
+        maxLength: 36
     OptionalTopicId:
       name: filter[articles-in-topic-tree]
       description: This parameter will restrict the search scope to the provided topic and it's sub topic.
