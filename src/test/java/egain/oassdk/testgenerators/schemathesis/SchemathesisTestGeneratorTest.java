@@ -32,7 +32,8 @@ class SchemathesisTestGeneratorTest {
 
         String toml = Files.readString(bundle.resolve("schemathesis.toml"));
         assertTrue(toml.contains("[phases.coverage]"));
-        assertTrue(toml.contains("unexpected-methods"));
+        assertTrue(toml.contains("unexpected-methods = [\"GET\", \"PUT\", \"POST\", \"DELETE\", \"OPTIONS\", \"PATCH\"]"),
+                "Coverage phase must list unexpected-methods (CBD-8365 regression)");
         assertTrue(toml.contains("[checks.missing_required_header]"));
         assertTrue(toml.contains("expected-statuses = [400]"));
 
@@ -43,13 +44,26 @@ class SchemathesisTestGeneratorTest {
         assertTrue(props.contains("TLS_VERIFY=false"));
         assertTrue(props.contains("EXTRA_ARGS="));
         assertTrue(props.contains("--include-operation-id createFolder"));
+        assertTrue(props.contains("CHECKS=all") || props.lines().anyMatch(l -> l.startsWith("CHECKS=") && l.contains("all")),
+                "Default CHECKS must be all for full contract coverage");
 
         String script = Files.readString(bundle.resolve("run-schemathesis.sh"));
         assertTrue(script.contains("st run"));
         assertTrue(script.contains("load_test_env"));
         assertTrue(script.contains("deleteFolder"));
         assertTrue(script.contains("--phases="));
+        assertTrue(script.contains("--checks"));
         assertTrue(script.contains("--tls-verify=false"));
+    }
+
+    @Test
+    void defaultTomlKeepsUnexpectedMethodsAndDoesNotRequire405Or414(@TempDir Path tempDir)
+            throws GenerationException, IOException {
+        new SchemathesisTestGenerator().generate(minimalSpec(), tempDir.toString(), TestConfig.builder().build(), null);
+        String toml = Files.readString(tempDir.resolve("schemathesis").resolve("schemathesis.toml"));
+        assertTrue(toml.contains("unexpected-methods"));
+        assertFalse(toml.contains("405"), "Do not bake 405 into default schemathesis.toml (CBD-8621 Won't Fix)");
+        assertFalse(toml.contains("414"), "Do not bake 414 into default schemathesis.toml (CBD-8622/8624 Won't Fix)");
     }
 
     @Test

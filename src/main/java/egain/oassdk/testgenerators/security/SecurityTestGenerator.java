@@ -246,6 +246,27 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                             sb.append("            \"Expected 401 or 403 for invalid authentication token, got \" + response.statusCode());\n");
                             sb.append("    }\n\n");
 
+                            // CBD-8481: client-app tokens must not be treated as user tokens for secured APIs
+                            sb.append("    @Test\n");
+                            sb.append("    @DisplayName(\"Authentication: ").append(summary != null ? summary : method.toUpperCase() + " " + path)
+                                    .append(" - Client App Token\")\n");
+                            sb.append("    void testAuthentication_ClientAppToken_").append(sanitizePath(path)).append("_").append(method).append("() throws Exception {\n");
+                            sb.append("        // Arrange - Client-application token (not a user token); expect 401/403\n");
+                            sb.append("        URI uri = uriFor(\"").append(path).append("\");\n");
+                            sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
+                            sb.append("            .uri(uri)\n");
+                            sb.append("            .timeout(REQUEST_TIMEOUT)\n");
+                            sb.append("            .").append(method.toUpperCase()).append("()\n");
+                            sb.append("            .header(\"Accept\", \"application/json\")\n");
+                            sb.append("            .header(\"Authorization\", \"Bearer <TOKEN_CLIENT_APP>\")\n");
+                            sb.append("            .build();\n\n");
+                            sb.append("        // Act\n");
+                            sb.append("        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());\n\n");
+                            sb.append("        // Assert\n");
+                            sb.append("        assertTrue(response.statusCode() == 401 || response.statusCode() == 403,\n");
+                            sb.append("            \"Expected 401 or 403 for client-app token on user-secured API, got \" + response.statusCode());\n");
+                            sb.append("    }\n\n");
+
                             break; // Only test first secured endpoint
                         }
                     }

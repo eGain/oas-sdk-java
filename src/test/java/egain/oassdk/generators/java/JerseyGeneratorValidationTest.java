@@ -913,5 +913,55 @@ public class JerseyGeneratorValidationTest {
         assertTrue(content.contains("public String getName()"),
             "non-boolean property name should have getName() getter");
     }
+
+    @Test
+    @DisplayName("PatternValidator is emitted before Min/MaxLength validators (CBD-8606)")
+    public void testPatternValidatorEmittedBeforeLengthValidators() throws OASSDKException, IOException {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Pattern Before Length API
+              version: 1.0.0
+            paths:
+              /async/job/{jobID}:
+                get:
+                  operationId: getAsyncJobStatus
+                  parameters:
+                    - name: jobID
+                      in: path
+                      required: true
+                      schema:
+                        type: string
+                        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+                        minLength: 36
+                        maxLength: 36
+                  responses:
+                    '200':
+                      description: OK
+            """;
+        Path specFile = tempOutputDir.resolve("pattern-before-length-spec.yaml");
+        Files.writeString(specFile, yamlContent);
+        Path outputDir = tempOutputDir.resolve("pattern-before-length-sdk");
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(specFile.toString());
+        sdk.generateApplication("java", "jersey", TEST_PACKAGE, outputDir.toString());
+
+        Path validators = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/QueryParamValidators.java");
+        assertTrue(Files.exists(validators), "QueryParamValidators.java should exist");
+        String content = Files.readString(validators);
+
+        int patternIdx = content.indexOf("new PatternValidator(\"jobID\"");
+        int minLenIdx = content.indexOf("new MinLengthValidator(\"jobID\"");
+        int maxLenIdx = content.indexOf("new MaxLengthValidator(\"jobID\"");
+
+        assertTrue(patternIdx >= 0, "PatternValidator should be emitted for jobID");
+        assertTrue(minLenIdx >= 0, "MinLengthValidator should be emitted for jobID");
+        assertTrue(maxLenIdx >= 0, "MaxLengthValidator should be emitted for jobID");
+        assertTrue(patternIdx < minLenIdx,
+            "PatternValidator must appear before MinLengthValidator for jobID");
+        assertTrue(patternIdx < maxLenIdx,
+            "PatternValidator must appear before MaxLengthValidator for jobID");
+    }
 }
 

@@ -284,6 +284,8 @@ components:
       schema:
         type: string
         pattern: '^[1-9][0-9]{13}(,[1-9][0-9]{13}){0,74}$'
+        minLength: 14
+        maxLength: 1124
         example: '20150000000203,40960000000096'
 
     filterParent:

@@ -82,20 +82,41 @@ public class SecurityTestGeneratorTest {
     
     @Test
     @SuppressWarnings("unchecked")
-    public void testGenerate_WithSecuritySchemes(@TempDir Path tempDir) throws GenerationException {
+    public void testGenerate_WithSecuritySchemes(@TempDir Path tempDir) throws GenerationException, java.io.IOException {
         // Arrange
         Map<String, Object> specWithSecurity = new HashMap<>(spec);
         Map<String, Object> paths = (Map<String, Object>) specWithSecurity.get("paths");
         Map<String, Object> pathItem = (Map<String, Object>) paths.get("/test");
         Map<String, Object> get = (Map<String, Object>) pathItem.get("get");
-        get.put("security", java.util.List.of(Map.of("BearerAuth", java.util.List.of())));
+        get.put("security", java.util.List.of(Map.of("BearerAuth", java.util.List.of("folders.read"))));
+        get.put("summary", "Get folders");
         specWithSecurity.put("paths", paths);
+        Map<String, Object> components = new HashMap<>();
+        components.put("securitySchemes", Map.of(
+                "BearerAuth", Map.of("type", "http", "scheme", "bearer")));
+        specWithSecurity.put("components", components);
         
         // Act
         generator.generate(specWithSecurity, tempDir.toString(), testConfig, "junit5");
         
         // Assert
-        assertTrue(Files.exists(tempDir.resolve("security")));
+        Path securityDir = tempDir.resolve("security");
+        assertTrue(Files.exists(securityDir));
+        boolean foundClientApp = Files.walk(securityDir)
+                .filter(Files::isRegularFile)
+                .filter(p -> p.toString().endsWith(".java"))
+                .anyMatch(f -> {
+                    try {
+                        String content = Files.readString(f);
+                        return content.contains("TOKEN_CLIENT_APP")
+                                && content.contains("Client App Token")
+                                && content.contains("TOKEN_WRONG_ROLE");
+                    } catch (java.io.IOException e) {
+                        return false;
+                    }
+                });
+        assertTrue(foundClientApp,
+                "Security suite should emit client-app token (CBD-8481) and wrong-role (CBD-8549) scenarios");
     }
     
     @Test

@@ -16,6 +16,12 @@ public class OASValidator {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     private static final Pattern URL_PATTERN = Pattern.compile("^https?://.*");
 
+    /** Minimum recommended maxLength for error developerMessage (CBD-8620 / v4 WSErrorCommon). */
+    private static final int DEVELOPER_MESSAGE_MAX_LENGTH_FLOOR = 1024;
+
+    private static final Set<String> PAGINATION_QUERY_PARAM_NAMES = Set.of(
+            "$pagesize", "$pagenum", "pagesize", "pagenum");
+
     /**
      * Validate OpenAPI specification
      *
@@ -200,6 +206,12 @@ public class OASValidator {
             List<Map<String, Object>> parameters = Util.asStringObjectMapList(operation.get("parameters"));
             validateParameters(parameters, errors, path + "." + method);
         }
+
+        // Validate request body (CBD-8623: JSON body must be an object)
+        if (operation.containsKey("requestBody")) {
+            validateRequestBody(Util.asStringObjectMap(operation.get("requestBody")),
+                    errors, path + "." + method);
+        }
     }
 
     /**
@@ -249,7 +261,83 @@ public class OASValidator {
                     errors.add("Invalid parameter location in " + path + ": " + in);
                 }
             }
+
+            validateParameterConstraints(param, errors, path, i);
         }
+    }
+
+    /**
+     * Contract lints for parameter schemas (CBD-8451, CBD-8623).
+     */
+    private void validateParameterConstraints(Map<String, Object> param, List<String> errors, String path, int index) {
+        Map<String, Object> schema = Util.asStringObjectMap(param.get("schema"));
+        if (schema == null) {
+            return;
+        }
+
+        String name = param.get("name") instanceof String s ? s : ("#" + index);
+        String in = param.get("in") instanceof String s ? s : "";
+        String type = schema.get("type") instanceof String s ? s : null;
+
+        // CBD-8451: path string with pattern should also declare minLength and/or maxLength
+        if ("path".equals(in) && "string".equals(type) && schema.containsKey("pattern")
+                && !schema.containsKey("minLength") && !schema.containsKey("maxLength")) {
+            errors.add("Path parameter '" + name + "' in " + path
+                    + " has pattern but neither minLength nor maxLength");
+        }
+
+        // CBD-8623: pagination query strings must not allow blank values
+        if ("query".equals(in) && PAGINATION_QUERY_PARAM_NAMES.contains(name) && "string".equals(type)) {
+            boolean hasMinLength = schema.get("minLength") instanceof Number n && n.intValue() >= 1;
+            boolean hasPattern = schema.containsKey("pattern");
+            if (!hasMinLength && !hasPattern) {
+                errors.add("Query parameter '" + name + "' in " + path
+                        + " is a blankable string; add minLength/pattern or use type integer");
+            }
+        }
+    }
+
+    /**
+     * Validate JSON request bodies require an object schema (CBD-8623).
+     */
+    private void validateRequestBody(Map<String, Object> requestBody, List<String> errors, String path) {
+        if (requestBody == null || requestBody.containsKey("$ref")) {
+            return;
+        }
+        Map<String, Object> content = Util.asStringObjectMap(requestBody.get("content"));
+        if (content == null) {
+            return;
+        }
+        for (Map.Entry<String, Object> mediaEntry : content.entrySet()) {
+            String mediaType = mediaEntry.getKey();
+            if (mediaType == null || !mediaType.toLowerCase(Locale.ROOT).startsWith("application/json")) {
+                continue;
+            }
+            Map<String, Object> media = Util.asStringObjectMap(mediaEntry.getValue());
+            if (media == null) {
+                continue;
+            }
+            Map<String, Object> schema = Util.asStringObjectMap(media.get("schema"));
+            if (schema == null || isObjectLikeSchema(schema)) {
+                continue;
+            }
+            errors.add("Request body for " + path + " (" + mediaType
+                    + ") must use an object schema (type object, properties, allOf/oneOf/anyOf, or $ref)");
+        }
+    }
+
+    private boolean isObjectLikeSchema(Map<String, Object> schema) {
+        if (schema.containsKey("$ref")) {
+            return true;
+        }
+        if (schema.containsKey("allOf") || schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
+            return true;
+        }
+        if (schema.containsKey("properties")) {
+            return true;
+        }
+        String type = schema.get("type") instanceof String s ? s : null;
+        return "object".equals(type);
     }
 
     /**
@@ -263,6 +351,21 @@ public class OASValidator {
         if (components.containsKey("schemas")) {
             Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
             validateSchemas(schemas, errors);
+        }
+
+        // Validate reusable parameters (same contract lints as inline params)
+        if (components.containsKey("parameters")) {
+            Map<String, Object> parameters = Util.asStringObjectMap(components.get("parameters"));
+            if (parameters != null) {
+                List<Map<String, Object>> paramList = new ArrayList<>();
+                for (Object value : parameters.values()) {
+                    Map<String, Object> param = Util.asStringObjectMap(value);
+                    if (param != null) {
+                        paramList.add(param);
+                    }
+                }
+                validateParameters(paramList, errors, "components.parameters");
+            }
         }
 
         // Validate security schemes
@@ -288,6 +391,40 @@ public class OASValidator {
             if (!isValidSchemaName(schemaName)) {
                 errors.add("Invalid schema name: " + schemaName);
             }
+
+            // CBD-8620: developerMessage maxLength must be large enough for localized errors
+            validateDeveloperMessageMaxLength(schema, schemaName, errors);
+        }
+    }
+
+    private void validateDeveloperMessageMaxLength(Map<String, Object> schema, String schemaName, List<String> errors) {
+        Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
+        if (properties == null) {
+            // Also inspect allOf members (common for WSError* compositions)
+            Object allOf = schema.get("allOf");
+            if (allOf instanceof List<?> list) {
+                for (Object item : list) {
+                    Map<String, Object> part = Util.asStringObjectMap(item);
+                    if (part != null) {
+                        validateDeveloperMessageMaxLength(part, schemaName, errors);
+                    }
+                }
+            }
+            return;
+        }
+        Map<String, Object> developerMessage = Util.asStringObjectMap(properties.get("developerMessage"));
+        if (developerMessage == null) {
+            return;
+        }
+        Object maxLengthObj = developerMessage.get("maxLength");
+        if (!(maxLengthObj instanceof Number maxLengthNum)) {
+            return;
+        }
+        int maxLength = maxLengthNum.intValue();
+        if (maxLength < DEVELOPER_MESSAGE_MAX_LENGTH_FLOOR) {
+            errors.add("Schema '" + schemaName + "' property developerMessage maxLength is " + maxLength
+                    + "; expected at least " + DEVELOPER_MESSAGE_MAX_LENGTH_FLOOR
+                    + " (use v4 WSErrorCommon, not v3)");
         }
     }
 
