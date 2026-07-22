@@ -267,7 +267,11 @@ public class OASValidator {
     }
 
     /**
-     * Contract lints for parameter schemas (CBD-8451, CBD-8623).
+     * Contract lints for parameter schemas (CBD-8623).
+     * <p>
+     * Path params with {@code pattern} but no {@code minLength}/{@code maxLength} are allowed:
+     * published v4 specs often omit length bounds, and generation must not fail on that
+     * (CBD-8451 lint removed).
      */
     private void validateParameterConstraints(Map<String, Object> param, List<String> errors, String path, int index) {
         Map<String, Object> schema = Util.asStringObjectMap(param.get("schema"));
@@ -278,13 +282,6 @@ public class OASValidator {
         String name = param.get("name") instanceof String s ? s : ("#" + index);
         String in = param.get("in") instanceof String s ? s : "";
         String type = schema.get("type") instanceof String s ? s : null;
-
-        // CBD-8451: path string with pattern should also declare minLength and/or maxLength
-        if ("path".equals(in) && "string".equals(type) && schema.containsKey("pattern")
-                && !schema.containsKey("minLength") && !schema.containsKey("maxLength")) {
-            errors.add("Path parameter '" + name + "' in " + path
-                    + " has pattern but neither minLength nor maxLength");
-        }
 
         // CBD-8623: pagination query strings must not allow blank values
         if ("query".equals(in) && PAGINATION_QUERY_PARAM_NAMES.contains(name) && "string".equals(type)) {
