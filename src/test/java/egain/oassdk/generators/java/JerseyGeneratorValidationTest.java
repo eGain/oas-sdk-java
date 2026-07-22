@@ -963,5 +963,116 @@ public class JerseyGeneratorValidationTest {
         assertTrue(patternIdx < maxLenIdx,
             "PatternValidator must appear before MaxLengthValidator for jobID");
     }
+
+    @Test
+    @DisplayName("EGS-98675: scalar enum query param emits List.of(name, allowedValues) for EnumValidator")
+    public void testScalarEnumQueryParamEmitsArgumentsListForEnumValidator() throws OASSDKException, IOException {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Scalar enum query param test
+              version: 1.0.0
+            servers:
+              - url: https://api.example.com
+            paths:
+              /items:
+                get:
+                  operationId: listItems
+                  parameters:
+                    - name: status
+                      in: query
+                      schema:
+                        type: string
+                        enum: [active, inactive, pending]
+                  responses:
+                    '200':
+                      description: OK
+            """;
+        Path specFile = tempOutputDir.resolve("scalar-enum-query-param-spec.yaml");
+        Files.writeString(specFile, yamlContent);
+        Path outputDir = tempOutputDir.resolve("scalar-enum-query-param-sdk");
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(specFile.toString());
+        sdk.generateApplication("java", "jersey", TEST_PACKAGE, outputDir.toString());
+
+        Path validators = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/QueryParamValidators.java");
+        assertTrue(Files.exists(validators), "QueryParamValidators.java should exist");
+        String content = Files.readString(validators);
+
+        assertTrue(content.contains("List.of(\"status\", \"active,inactive,pending\")"),
+            "Should emit List.of with query param name and comma-joined allowed enum values");
+
+        int enumIdx = content.indexOf("new EnumValidator(\"status\"");
+        assertTrue(enumIdx >= 0, "EnumValidator should be emitted for status query param");
+        String enumInvocation = content.substring(enumIdx, content.indexOf("));", enumIdx) + 3);
+
+        assertTrue(enumInvocation.contains("arguments"),
+            "EnumValidator should receive generated arguments list variable");
+        assertTrue(enumInvocation.contains("\"active,inactive,pending\""),
+            "EnumValidator should include comma-joined allowed values");
+        assertTrue(enumInvocation.contains(",false)") || enumInvocation.contains(", false)"),
+            "Scalar query param enum validator should set isArray flag to false");
+        assertFalse(enumInvocation.contains("L10N_INVALID_VALUE_FOR_ENUM_ATTRIBUTE\", Collections.emptyList()"),
+            "EnumValidator must not use Collections.emptyList() for l10n arguments (EGS-98675)");
+    }
+
+    @Test
+    @DisplayName("EGS-98675: array items.enum query param emits List.of(name, allowedValues) for EnumValidator")
+    public void testArrayItemsEnumQueryParamEmitsArgumentsListForEnumValidator() throws OASSDKException, IOException {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Array items enum query param test
+              version: 1.0.0
+            servers:
+              - url: https://api.example.com
+            paths:
+              /export:
+                get:
+                  operationId: listExports
+                  parameters:
+                    - name: resourceTypes
+                      in: query
+                      schema:
+                        type: array
+                        items:
+                          type: string
+                          enum:
+                            - articles
+                            - topics
+                            - portals
+                  responses:
+                    '200':
+                      description: OK
+            """;
+        Path specFile = tempOutputDir.resolve("array-items-enum-query-param-spec.yaml");
+        Files.writeString(specFile, yamlContent);
+        Path outputDir = tempOutputDir.resolve("array-items-enum-query-param-sdk");
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(specFile.toString());
+        sdk.generateApplication("java", "jersey", TEST_PACKAGE, outputDir.toString());
+
+        Path validators = outputDir.resolve("src/main/java/" + TEST_PACKAGE_PATH + "/QueryParamValidators.java");
+        assertTrue(Files.exists(validators), "QueryParamValidators.java should exist");
+        String content = Files.readString(validators);
+
+        assertTrue(content.contains("List.of(\"resourceTypes\", \"articles,topics,portals\")"),
+            "Should emit List.of with query param name and comma-joined items.enum values");
+
+        int enumIdx = content.indexOf("new EnumValidator(\"resourceTypes\"");
+        assertTrue(enumIdx >= 0, "EnumValidator should be emitted for resourceTypes array query param");
+        String enumInvocation = content.substring(enumIdx, content.indexOf("));", enumIdx) + 3);
+
+        assertTrue(enumInvocation.contains("arguments"),
+            "EnumValidator should receive generated arguments list variable");
+        assertTrue(enumInvocation.contains("\"articles,topics,portals\""),
+            "EnumValidator should include comma-joined items.enum allowed values");
+        assertTrue(enumInvocation.contains(", true)"),
+            "Array query param enum validator should set isArray flag to true");
+        assertFalse(enumInvocation.contains("L10N_INVALID_VALUE_FOR_ENUM_ATTRIBUTE\", Collections.emptyList()"),
+            "EnumValidator must not use Collections.emptyList() for l10n arguments (EGS-98675)");
+    }
 }
 
