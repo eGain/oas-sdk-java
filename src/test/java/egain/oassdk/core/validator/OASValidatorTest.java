@@ -480,7 +480,9 @@ public class OASValidatorTest {
     }
     
     @Test
-    public void testPatternWithoutMinOrMaxLength_flagsPathParam() {
+    public void testPatternWithoutMinOrMaxLength_passesPathParam() {
+        // Published v4 specs often omit minLength/maxLength; CBD-8451 lint was removed
+        // so OasSdkGenerateRunner can load those specs without changing them.
         Map<String, Object> spec = createValidOpenAPISpec();
         Map<String, Object> paths = getPaths(spec);
         Map<String, Object> pathItem = new HashMap<>();
@@ -498,9 +500,7 @@ public class OASValidatorTest {
         pathItem.put("get", get);
         paths.put("/folders/{folderID}", pathItem);
 
-        ValidationException ex = assertThrows(ValidationException.class, () -> validator.validate(spec));
-        assertTrue(ex.getMessage().contains("has pattern but neither minLength nor maxLength"),
-                ex.getMessage());
+        assertDoesNotThrow(() -> validator.validate(spec));
     }
 
     @Test
