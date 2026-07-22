@@ -290,9 +290,11 @@ class JerseyQueryParamValidatorGenerator {
                     if (i > 0) enumStr.append(",");
                     enumStr.append(enumValues.get(i).toString());
                 }
-				getNextArgCounter();//call this to keep argument counter correct
+				sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(paramName)
+								.append("\", \"").append(enumStr).append("\");\n");
                 sb.append("    v.add(new EnumValidator(\"").append(paramName).append("\", \"").append(enumStr)
-                        .append("\", \"L10N_INVALID_VALUE_FOR_ENUM_ATTRIBUTE\", Collections.emptyList(), Collections.emptyList(), \"")
+                        .append("\", \"L10N_INVALID_VALUE_FOR_ENUM_ATTRIBUTE\", arguments").append(getCurrentArgCounter())
+						.append(", Collections.emptyList(), \"")
                         .append(paramType).append("\" ,").append(isArray).append("));\n");
             }
         }
@@ -391,9 +393,11 @@ class JerseyQueryParamValidatorGenerator {
                             if (i > 0) enumStr.append(",");
                             enumStr.append(enumValues.get(i).toString());
                         }
-						getNextArgCounter();//call this to keep argument counter correct
+						sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(paramName)
+										.append("\", \"").append(enumStr).append("\");\n");
                         sb.append("    v.add(new EnumValidator(\"").append(paramName).append("\", \"").append(enumStr)
-                                .append("\", \"L10N_INVALID_VALUE_FOR_ENUM_ATTRIBUTE\", Collections.emptyList(), Collections.emptyList(), \"")
+                                .append("\", \"L10N_INVALID_VALUE_FOR_ENUM_ATTRIBUTE\", arguments").append(getCurrentArgCounter())
+								.append(", Collections.emptyList(), \"")
                                 .append(paramType).append("\", true));\n");
                     }
 
