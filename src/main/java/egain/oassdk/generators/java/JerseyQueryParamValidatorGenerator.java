@@ -189,13 +189,13 @@ class JerseyQueryParamValidatorGenerator {
                 sb.append("\"").append(allowedParams.get(i)).append("\"");
             }
             sb.append(");\n");
-            sb.append("    v.add(new AllowedParameterValidator(allowedParameters));\n");
+            sb.append("    v.add(new AllowedParameterValidator(allowedParameters, \"L10N_INVALID_QUERY_PARAMETER\", Collections.emptyList()));\n");
         } else {
 			if(sb.length() == sbInitLength) {
 				// no parameters at all, return empty String
 				return "";
 			}
-            sb.append("    v.add(new AllowedParameterValidator(Collections.emptyList()));\n");
+            sb.append("    v.add(new AllowedParameterValidator(Collections.emptyList(), \"L10N_INVALID_QUERY_PARAMETER\", Collections.emptyList()));\n");
         }
 
         sb.append("    return v;\n");

@@ -972,6 +972,7 @@ class JerseyValidationGenerator {
         String content = String.format("""
                 package %s;
 
+                import java.util.ArrayList;
                 import java.util.List;
 
                 import egain.framework.validation.ValidationError;
@@ -983,10 +984,15 @@ class JerseyValidationGenerator {
                 public class AllowedParameterValidator implements ValidatorAction<RequestInfo>
                 {
                     private final List<String> allowedParameters;
+                    private final String l10nKey;
+                    private final List<String> localizedArgs;
 
-                    public AllowedParameterValidator(List<String> allowedParameters)
+                    public AllowedParameterValidator(List<String> allowedParameters, String l10nKey,
+                        List<String> localizedArguments)
                     {
                         this.allowedParameters = allowedParameters;
+                        this.l10nKey = l10nKey;
+                        this.localizedArgs = new ArrayList<>(localizedArguments);
                     }
 
                     @Override
@@ -996,8 +1002,8 @@ class JerseyValidationGenerator {
                         {
                             if (!allowedParameters.contains(param))
                             {
-                                return ValidationErrorHelper.createValidationError("", "L10N_INVALID_QUERY_PARAMETER",
-                                    List.of(param), List.of());
+                                return ValidationErrorHelper.createValidationError("", l10nKey,
+                                    List.of(param), localizedArgs);
                             }
                         }
                         return null;
