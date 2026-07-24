@@ -530,8 +530,10 @@ public class JerseyGeneratorValidationTest {
             "Should have allowedParameters field");
         assertTrue(content.contains("val.queryParameters().keySet()"),
             "Should check query parameters");
-        assertTrue(content.contains("L10N_INVALID_QUERY_PARAMETER"),
-            "Should use correct error code");
+        assertTrue(content.contains("private final String l10nKey"),
+            "Should accept l10n key via constructor");
+        assertTrue(content.contains("ValidationErrorHelper.createValidationError(\"\", l10nKey"),
+            "Should use constructor-provided l10n key");
     }
     
     @Test
