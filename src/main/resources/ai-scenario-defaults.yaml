@@ -1,0 +1,39 @@
+aiScenario:
+  enabled: true
+  activeModel: openai          # openai | anthropic | gemini
+  models:
+    openai:
+      provider: openai
+      model: gpt-4o
+      baseUrl: https://api.openai.com/v1
+      apiKeyEnv: OPENAI_API_KEY
+      temperature: 0.2
+      maxTokens: 4096
+    anthropic:
+      provider: anthropic
+      model: claude-sonnet-4-20250514
+      baseUrl: https://api.anthropic.com
+      apiKeyEnv: ANTHROPIC_API_KEY
+      temperature: 0.2
+      maxTokens: 4096
+    gemini:
+      provider: gemini
+      model: gemini-2.0-flash
+      baseUrl: https://generativelanguage.googleapis.com/v1beta
+      apiKeyEnv: GOOGLE_API_KEY
+      temperature: 0.2
+      maxTokens: 4096
+  scenarioSource:
+    type: jira                 # default
+    jira:
+      baseUrlEnv: JIRA_BASE_URL
+      userEnv: JIRA_USER
+      tokenEnv: JIRA_API_TOKEN
+      jql: "project = DEMO AND type = Story AND labels = api-scenario ORDER BY created DESC"
+      maxIssues: 25
+      fields: ["summary", "description", "labels"]
+  generation:
+    outputSubdir: scenario
+    writeScenarioJson: true
+    mapToOpenApiOperations: true
+    failOnUnmappedSteps: true

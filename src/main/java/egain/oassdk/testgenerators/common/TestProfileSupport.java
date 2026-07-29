@@ -17,7 +17,7 @@ public final class TestProfileSupport {
     public static final String PROFILE_SMOKE = "smoke";
 
     private static final Set<String> JAVA_MODULES = Set.of(
-            "unit", "integration", "nfr", "performance", "security", "sequence-java");
+            "unit", "integration", "nfr", "performance", "security", "sequence-java", "scenario");
 
     private TestProfileSupport() {
     }

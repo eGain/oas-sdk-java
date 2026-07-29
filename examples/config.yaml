@@ -11,7 +11,7 @@ generator:
   custom_templates: false
 
 # Test configuration
-# SDK test types include: unit, integration, nfr, performance, security, postman, schemathesis, mock_data (see README).
+# SDK test types include: unit, integration, nfr, performance, security, postman, schemathesis, scenario, mock_data (see README).
 test:
   unit_tests: true
   integration_tests: true
@@ -24,6 +24,48 @@ test:
   test_framework: "junit5"
   mock_data: true
   test_utilities: true
+
+# AI scenario tests (-t scenario): Jira source + LLM. Secrets via env vars only.
+# Full defaults also ship in classpath ai-scenario-defaults.yaml
+aiScenario:
+  enabled: true
+  activeModel: openai          # openai | anthropic | gemini
+  models:
+    openai:
+      provider: openai
+      model: gpt-4o
+      baseUrl: https://api.openai.com/v1
+      apiKeyEnv: OPENAI_API_KEY
+      temperature: 0.2
+      maxTokens: 4096
+    anthropic:
+      provider: anthropic
+      model: claude-sonnet-4-20250514
+      baseUrl: https://api.anthropic.com
+      apiKeyEnv: ANTHROPIC_API_KEY
+      temperature: 0.2
+      maxTokens: 4096
+    gemini:
+      provider: gemini
+      model: gemini-2.0-flash
+      baseUrl: https://generativelanguage.googleapis.com/v1beta
+      apiKeyEnv: GOOGLE_API_KEY
+      temperature: 0.2
+      maxTokens: 4096
+  scenarioSource:
+    type: jira
+    jira:
+      baseUrlEnv: JIRA_BASE_URL
+      userEnv: JIRA_USER
+      tokenEnv: JIRA_API_TOKEN
+      jql: "project = DEMO AND type = Story AND labels = api-scenario ORDER BY created DESC"
+      maxIssues: 25
+      fields: ["summary", "description", "labels"]
+  generation:
+    outputSubdir: scenario
+    writeScenarioJson: true
+    mapToOpenApiOperations: true
+    failOnUnmappedSteps: true
 
 # SLA configuration
 sla:

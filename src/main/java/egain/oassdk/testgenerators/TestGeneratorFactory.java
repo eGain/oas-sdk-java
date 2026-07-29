@@ -10,6 +10,7 @@ import egain.oassdk.testgenerators.performance.PerformanceTestGenerator;
 import egain.oassdk.testgenerators.postman.PostmanTestGenerator;
 import egain.oassdk.testgenerators.python.PytestIntegrationTestGenerator;
 import egain.oassdk.testgenerators.python.PytestUnitTestGenerator;
+import egain.oassdk.testgenerators.scenario.AiScenarioTestGenerator;
 import egain.oassdk.testgenerators.schemathesis.SchemathesisTestGenerator;
 import egain.oassdk.testgenerators.security.SecurityTestGenerator;
 import egain.oassdk.testgenerators.sequence.JavaSequenceChainTestGenerator;
@@ -27,7 +28,7 @@ public class TestGeneratorFactory {
     /**
      * Get test generator for specific test type with language/framework awareness
      *
-     * @param testType Type of test (unit, integration, nfr, performance, security, postman, schemathesis, sequence, mock_data)
+     * @param testType Type of test (unit, integration, nfr, performance, security, postman, schemathesis, sequence, scenario, mock_data)
      * @param config   Test configuration containing language and framework information
      * @return Test generator instance
      * @throws IllegalArgumentException if test type or language/framework combination is not supported
@@ -76,6 +77,12 @@ public class TestGeneratorFactory {
 
             case "sequence-java":
                 generator = new JavaSequenceChainTestGenerator();
+                break;
+
+            case "scenario":
+            case "ai-scenario":
+            case "aiscenario":
+                generator = new AiScenarioTestGenerator();
                 break;
 
             case "mock_data":
@@ -166,6 +173,7 @@ public class TestGeneratorFactory {
                 "postman",
                 "schemathesis",
                 "sequence",
+                "scenario",
                 "mock_data"
         };
     }

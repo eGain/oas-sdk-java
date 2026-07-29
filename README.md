@@ -82,6 +82,7 @@ All generated Java applications use industry-standard **JAX-RS annotations** (@P
     - Postman Collections with automated scripts
     - **Schemathesis** contract testing bundle (`openapi.yaml`, `schemathesis.properties`, `run-schemathesis.sh` using the `st` CLI; optional `--run` on the SDK CLI)
     - Randomized Sequence Testing (OAS-driven, with dependency inference and cleanup)
+    - **AI Scenario Tests** (`-t scenario`): fetch acceptance scenarios from Jira (default), map to OpenAPI via a configured LLM (OpenAI / Anthropic / Gemini), emit auditable JSON + JUnit IT classes
 
 - **📊 Mock Data**: Realistic mock data generation based on OpenAPI schemas
   - JSON examples with JavaFaker-based smart field generation
@@ -1377,6 +1378,11 @@ java -jar oas-sdk.jar tests openapi.yaml -t unit,integration,postman -o ./genera
 java -jar oas-sdk.jar tests openapi.yaml -t schemathesis -o ./generated-tests --url https://api.example.com
 # Optionally run ./run-schemathesis.sh after generation (requires bash and `st` on PATH)
 java -jar oas-sdk.jar tests openapi.yaml -t schemathesis -o ./generated-tests --url https://api.example.com --run
+
+# AI scenario tests from Jira (requires JIRA_* and LLM API key env vars; see ai-scenario-defaults.yaml)
+java -jar oas-sdk.jar tests openapi.yaml -t scenario -o ./generated-tests \
+  --ai-model openai \
+  --jira-jql "project = EGS AND labels = api-scenario"
 
 # Generate tests with explicit test framework (when supported by the selected test types)
 java -jar oas-sdk.jar tests openapi.yaml -t unit,integration -o ./generated-tests --framework pytest

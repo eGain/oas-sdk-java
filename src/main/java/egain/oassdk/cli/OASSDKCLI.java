@@ -147,12 +147,30 @@ public class OASSDKCLI implements Callable<Integer> {
         @Option(names = {"--run"}, description = "After generation, run ./run-schemathesis.sh when types include schemathesis (requires bash and st on PATH)")
         private boolean runSchemathesis;
 
+        @Option(names = {"--ai-config"}, description = "Path to AI scenario YAML config (overrides classpath defaults)")
+        private String aiConfigPath;
+
+        @Option(names = {"--ai-model"}, description = "Active LLM for -t scenario (openai, anthropic, gemini)")
+        private String aiModel;
+
+        @Option(names = {"--jira-jql"}, description = "Jira JQL used when generating -t scenario tests")
+        private String jiraJql;
+
         @Override
         public Integer call() {
             try {
                 Map<String, Object> extra = new HashMap<>();
                 if (baseUrl != null && !baseUrl.isBlank()) {
                     extra.put("schemathesis.baseUrl", baseUrl.trim());
+                }
+                if (aiConfigPath != null && !aiConfigPath.isBlank()) {
+                    extra.put(egain.oassdk.config.AiScenarioConfigLoader.AI_CONFIG_PATH_KEY, aiConfigPath.trim());
+                }
+                if (aiModel != null && !aiModel.isBlank()) {
+                    extra.put(egain.oassdk.config.AiScenarioConfigLoader.AI_MODEL_KEY, aiModel.trim());
+                }
+                if (jiraJql != null && !jiraJql.isBlank()) {
+                    extra.put(egain.oassdk.config.AiScenarioConfigLoader.JIRA_JQL_KEY, jiraJql.trim());
                 }
                 TestConfig testConfig = TestConfig.builder()
                         .testFramework(framework)

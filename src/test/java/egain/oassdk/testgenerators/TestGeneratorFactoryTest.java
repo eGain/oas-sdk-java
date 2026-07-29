@@ -126,6 +126,7 @@ public class TestGeneratorFactoryTest {
         assertTrue(java.util.Arrays.asList(types).contains("security"));
         assertTrue(java.util.Arrays.asList(types).contains("postman"));
         assertTrue(java.util.Arrays.asList(types).contains("schemathesis"));
+        assertTrue(java.util.Arrays.asList(types).contains("scenario"));
         assertTrue(java.util.Arrays.asList(types).contains("mock_data"));
     }
     
@@ -138,6 +139,8 @@ public class TestGeneratorFactoryTest {
         assertTrue(factory.isSupported("security"));
         assertTrue(factory.isSupported("postman"));
         assertTrue(factory.isSupported("schemathesis"));
+        assertTrue(factory.isSupported("scenario"));
+        assertTrue(factory.isSupported("ai-scenario"));
         assertTrue(factory.isSupported("mock_data"));
         assertTrue(factory.isSupported("mockdata"));
         
