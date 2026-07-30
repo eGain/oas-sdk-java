@@ -27,7 +27,7 @@ public class TestConfigTest {
         assertEquals("junit5", config.getFramework());
         assertTrue(config.isMockData());
         assertTrue(config.isTestUtilities());
-        assertTrue(config.isPlaywrightTests());
+        assertFalse(config.isPlaywrightTests());
         assertNotNull(config.getAdditionalProperties());
     }
     
@@ -190,9 +190,9 @@ public class TestConfigTest {
     }
 
     @Test
-    public void testPlaywrightTestsDefaultTrue() {
-        assertTrue(new TestConfig().isPlaywrightTests());
-        assertTrue(TestConfig.builder().build().isPlaywrightTests());
+    public void testPlaywrightTestsDefaultFalse() {
+        assertFalse(new TestConfig().isPlaywrightTests());
+        assertFalse(TestConfig.builder().build().isPlaywrightTests());
     }
     
     @Test

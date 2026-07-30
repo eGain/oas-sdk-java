@@ -147,9 +147,9 @@ public class OASSDKCLI implements Callable<Integer> {
         @Option(names = {"--run"}, description = "After generation, run ./run-schemathesis.sh when types include schemathesis (requires bash and st on PATH)")
         private boolean runSchemathesis;
 
-        @Option(names = {"--playwright"}, negatable = true, defaultValue = "true",
-                description = "Include Playwright API test generation (eGain-oriented). Use --no-playwright to skip.")
-        private boolean playwright = true;
+        @Option(names = {"--playwright"}, negatable = true, defaultValue = "false",
+                description = "Include Playwright API test generation. Pass --playwright to enable; default is off.")
+        private boolean playwright = false;
 
         @Override
         public Integer call() {
@@ -316,9 +316,9 @@ public class OASSDKCLI implements Callable<Integer> {
                 description = "Use wrapper types (Integer, Long, Double, Float) instead of primitives in generated Java code")
         private boolean useBoxedPrimitives;
 
-        @Option(names = {"--playwright"}, negatable = true, defaultValue = "true",
-                description = "Include Playwright API test generation (eGain-oriented). Use --no-playwright to skip.")
-        private boolean playwright = true;
+        @Option(names = {"--playwright"}, negatable = true, defaultValue = "false",
+                description = "Include Playwright API test generation. Pass --playwright to enable; default is off.")
+        private boolean playwright = false;
 
         @Override
         public Integer call() {

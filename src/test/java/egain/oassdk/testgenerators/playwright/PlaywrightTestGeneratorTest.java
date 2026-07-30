@@ -84,9 +84,18 @@ public class PlaywrightTestGeneratorTest {
     }
 
     @Test
-    public void testApplyPlaywrightFlag_DefaultAppends() {
+    public void testApplyPlaywrightFlag_DefaultDoesNotAppend() {
         List<String> types = TestProfileSupport.applyPlaywrightFlag(
                 List.of("unit", "integration"), TestConfig.builder().build());
+        assertTrue(types.stream().noneMatch(t -> "playwright".equalsIgnoreCase(t)));
+        assertEquals(2, types.size());
+    }
+
+    @Test
+    public void testApplyPlaywrightFlag_EnabledAppends() {
+        List<String> types = TestProfileSupport.applyPlaywrightFlag(
+                List.of("unit", "integration"),
+                TestConfig.builder().playwrightTests(true).build());
         assertTrue(types.stream().anyMatch(t -> "playwright".equalsIgnoreCase(t)));
         assertEquals(3, types.size());
     }
