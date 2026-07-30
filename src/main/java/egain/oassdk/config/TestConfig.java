@@ -21,6 +21,8 @@ public class TestConfig {
     private String framework;  // Framework for test generation (junit5, pytest, jest)
     private boolean mockData;
     private boolean testUtilities;
+    /** When true (default), Playwright API tests are included in test generation (eGain-oriented). */
+    private boolean playwrightTests;
     private Map<String, Object> additionalProperties;
 
     /**
@@ -40,6 +42,7 @@ public class TestConfig {
         this.framework = "junit5";
         this.mockData = true;
         this.testUtilities = true;
+        this.playwrightTests = true;
         this.additionalProperties = new HashMap<>();
     }
 
@@ -50,7 +53,8 @@ public class TestConfig {
                       boolean performanceTests, boolean securityTests, boolean scalabilityTests,
                       boolean reliabilityTests, boolean complianceTests, String testFramework,
                       String language, String framework,
-                      boolean mockData, boolean testUtilities, Map<String, Object> additionalProperties) {
+                      boolean mockData, boolean testUtilities, boolean playwrightTests,
+                      Map<String, Object> additionalProperties) {
         this.unitTests = unitTests;
         this.integrationTests = integrationTests;
         this.nfrTests = nfrTests;
@@ -64,7 +68,21 @@ public class TestConfig {
         this.framework = framework;
         this.mockData = mockData;
         this.testUtilities = testUtilities;
+        this.playwrightTests = playwrightTests;
         this.additionalProperties = additionalProperties != null ? additionalProperties : new HashMap<>();
+    }
+
+    /**
+     * Legacy constructor without {@code playwrightTests} (defaults to {@code true}).
+     */
+    public TestConfig(boolean unitTests, boolean integrationTests, boolean nfrTests,
+                      boolean performanceTests, boolean securityTests, boolean scalabilityTests,
+                      boolean reliabilityTests, boolean complianceTests, String testFramework,
+                      String language, String framework,
+                      boolean mockData, boolean testUtilities, Map<String, Object> additionalProperties) {
+        this(unitTests, integrationTests, nfrTests, performanceTests, securityTests, scalabilityTests,
+                reliabilityTests, complianceTests, testFramework, language, framework,
+                mockData, testUtilities, true, additionalProperties);
     }
 
     // Getters and Setters
@@ -172,6 +190,14 @@ public class TestConfig {
         this.testUtilities = testUtilities;
     }
 
+    public boolean isPlaywrightTests() {
+        return playwrightTests;
+    }
+
+    public void setPlaywrightTests(boolean playwrightTests) {
+        this.playwrightTests = playwrightTests;
+    }
+
     public Map<String, Object> getAdditionalProperties() {
         return additionalProperties != null ? new HashMap<>(additionalProperties) : null;
     }
@@ -197,6 +223,7 @@ public class TestConfig {
         private String framework = "junit5";
         private boolean mockData = true;
         private boolean testUtilities = true;
+        private boolean playwrightTests = true;
         private Map<String, Object> additionalProperties = new HashMap<>();
 
         public Builder unitTests(boolean unitTests) {
@@ -264,6 +291,11 @@ public class TestConfig {
             return this;
         }
 
+        public Builder playwrightTests(boolean playwrightTests) {
+            this.playwrightTests = playwrightTests;
+            return this;
+        }
+
         public Builder additionalProperties(Map<String, Object> additionalProperties) {
             this.additionalProperties = additionalProperties != null ? new HashMap<>(additionalProperties) : null;
             return this;
@@ -272,7 +304,8 @@ public class TestConfig {
         public TestConfig build() {
             return new TestConfig(unitTests, integrationTests, nfrTests, performanceTests,
                     securityTests, scalabilityTests, reliabilityTests, complianceTests,
-                    testFramework, language, framework, mockData, testUtilities, additionalProperties);
+                    testFramework, language, framework, mockData, testUtilities, playwrightTests,
+                    additionalProperties);
         }
     }
 
@@ -301,6 +334,7 @@ public class TestConfig {
                 ", framework='" + framework + '\'' +
                 ", mockData=" + mockData +
                 ", testUtilities=" + testUtilities +
+                ", playwrightTests=" + playwrightTests +
                 ", additionalProperties=" + additionalProperties +
                 '}';
     }

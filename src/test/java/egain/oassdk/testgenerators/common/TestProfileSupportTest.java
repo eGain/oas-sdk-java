@@ -29,4 +29,32 @@ class TestProfileSupportTest {
         assertThat(TestProfileSupport.aggregatorModules(List.of("unit", "integration", "postman")))
                 .containsExactly("unit", "integration");
     }
+
+    @Test
+    void applyPlaywrightFlag_appendsWhenEnabled() {
+        List<String> types = TestProfileSupport.applyPlaywrightFlag(
+                List.of("unit"), TestConfig.builder().build());
+        assertThat(types).containsExactly("unit", "playwright");
+    }
+
+    @Test
+    void applyPlaywrightFlag_stripsWhenDisabled() {
+        List<String> types = TestProfileSupport.applyPlaywrightFlag(
+                List.of("unit", "playwright"),
+                TestConfig.builder().playwrightTests(false).build());
+        assertThat(types).containsExactly("unit");
+    }
+
+    @Test
+    void smokeProfile_allowsPlaywright() {
+        TestConfig config = new TestConfig();
+        Map<String, Object> props = new HashMap<>();
+        props.put("testProfile", "smoke");
+        config.setAdditionalProperties(props);
+
+        List<String> filtered = TestProfileSupport.filterTestTypes(
+                List.of("unit", "playwright", "integration"), config);
+
+        assertThat(filtered).containsExactly("playwright", "integration");
+    }
 }

@@ -27,6 +27,7 @@ public class TestConfigTest {
         assertEquals("junit5", config.getFramework());
         assertTrue(config.isMockData());
         assertTrue(config.isTestUtilities());
+        assertTrue(config.isPlaywrightTests());
         assertNotNull(config.getAdditionalProperties());
     }
     
@@ -98,6 +99,9 @@ public class TestConfigTest {
         
         config.setTestUtilities(false);
         assertFalse(config.isTestUtilities());
+
+        config.setPlaywrightTests(false);
+        assertFalse(config.isPlaywrightTests());
         
         Map<String, Object> props = new HashMap<>();
         props.put("test", "value");
@@ -121,6 +125,7 @@ public class TestConfigTest {
             .framework("pytest")
             .mockData(false)
             .testUtilities(false)
+            .playwrightTests(false)
             .build();
         
         assertFalse(config.isUnitTests());
@@ -136,6 +141,7 @@ public class TestConfigTest {
         assertEquals("pytest", config.getFramework());
         assertFalse(config.isMockData());
         assertFalse(config.isTestUtilities());
+        assertFalse(config.isPlaywrightTests());
     }
     
     @Test
@@ -181,6 +187,12 @@ public class TestConfigTest {
         assertNotNull(str);
         assertTrue(str.contains("TestConfig"));
         assertTrue(str.contains("unitTests"));
+    }
+
+    @Test
+    public void testPlaywrightTestsDefaultTrue() {
+        assertTrue(new TestConfig().isPlaywrightTests());
+        assertTrue(TestConfig.builder().build().isPlaywrightTests());
     }
     
     @Test
