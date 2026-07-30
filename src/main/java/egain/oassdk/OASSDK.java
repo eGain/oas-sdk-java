@@ -428,7 +428,8 @@ public class OASSDK implements AutoCloseable {
             // Filter spec if filters are set
             Map<String, Object> specToUse = filterSpec(spec);
 
-            List<String> effectiveTypes = TestProfileSupport.filterTestTypes(testTypes, testConfig);
+            List<String> effectiveTypes = TestProfileSupport.filterTestTypes(
+                    TestProfileSupport.applyPlaywrightFlag(testTypes, testConfig), testConfig);
 
             // Shared test-support (TestEnv, TestAuth, test-env.properties)
             new egain.oassdk.testgenerators.support.TestSupportGenerator()
@@ -661,7 +662,8 @@ public class OASSDK implements AutoCloseable {
             // Generate tests
             if (testConfig != null) {
                 generateTests(
-                        List.of("unit", "integration", "nfr", "performance", "security", "postman", "schemathesis", "sequence", "sequence-java"),
+                        List.of("unit", "integration", "nfr", "performance", "security", "postman",
+                                "schemathesis", "sequence", "sequence-java", "playwright"),
                         outputDir + "/tests"
                 );
 

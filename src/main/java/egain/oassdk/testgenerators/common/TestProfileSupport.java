@@ -45,7 +45,8 @@ public final class TestProfileSupport {
         if (!isSmoke(config) || testTypes == null) {
             return testTypes;
         }
-        Set<String> allowed = Set.of("integration", "schemathesis", "postman", "sequence-java", "sequence");
+        Set<String> allowed = Set.of("integration", "schemathesis", "postman", "playwright",
+                "sequence-java", "sequence");
         List<String> filtered = new ArrayList<>();
         for (String type : testTypes) {
             if (type != null && allowed.contains(type.toLowerCase(Locale.ROOT))) {
@@ -53,6 +54,30 @@ public final class TestProfileSupport {
             }
         }
         return filtered.isEmpty() ? List.of("integration") : filtered;
+    }
+
+    /**
+     * Appends or strips {@code playwright} based on {@link TestConfig#isPlaywrightTests()}.
+     * Default-on for eGain callers; use {@code playwrightTests(false)} / {@code --no-playwright} to skip.
+     */
+    public static List<String> applyPlaywrightFlag(List<String> testTypes, TestConfig config) {
+        List<String> result = new ArrayList<>();
+        if (testTypes != null) {
+            for (String type : testTypes) {
+                if (type != null) {
+                    result.add(type);
+                }
+            }
+        }
+        boolean enabled = config == null || config.isPlaywrightTests();
+        boolean hasPlaywright = result.stream()
+                .anyMatch(t -> "playwright".equalsIgnoreCase(t));
+        if (enabled && !hasPlaywright) {
+            result.add("playwright");
+        } else if (!enabled) {
+            result.removeIf(t -> "playwright".equalsIgnoreCase(t));
+        }
+        return result;
     }
 
     public static List<String> aggregatorModules(List<String> testTypes) {

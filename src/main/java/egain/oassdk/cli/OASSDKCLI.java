@@ -147,6 +147,10 @@ public class OASSDKCLI implements Callable<Integer> {
         @Option(names = {"--run"}, description = "After generation, run ./run-schemathesis.sh when types include schemathesis (requires bash and st on PATH)")
         private boolean runSchemathesis;
 
+        @Option(names = {"--playwright"}, negatable = true, defaultValue = "true",
+                description = "Include Playwright API test generation (eGain-oriented). Use --no-playwright to skip.")
+        private boolean playwright = true;
+
         @Override
         public Integer call() {
             try {
@@ -156,13 +160,14 @@ public class OASSDKCLI implements Callable<Integer> {
                 }
                 TestConfig testConfig = TestConfig.builder()
                         .testFramework(framework)
+                        .playwrightTests(playwright)
                         .additionalProperties(extra.isEmpty() ? null : extra)
                         .build();
                 try (OASSDK sdk = new OASSDK(null, testConfig, null)) {
                     // Load specification
                     sdk.loadSpec(specPath);
 
-                    // Generate tests
+                    // Generate tests (playwright type appended/stripped via TestConfig.playwrightTests)
                     sdk.generateTests(types, framework, output);
 
                     if (runSchemathesis && types != null
@@ -311,6 +316,10 @@ public class OASSDKCLI implements Callable<Integer> {
                 description = "Use wrapper types (Integer, Long, Double, Float) instead of primitives in generated Java code")
         private boolean useBoxedPrimitives;
 
+        @Option(names = {"--playwright"}, negatable = true, defaultValue = "true",
+                description = "Include Playwright API test generation (eGain-oriented). Use --no-playwright to skip.")
+        private boolean playwright = true;
+
         @Override
         public Integer call() {
             try {
@@ -328,7 +337,9 @@ public class OASSDKCLI implements Callable<Integer> {
                     configBuilder.additionalProperties(extra);
                 }
                 GeneratorConfig generatorConfig = configBuilder.build();
-                TestConfig testConfig = TestConfig.builder().build();
+                TestConfig testConfig = TestConfig.builder()
+                        .playwrightTests(playwright)
+                        .build();
                 SLAConfig slaConfig = null;
 
                 try (OASSDK sdk = new OASSDK(generatorConfig, testConfig, slaConfig)) {

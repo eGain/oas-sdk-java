@@ -65,6 +65,14 @@ public class TestGeneratorFactoryTest {
     }
 
     @Test
+    public void testGetPlaywrightTestGenerator() {
+        TestGenerator generator = factory.getGenerator("playwright");
+        assertNotNull(generator);
+        assertTrue(generator instanceof egain.oassdk.testgenerators.playwright.PlaywrightTestGenerator);
+        assertEquals("playwright", generator.getTestType());
+    }
+
+    @Test
     public void testGetSchemathesisTestGenerator() {
         TestGenerator generator = factory.getGenerator("schemathesis");
         assertNotNull(generator);
@@ -125,6 +133,7 @@ public class TestGeneratorFactoryTest {
         assertTrue(java.util.Arrays.asList(types).contains("performance"));
         assertTrue(java.util.Arrays.asList(types).contains("security"));
         assertTrue(java.util.Arrays.asList(types).contains("postman"));
+        assertTrue(java.util.Arrays.asList(types).contains("playwright"));
         assertTrue(java.util.Arrays.asList(types).contains("schemathesis"));
         assertTrue(java.util.Arrays.asList(types).contains("mock_data"));
     }
@@ -137,6 +146,7 @@ public class TestGeneratorFactoryTest {
         assertTrue(factory.isSupported("performance"));
         assertTrue(factory.isSupported("security"));
         assertTrue(factory.isSupported("postman"));
+        assertTrue(factory.isSupported("playwright"));
         assertTrue(factory.isSupported("schemathesis"));
         assertTrue(factory.isSupported("mock_data"));
         assertTrue(factory.isSupported("mockdata"));

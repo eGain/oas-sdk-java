@@ -80,6 +80,7 @@ All generated Java applications use industry-standard **JAX-RS annotations** (@P
     - Performance Tests (JMeter, Gatling)
     - Security Tests (OWASP ZAP, RBAC, CORS, rate limiting)
     - Postman Collections with automated scripts
+    - **Playwright** API tests (default on for eGain; shaped like [playwright-api-tests](https://github.com/eGainDev/playwright-api-tests); use `--no-playwright` to skip)
     - **Schemathesis** contract testing bundle (`openapi.yaml`, `schemathesis.properties`, `run-schemathesis.sh` using the `st` CLI; optional `--run` on the SDK CLI)
     - Randomized Sequence Testing (OAS-driven, with dependency inference and cleanup)
 
@@ -245,8 +246,11 @@ java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar generate openapi.yaml -l java -f 
 # Models implement only Serializable; no JAXBBean, ValidationBuilder, etc.
 java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar generate openapi.yaml -l java -f jersey -p com.example.api -o ./generated --standalone
 
-# Generate test suites
+# Generate test suites (Playwright API tests included by default; output under ./generated/tests/playwright/)
 java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar tests openapi.yaml -t unit,integration -o ./generated/tests
+
+# Same without Playwright (open-source / non-eGain)
+java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar tests openapi.yaml -t unit,integration -o ./generated/tests --no-playwright
 
 # Generate mock data
 java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar mockdata openapi.yaml -o ./generated/mock-data
@@ -259,6 +263,9 @@ java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar all openapi.yaml -l java -f jerse
 
 # Generate everything in standalone (open-source) mode
 java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar all openapi.yaml -l java -f jersey -o ./generated --standalone
+
+# Generate everything without Playwright tests
+java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar all openapi.yaml -l java -f jersey -o ./generated --no-playwright
 
 # Validate a specification
 java -jar target/oas-sdk-java-2.1-SNAPSHOT.jar validate openapi.yaml
@@ -300,6 +307,7 @@ public class Example {
             
             // Generate comprehensive test suites
             // Tests are automatically generated in the same language as your application
+            // Playwright is appended by default (TestConfig.playwrightTests); use .playwrightTests(false) to skip
             sdk.generateTests(
                 List.of("unit", "integration", "nfr", "postman", "schemathesis"), 
                 "./generated-tests"
@@ -1371,7 +1379,14 @@ java -jar oas-sdk.jar docs --spec openapi.yaml --output ./generated-docs
 java -jar oas-sdk.jar validate --spec openapi.yaml
 
 # Generate tests (positional spec path; `-t` / `--types` is comma-separated)
+# Playwright is ON by default (appended when TestConfig.playwrightTests is true)
 java -jar oas-sdk.jar tests openapi.yaml -t unit,integration,postman -o ./generated-tests
+
+# Skip Playwright generation (non-eGain / open-source)
+java -jar oas-sdk.jar tests openapi.yaml -t unit,integration -o ./generated-tests --no-playwright
+
+# Explicit Playwright type only (still respects --no-playwright to strip it)
+java -jar oas-sdk.jar tests openapi.yaml -t playwright -o ./generated-tests
 
 # Schemathesis bundle (under ./generated-tests/schemathesis/ by default): properties + st run script
 java -jar oas-sdk.jar tests openapi.yaml -t schemathesis -o ./generated-tests --url https://api.example.com
@@ -1912,6 +1927,14 @@ Tests are generated in the same language as your application code for seamless i
   - CORS preflight and unauthorized origin testing
   - Rate limiting verification
 - **Postman Collection**: Complete API testing collection with automated scripts (language-agnostic)
+- **Playwright API Tests**: Self-contained suite under `<output>/playwright/` aligned with [playwright-api-tests](https://github.com/eGainDev/playwright-api-tests) conventions (language-agnostic; **enabled by default**)
+  - Thin API clients per OpenAPI tag (`apis/{tag}.api.ts`) extending generated `BaseApi`
+  - Data-driven positive / negative specs: `tests/generated/{slug}/tc01-P-*.spec.ts`, `tc02-N-*.spec.ts`
+  - Matching JSON fixtures under `data/generated/{slug}/`
+  - Scaffolding: `package.json`, `playwright.config.ts`, `tsconfig.json`, `utilities/helpers.ts`
+  - Cases from `IntegrationScenarioSupport` (happy path, declared errors, param/body negatives)
+  - Portable env auth: `BASE_URL` + `TOKEN` (or `API_BEARER_TOKEN` / `API_TOKEN`); no product-specific LoginApi in v1
+  - Flag: `TestConfig.playwrightTests` (default `true`); CLI `--playwright` / `--no-playwright` on `tests` and `all`
 - **Schemathesis**: API contract testing bundle with `openapi.yaml`, `schemathesis.properties` (CI placeholders such as `%BASEURL%`, `%TOKEN%`), and `run-schemathesis.sh` invoking the `st` CLI; output defaults to `<output>/schemathesis/` (language-agnostic)
 - **Randomized Sequence Tests**: OAS-driven end-to-end testing (Java-based)
   - Endpoints extracted dynamically from OAS spec (not hardcoded)
@@ -2098,6 +2121,30 @@ chmod +x run-schemathesis.sh
 
 From the packaged CLI you can also pass `--url` / `--base-url` when generating, and `--run` to execute the script immediately after generation (requires `bash` and `st` on `PATH`).
 
+#### Playwright (API tests against a live API)
+
+When Playwright generation is enabled (default), the SDK writes a suite under `<output>/playwright/` with tag-grouped clients, data-driven `@generated` specs, and JSON fixtures. Install Node 20+, then:
+
+```bash
+cd ./generated-tests/playwright   # if -o ./generated-tests
+npm install
+npx playwright install
+export BASE_URL=https://your-api-host
+export TOKEN=your-bearer-token    # optional; required for secured operations
+npm run test:generated
+# or: npx playwright test tests/generated --project=generated --workers=1
+```
+
+Disable with CLI `--no-playwright` or programmatically:
+
+```java
+TestConfig testConfig = TestConfig.builder()
+        .playwrightTests(false)
+        .build();
+```
+
+To promote specs into the full eGain [playwright-api-tests](https://github.com/eGainDev/playwright-api-tests) harness, copy `tests/generated/` and `data/generated/` into that repo and swap `utilities/helpers.ts` for product `@utilities/helpers` / LoginApi flows.
+
 ## 🤝 Contributing
 
 We welcome contributions! Please follow these steps:
@@ -2227,6 +2274,8 @@ For support and questions:
   - [x] Negative test cases (empty body, malformed JSON, boundary values)
   - [x] RBAC testing from OAS security scopes
   - [x] CORS and rate limiting security tests
+  - [x] Playwright API test generation (default-on; `--no-playwright` to skip; playwright-api-tests conventions)
+
 - [x] SLA monitoring improvements
   - [x] Real AtomicLong metric counters (replaces hardcoded stubs)
   - [x] Correlation ID propagation via X-Trace-Id headers
