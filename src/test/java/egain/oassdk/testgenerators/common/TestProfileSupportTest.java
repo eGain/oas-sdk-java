@@ -33,8 +33,15 @@ class TestProfileSupportTest {
     @Test
     void applyPlaywrightFlag_appendsWhenEnabled() {
         List<String> types = TestProfileSupport.applyPlaywrightFlag(
-                List.of("unit"), TestConfig.builder().build());
+                List.of("unit"), TestConfig.builder().playwrightTests(true).build());
         assertThat(types).containsExactly("unit", "playwright");
+    }
+
+    @Test
+    void applyPlaywrightFlag_doesNotAppendByDefault() {
+        List<String> types = TestProfileSupport.applyPlaywrightFlag(
+                List.of("unit"), TestConfig.builder().build());
+        assertThat(types).containsExactly("unit");
     }
 
     @Test

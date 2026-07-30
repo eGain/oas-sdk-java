@@ -58,7 +58,7 @@ public final class TestProfileSupport {
 
     /**
      * Appends or strips {@code playwright} based on {@link TestConfig#isPlaywrightTests()}.
-     * Default-on for eGain callers; use {@code playwrightTests(false)} / {@code --no-playwright} to skip.
+     * Default-off; use {@code playwrightTests(true)} / {@code --playwright} to enable.
      */
     public static List<String> applyPlaywrightFlag(List<String> testTypes, TestConfig config) {
         List<String> result = new ArrayList<>();
@@ -69,7 +69,7 @@ public final class TestProfileSupport {
                 }
             }
         }
-        boolean enabled = config == null || config.isPlaywrightTests();
+        boolean enabled = config != null && config.isPlaywrightTests();
         boolean hasPlaywright = result.stream()
                 .anyMatch(t -> "playwright".equalsIgnoreCase(t));
         if (enabled && !hasPlaywright) {

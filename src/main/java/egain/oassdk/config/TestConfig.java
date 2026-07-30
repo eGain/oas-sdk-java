@@ -21,7 +21,7 @@ public class TestConfig {
     private String framework;  // Framework for test generation (junit5, pytest, jest)
     private boolean mockData;
     private boolean testUtilities;
-    /** When true (default), Playwright API tests are included in test generation (eGain-oriented). */
+    /** When true, Playwright API tests are included in test generation. Default is false (opt-in via CLI {@code --playwright}). */
     private boolean playwrightTests;
     private Map<String, Object> additionalProperties;
 
@@ -42,7 +42,7 @@ public class TestConfig {
         this.framework = "junit5";
         this.mockData = true;
         this.testUtilities = true;
-        this.playwrightTests = true;
+        this.playwrightTests = false;
         this.additionalProperties = new HashMap<>();
     }
 
@@ -73,7 +73,7 @@ public class TestConfig {
     }
 
     /**
-     * Legacy constructor without {@code playwrightTests} (defaults to {@code true}).
+     * Legacy constructor without {@code playwrightTests} (defaults to {@code false}).
      */
     public TestConfig(boolean unitTests, boolean integrationTests, boolean nfrTests,
                       boolean performanceTests, boolean securityTests, boolean scalabilityTests,
@@ -82,7 +82,7 @@ public class TestConfig {
                       boolean mockData, boolean testUtilities, Map<String, Object> additionalProperties) {
         this(unitTests, integrationTests, nfrTests, performanceTests, securityTests, scalabilityTests,
                 reliabilityTests, complianceTests, testFramework, language, framework,
-                mockData, testUtilities, true, additionalProperties);
+                mockData, testUtilities, false, additionalProperties);
     }
 
     // Getters and Setters
@@ -223,7 +223,7 @@ public class TestConfig {
         private String framework = "junit5";
         private boolean mockData = true;
         private boolean testUtilities = true;
-        private boolean playwrightTests = true;
+        private boolean playwrightTests = false;
         private Map<String, Object> additionalProperties = new HashMap<>();
 
         public Builder unitTests(boolean unitTests) {
