@@ -189,13 +189,13 @@ class JerseyQueryParamValidatorGenerator {
                 sb.append("\"").append(allowedParams.get(i)).append("\"");
             }
             sb.append(");\n");
-            sb.append("    v.add(new AllowedParameterValidator(allowedParameters, \"L10N_INVALID_QUERY_PARAMETER\", Collections.emptyList()));\n");
+            sb.append("    v.add(new AllowedParameterValidator(allowedParameters, \"L10N_UNSUPPORTED_QUERY_PARAM\", Collections.emptyList()));\n");
         } else {
 			if(sb.length() == sbInitLength) {
 				// no parameters at all, return empty String
 				return "";
 			}
-            sb.append("    v.add(new AllowedParameterValidator(Collections.emptyList(), \"L10N_INVALID_QUERY_PARAMETER\", Collections.emptyList()));\n");
+            sb.append("    v.add(new AllowedParameterValidator(Collections.emptyList(), \"L10N_UNSUPPORTED_QUERY_PARAM\", Collections.emptyList()));\n");
         }
 
         sb.append("    return v;\n");
@@ -214,7 +214,7 @@ class JerseyQueryParamValidatorGenerator {
         if (isRequired) {
             String errorCode = "path".equals(paramType)
                     ? "L10N_INVALID_VALUE_FOR_PATH_PARAM_REQUIRED"
-                    : "I18N_REQUIRED_QUERY_PARAM_MISSING";
+                    : "L10N_REQUIRED_QUERY_PARAM_MISSING";
             sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(paramName).append("\");\n");
             sb.append("    v.add(new IsRequiredValidator(\"").append(paramName).append("\", \"").append(paramName)
                     .append("\", \"").append(errorCode).append("\", arguments").append(getCurrentArgCounter())

@@ -160,7 +160,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_completeexample",
-      "community": 117,
+      "community": 31,
       "norm_label": "completeexample.java"
     },
     {
@@ -170,7 +170,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "examples_completeexample_completeexample",
-      "community": 117,
+      "community": 31,
       "norm_label": "completeexample"
     },
     {
@@ -180,7 +180,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "examples_completeexample_completeexample_main",
-      "community": 31,
+      "community": 17,
       "norm_label": ".main()"
     },
     {
@@ -190,7 +190,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "examples_completeexample_java_string",
-      "community": 31,
+      "community": 17,
       "norm_label": "string"
     },
     {
@@ -220,7 +220,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "examples_generatebundlesdk_generatebundlesdk_main",
-      "community": 117,
+      "community": 30,
       "norm_label": ".main()"
     },
     {
@@ -230,7 +230,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "examples_generatebundlesdk_java_string",
-      "community": 117,
+      "community": 30,
       "norm_label": "string"
     },
     {
@@ -240,7 +240,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_helloworldexample",
-      "community": 117,
+      "community": 31,
       "norm_label": "helloworldexample.java"
     },
     {
@@ -250,7 +250,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "examples_helloworldexample_helloworldexample",
-      "community": 117,
+      "community": 31,
       "norm_label": "helloworldexample"
     },
     {
@@ -260,7 +260,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "examples_helloworldexample_helloworldexample_main",
-      "community": 31,
+      "community": 17,
       "norm_label": ".main()"
     },
     {
@@ -270,7 +270,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "examples_helloworldexample_java_string",
-      "community": 31,
+      "community": 17,
       "norm_label": "string"
     },
     {
@@ -280,7 +280,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_egain_oassdk_examples_generatecontentmgrv4playwrighttests",
-      "community": 117,
+      "community": 31,
       "norm_label": "generatecontentmgrv4playwrighttests.java"
     },
     {
@@ -290,7 +290,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "examples_egain_oassdk_examples_generatecontentmgrv4playwrighttests_generatecontentmgrv4playwrighttests",
-      "community": 117,
+      "community": 31,
       "norm_label": "generatecontentmgrv4playwrighttests"
     },
     {
@@ -300,7 +300,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "examples_egain_oassdk_examples_generatecontentmgrv4playwrighttests_generatecontentmgrv4playwrighttests_main",
-      "community": 117,
+      "community": 17,
       "norm_label": ".main()"
     },
     {
@@ -310,7 +310,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "examples_egain_oassdk_examples_generatecontentmgrv4playwrighttests_java_string",
-      "community": 117,
+      "community": 17,
       "norm_label": "string"
     },
     {
@@ -320,7 +320,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "examples_egain_oassdk_examples_generatecontentmgrv4playwrighttests_generatecontentmgrv4playwrighttests_generatecontentmgrv4playwrighttests",
-      "community": 117,
+      "community": 31,
       "norm_label": ".generatecontentmgrv4playwrighttests()"
     },
     {
@@ -330,7 +330,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_egain_oassdk_examples_generatesequencechainsfromspec",
-      "community": 39,
+      "community": 31,
       "norm_label": "generatesequencechainsfromspec.java"
     },
     {
@@ -410,7 +410,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_egain_oassdk_examples_helloworldexample",
-      "community": 39,
+      "community": 65,
       "norm_label": "helloworldexample.java"
     },
     {
@@ -420,7 +420,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "examples_egain_oassdk_examples_helloworldexample_helloworldexample",
-      "community": 39,
+      "community": 65,
       "norm_label": "helloworldexample"
     },
     {
@@ -430,7 +430,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "examples_egain_oassdk_examples_helloworldexample_helloworldexample_main",
-      "community": 39,
+      "community": 65,
       "norm_label": ".main()"
     },
     {
@@ -440,7 +440,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "examples_egain_oassdk_examples_helloworldexample_java_string",
-      "community": 39,
+      "community": 65,
       "norm_label": "string"
     },
     {
@@ -450,7 +450,7 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "examples_egain_oassdk_examples_helloworldexample_helloworldexample_showdirectorystructure",
-      "community": 39,
+      "community": 65,
       "norm_label": ".showdirectorystructure()"
     },
     {
@@ -1984,7 +1984,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "generated_playwright_contentmgr_v4_test_support_src_test_java_com_example_api_support_testclient_testclient_configurerestassured",
-      "community": 118,
+      "community": 40,
       "norm_label": ".configurerestassured()"
     },
     {
@@ -2284,7 +2284,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "generated_playwright_contentmgr_v4_test_support_src_test_java_com_example_api_support_testenv_testenv_get",
-      "community": 40,
+      "community": 73,
       "norm_label": ".get()"
     },
     {
@@ -2324,7 +2324,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "generated_playwright_contentmgr_v4_test_support_src_test_java_com_example_api_support_testenv_testenv_acceptlanguage",
-      "community": 40,
+      "community": 118,
       "norm_label": ".acceptlanguage()"
     },
     {
@@ -2454,7 +2454,7 @@
       "source_location": "L164",
       "_origin": "ast",
       "id": "generated_playwright_contentmgr_v4_test_support_src_test_java_com_example_api_support_testenv_testenv_tlsverify",
-      "community": 158,
+      "community": 40,
       "norm_label": ".tlsverify()"
     },
     {
@@ -2624,7 +2624,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk",
-      "community": 31,
+      "community": 17,
       "norm_label": "oassdk"
     },
     {
@@ -2634,7 +2634,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "autocloseable",
-      "community": 31,
+      "community": 17,
       "norm_label": "autocloseable"
     },
     {
@@ -2654,7 +2654,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_java_filesystem",
-      "community": 31,
+      "community": 17,
       "norm_label": "filesystem"
     },
     {
@@ -2664,7 +2664,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_java_map",
-      "community": 31,
+      "community": 17,
       "norm_label": "map"
     },
     {
@@ -2674,7 +2674,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_java_string",
-      "community": 31,
+      "community": 17,
       "norm_label": "string"
     },
     {
@@ -2684,7 +2684,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_java_object",
-      "community": 31,
+      "community": 17,
       "norm_label": "object"
     },
     {
@@ -2714,7 +2714,7 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_close",
-      "community": 31,
+      "community": 17,
       "norm_label": ".close()"
     },
     {
@@ -2724,7 +2724,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_java_override",
-      "community": 31,
+      "community": 17,
       "norm_label": "override"
     },
     {
@@ -2734,7 +2734,7 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_filterpaths",
-      "community": 31,
+      "community": 17,
       "norm_label": ".filterpaths()"
     },
     {
@@ -2744,7 +2744,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_java_list",
-      "community": 31,
+      "community": 17,
       "norm_label": "list"
     },
     {
@@ -2754,7 +2754,7 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_filteroperations",
-      "community": 31,
+      "community": 17,
       "norm_label": ".filteroperations()"
     },
     {
@@ -2764,7 +2764,7 @@
       "source_location": "L179",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_clearfilters",
-      "community": 31,
+      "community": 17,
       "norm_label": ".clearfilters()"
     },
     {
@@ -2774,7 +2774,7 @@
       "source_location": "L188",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_applyconfigfilters",
-      "community": 31,
+      "community": 17,
       "norm_label": ".applyconfigfilters()"
     },
     {
@@ -2784,7 +2784,7 @@
       "source_location": "L205",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_filterspec",
-      "community": 31,
+      "community": 17,
       "norm_label": ".filterspec()"
     },
     {
@@ -2804,7 +2804,7 @@
       "source_location": "L322",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_loadsla",
-      "community": 31,
+      "community": 17,
       "norm_label": ".loadsla()"
     },
     {
@@ -2824,7 +2824,7 @@
       "source_location": "L401",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_generatetests",
-      "community": 31,
+      "community": 17,
       "norm_label": ".generatetests()"
     },
     {
@@ -2834,7 +2834,7 @@
       "source_location": "L480",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_generatemockdata",
-      "community": 31,
+      "community": 17,
       "norm_label": ".generatemockdata()"
     },
     {
@@ -2844,7 +2844,7 @@
       "source_location": "L519",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_generateslaenforcement",
-      "community": 31,
+      "community": 17,
       "norm_label": ".generateslaenforcement()"
     },
     {
@@ -2854,7 +2854,7 @@
       "source_location": "L559",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_generatemonitoring",
-      "community": 31,
+      "community": 17,
       "norm_label": ".generatemonitoring()"
     },
     {
@@ -2864,7 +2864,7 @@
       "source_location": "L591",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_generatedocumentation",
-      "community": 31,
+      "community": 17,
       "norm_label": ".generatedocumentation()"
     },
     {
@@ -2874,7 +2874,7 @@
       "source_location": "L642",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_generateall",
-      "community": 31,
+      "community": 17,
       "norm_label": ".generateall()"
     },
     {
@@ -2884,7 +2884,7 @@
       "source_location": "L709",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_runtests",
-      "community": 31,
+      "community": 17,
       "norm_label": ".runtests()"
     },
     {
@@ -2894,7 +2894,7 @@
       "source_location": "L721",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_getmetadata",
-      "community": 31,
+      "community": 17,
       "norm_label": ".getmetadata()"
     },
     {
@@ -2914,7 +2914,7 @@
       "source_location": "L754",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_oassdk_oassdk_createdirectory",
-      "community": 31,
+      "community": 17,
       "norm_label": ".createdirectory()"
     },
     {
@@ -2944,7 +2944,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_util_util_asstringobjectmap",
-      "community": 73,
+      "community": 6,
       "norm_label": ".asstringobjectmap()"
     },
     {
@@ -3304,7 +3304,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig",
-      "community": 180,
+      "community": 31,
       "norm_label": "generatorconfig.java"
     },
     {
@@ -3444,7 +3444,7 @@
       "source_location": "L150",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig_generatorconfig_setversion",
-      "community": 9,
+      "community": 63,
       "norm_label": ".setversion()"
     },
     {
@@ -3454,7 +3454,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig_generatorconfig_getoutputdir",
-      "community": 9,
+      "community": 63,
       "norm_label": ".getoutputdir()"
     },
     {
@@ -3464,7 +3464,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig_generatorconfig_setoutputdir",
-      "community": 9,
+      "community": 63,
       "norm_label": ".setoutputdir()"
     },
     {
@@ -3474,7 +3474,7 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig_generatorconfig_ismodelsonly",
-      "community": 9,
+      "community": 63,
       "norm_label": ".ismodelsonly()"
     },
     {
@@ -3614,7 +3614,7 @@
       "source_location": "L218",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig_generatorconfig_gettemplatesdir",
-      "community": 9,
+      "community": 63,
       "norm_label": ".gettemplatesdir()"
     },
     {
@@ -3624,7 +3624,7 @@
       "source_location": "L222",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig_generatorconfig_settemplatesdir",
-      "community": 9,
+      "community": 63,
       "norm_label": ".settemplatesdir()"
     },
     {
@@ -3634,7 +3634,7 @@
       "source_location": "L226",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig_generatorconfig_iscustomtemplates",
-      "community": 9,
+      "community": 63,
       "norm_label": ".iscustomtemplates()"
     },
     {
@@ -3644,7 +3644,7 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig_generatorconfig_setcustomtemplates",
-      "community": 9,
+      "community": 63,
       "norm_label": ".setcustomtemplates()"
     },
     {
@@ -3674,7 +3674,7 @@
       "source_location": "L242",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig_generatorconfig_getincludepaths",
-      "community": 9,
+      "community": 63,
       "norm_label": ".getincludepaths()"
     },
     {
@@ -3734,7 +3734,7 @@
       "source_location": "L285",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig_generatorconfig_getspeczippath",
-      "community": 9,
+      "community": 63,
       "norm_label": ".getspeczippath()"
     },
     {
@@ -3974,7 +3974,7 @@
       "source_location": "L428",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_generatorconfig_builder_observabilityconfig",
-      "community": 7,
+      "community": 9,
       "norm_label": ".observabilityconfig()"
     },
     {
@@ -4734,7 +4734,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig",
-      "community": 39,
+      "community": 31,
       "norm_label": "testconfig.java"
     },
     {
@@ -5094,7 +5094,7 @@
       "source_location": "L212",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder",
-      "community": 39,
+      "community": 65,
       "norm_label": "builder"
     },
     {
@@ -5104,7 +5104,7 @@
       "source_location": "L229",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder_unittests",
-      "community": 39,
+      "community": 65,
       "norm_label": ".unittests()"
     },
     {
@@ -5114,7 +5114,7 @@
       "source_location": "L234",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder_integrationtests",
-      "community": 39,
+      "community": 65,
       "norm_label": ".integrationtests()"
     },
     {
@@ -5124,7 +5124,7 @@
       "source_location": "L239",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder_nfrtests",
-      "community": 39,
+      "community": 65,
       "norm_label": ".nfrtests()"
     },
     {
@@ -5134,7 +5134,7 @@
       "source_location": "L244",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder_performancetests",
-      "community": 39,
+      "community": 65,
       "norm_label": ".performancetests()"
     },
     {
@@ -5144,7 +5144,7 @@
       "source_location": "L249",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder_securitytests",
-      "community": 39,
+      "community": 65,
       "norm_label": ".securitytests()"
     },
     {
@@ -5154,7 +5154,7 @@
       "source_location": "L254",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder_scalabilitytests",
-      "community": 39,
+      "community": 65,
       "norm_label": ".scalabilitytests()"
     },
     {
@@ -5164,7 +5164,7 @@
       "source_location": "L259",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder_reliabilitytests",
-      "community": 39,
+      "community": 65,
       "norm_label": ".reliabilitytests()"
     },
     {
@@ -5174,7 +5174,7 @@
       "source_location": "L264",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder_compliancetests",
-      "community": 39,
+      "community": 65,
       "norm_label": ".compliancetests()"
     },
     {
@@ -5184,7 +5184,7 @@
       "source_location": "L269",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder_testframework",
-      "community": 39,
+      "community": 65,
       "norm_label": ".testframework()"
     },
     {
@@ -5214,7 +5214,7 @@
       "source_location": "L284",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder_mockdata",
-      "community": 39,
+      "community": 65,
       "norm_label": ".mockdata()"
     },
     {
@@ -5224,7 +5224,7 @@
       "source_location": "L289",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_builder_testutilities",
-      "community": 39,
+      "community": 65,
       "norm_label": ".testutilities()"
     },
     {
@@ -5264,7 +5264,7 @@
       "source_location": "L317",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_config_testconfig_testconfig_builder",
-      "community": 39,
+      "community": 65,
       "norm_label": ".builder()"
     },
     {
@@ -5364,7 +5364,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector",
-      "community": 133,
+      "community": 45,
       "norm_label": "businesslogicconnector.java"
     },
     {
@@ -5374,7 +5374,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_businesslogicconnector",
-      "community": 133,
+      "community": 45,
       "norm_label": "businesslogicconnector"
     },
     {
@@ -5384,7 +5384,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_java_singleton",
-      "community": 133,
+      "community": 45,
       "norm_label": "singleton"
     },
     {
@@ -5394,7 +5394,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_java_logger",
-      "community": 133,
+      "community": 45,
       "norm_label": "logger"
     },
     {
@@ -5404,7 +5404,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_java_apivalidator",
-      "community": 133,
+      "community": 45,
       "norm_label": "apivalidator"
     },
     {
@@ -5414,7 +5414,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_java_staticlimitchecker",
-      "community": 133,
+      "community": 45,
       "norm_label": "staticlimitchecker"
     },
     {
@@ -5484,7 +5484,7 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_businesslogicconnector_processrequestwithslaenforcement",
-      "community": 45,
+      "community": 124,
       "norm_label": ".processrequestwithslaenforcement()"
     },
     {
@@ -5514,7 +5514,7 @@
       "source_location": "L200",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_businesslogicconnector_checkratelimits",
-      "community": 133,
+      "community": 45,
       "norm_label": ".checkratelimits()"
     },
     {
@@ -5594,7 +5594,7 @@
       "source_location": "L313",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_businesslogicconnector_startmonitoring",
-      "community": 140,
+      "community": 45,
       "norm_label": ".startmonitoring()"
     },
     {
@@ -5604,7 +5604,7 @@
       "source_location": "L325",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_businesslogicconnector_stopmonitoring",
-      "community": 140,
+      "community": 45,
       "norm_label": ".stopmonitoring()"
     },
     {
@@ -5614,7 +5614,7 @@
       "source_location": "L342",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_businesslogicconnector_extractclientkey",
-      "community": 133,
+      "community": 45,
       "norm_label": ".extractclientkey()"
     },
     {
@@ -5834,7 +5834,7 @@
       "source_location": "L436",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_monitoringconfig",
-      "community": 140,
+      "community": 45,
       "norm_label": "monitoringconfig"
     },
     {
@@ -5844,7 +5844,7 @@
       "source_location": "L441",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_monitoringconfig_isenableperformancemonitoring",
-      "community": 140,
+      "community": 45,
       "norm_label": ".isenableperformancemonitoring()"
     },
     {
@@ -5854,7 +5854,7 @@
       "source_location": "L445",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_monitoringconfig_setenableperformancemonitoring",
-      "community": 140,
+      "community": 45,
       "norm_label": ".setenableperformancemonitoring()"
     },
     {
@@ -5864,7 +5864,7 @@
       "source_location": "L449",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_monitoringconfig_isenableerrormonitoring",
-      "community": 140,
+      "community": 45,
       "norm_label": ".isenableerrormonitoring()"
     },
     {
@@ -5874,7 +5874,7 @@
       "source_location": "L453",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_monitoringconfig_setenableerrormonitoring",
-      "community": 140,
+      "community": 45,
       "norm_label": ".setenableerrormonitoring()"
     },
     {
@@ -5884,7 +5884,7 @@
       "source_location": "L457",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_monitoringconfig_isenableslamonitoring",
-      "community": 140,
+      "community": 45,
       "norm_label": ".isenableslamonitoring()"
     },
     {
@@ -5894,7 +5894,7 @@
       "source_location": "L461",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_connectors_businesslogicconnector_monitoringconfig_setenableslamonitoring",
-      "community": 140,
+      "community": 45,
       "norm_label": ".setenableslamonitoring()"
     },
     {
@@ -6144,7 +6144,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_exceptions_generationexception",
-      "community": 180,
+      "community": 31,
       "norm_label": "generationexception.java"
     },
     {
@@ -6194,7 +6194,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_exceptions_oassdkexception",
-      "community": 45,
+      "community": 59,
       "norm_label": "oassdkexception.java"
     },
     {
@@ -6204,7 +6204,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_exceptions_oassdkexception_oassdkexception",
-      "community": 45,
+      "community": 59,
       "norm_label": "oassdkexception"
     },
     {
@@ -6214,7 +6214,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "exception",
-      "community": 45,
+      "community": 59,
       "norm_label": "exception"
     },
     {
@@ -6224,7 +6224,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_exceptions_oassdkexception_oassdkexception_oassdkexception",
-      "community": 156,
+      "community": 127,
       "norm_label": ".oassdkexception()"
     },
     {
@@ -6234,7 +6234,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_exceptions_oassdkexception_java_string",
-      "community": 156,
+      "community": 127,
       "norm_label": "string"
     },
     {
@@ -6244,7 +6244,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_exceptions_oassdkexception_java_throwable",
-      "community": 156,
+      "community": 127,
       "norm_label": "throwable"
     },
     {
@@ -6254,7 +6254,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_exceptions_validationexception",
-      "community": 159,
+      "community": 117,
       "norm_label": "validationexception.java"
     },
     {
@@ -6264,7 +6264,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_exceptions_validationexception_validationexception",
-      "community": 159,
+      "community": 117,
       "norm_label": "validationexception"
     },
     {
@@ -6274,7 +6274,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_exceptions_validationexception_validationexception_validationexception",
-      "community": 159,
+      "community": 117,
       "norm_label": ".validationexception()"
     },
     {
@@ -6284,7 +6284,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_exceptions_validationexception_java_string",
-      "community": 159,
+      "community": 117,
       "norm_label": "string"
     },
     {
@@ -6294,7 +6294,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_exceptions_validationexception_java_throwable",
-      "community": 159,
+      "community": 117,
       "norm_label": "throwable"
     },
     {
@@ -6524,7 +6524,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_logging_loggerconfig_loggerconfig_getproperty",
-      "community": 40,
+      "community": 176,
       "norm_label": ".getproperty()"
     },
     {
@@ -6794,7 +6794,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata",
-      "community": 65,
+      "community": 38,
       "norm_label": "oasmetadata"
     },
     {
@@ -6804,7 +6804,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_java_map",
-      "community": 65,
+      "community": 38,
       "norm_label": "map"
     },
     {
@@ -6814,7 +6814,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_java_string",
-      "community": 65,
+      "community": 38,
       "norm_label": "string"
     },
     {
@@ -6824,7 +6824,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_java_object",
-      "community": 65,
+      "community": 38,
       "norm_label": "object"
     },
     {
@@ -6834,7 +6834,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_oasmetadata",
-      "community": 65,
+      "community": 38,
       "norm_label": ".oasmetadata()"
     },
     {
@@ -6844,7 +6844,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_extract",
-      "community": 65,
+      "community": 38,
       "norm_label": ".extract()"
     },
     {
@@ -6854,7 +6854,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_getmetadata",
-      "community": 65,
+      "community": 38,
       "norm_label": ".getmetadata()"
     },
     {
@@ -6864,7 +6864,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_extractbasicinfo",
-      "community": 65,
+      "community": 38,
       "norm_label": ".extractbasicinfo()"
     },
     {
@@ -6874,7 +6874,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_extractapidetails",
-      "community": 65,
+      "community": 38,
       "norm_label": ".extractapidetails()"
     },
     {
@@ -6884,7 +6884,7 @@
       "source_location": "L141",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_extractendpoints",
-      "community": 65,
+      "community": 38,
       "norm_label": ".extractendpoints()"
     },
     {
@@ -6894,7 +6894,7 @@
       "source_location": "L201",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_extractmodels",
-      "community": 65,
+      "community": 38,
       "norm_label": ".extractmodels()"
     },
     {
@@ -6904,7 +6904,7 @@
       "source_location": "L249",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_extractsecurity",
-      "community": 65,
+      "community": 38,
       "norm_label": ".extractsecurity()"
     },
     {
@@ -6914,7 +6914,7 @@
       "source_location": "L290",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_extractservers",
-      "community": 65,
+      "community": 38,
       "norm_label": ".extractservers()"
     },
     {
@@ -6924,7 +6924,7 @@
       "source_location": "L314",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_extracttags",
-      "community": 65,
+      "community": 38,
       "norm_label": ".extracttags()"
     },
     {
@@ -6934,7 +6934,7 @@
       "source_location": "L339",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_extractexternaldocs",
-      "community": 65,
+      "community": 38,
       "norm_label": ".extractexternaldocs()"
     },
     {
@@ -6944,7 +6944,7 @@
       "source_location": "L358",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_getmetadatavalue",
-      "community": 65,
+      "community": 38,
       "norm_label": ".getmetadatavalue()"
     },
     {
@@ -6954,7 +6954,7 @@
       "source_location": "L379",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_metadata_oasmetadata_oasmetadata_hasmetadata",
-      "community": 65,
+      "community": 38,
       "norm_label": ".hasmetadata()"
     },
     {
@@ -7064,7 +7064,7 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_parser_oasparser_oasparser_sanitizefilepath",
-      "community": 1,
+      "community": 79,
       "norm_label": ".sanitizefilepath()"
     },
     {
@@ -7084,7 +7084,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_parser_oasparser_oasparser_isopenapispec",
-      "community": 43,
+      "community": 1,
       "norm_label": ".isopenapispec()"
     },
     {
@@ -7104,7 +7104,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_parser_oasparser_oasparser_getopenapiversion",
-      "community": 43,
+      "community": 1,
       "norm_label": ".getopenapiversion()"
     },
     {
@@ -7574,7 +7574,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_parser_pathutils",
-      "community": 120,
+      "community": 146,
       "norm_label": "pathutils.java"
     },
     {
@@ -7584,7 +7584,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_parser_pathutils_pathutils",
-      "community": 120,
+      "community": 146,
       "norm_label": "pathutils"
     },
     {
@@ -7594,7 +7594,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_parser_pathutils_pathutils_pathutils",
-      "community": 120,
+      "community": 146,
       "norm_label": ".pathutils()"
     },
     {
@@ -7624,7 +7624,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_parser_pathutils_java_path",
-      "community": 120,
+      "community": 146,
       "norm_label": "path"
     },
     {
@@ -8174,7 +8174,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_sequence_enumeratedchain",
-      "community": 27,
+      "community": 70,
       "norm_label": "enumeratedchain.java"
     },
     {
@@ -8184,7 +8184,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_sequence_enumeratedchain_enumeratedchain",
-      "community": 27,
+      "community": 70,
       "norm_label": "enumeratedchain"
     },
     {
@@ -8194,7 +8194,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_sequence_enumeratedchain_java_list",
-      "community": 27,
+      "community": 70,
       "norm_label": "list"
     },
     {
@@ -8204,7 +8204,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_core_sequence_enumeratedchain_enumeratedchain_enumeratedchain",
-      "community": 27,
+      "community": 70,
       "norm_label": ".enumeratedchain()"
     },
     {
@@ -12454,7 +12454,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_codegenerator",
-      "community": 180,
+      "community": 31,
       "norm_label": "codegenerator.java"
     },
     {
@@ -12464,7 +12464,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_codegenerator_codegenerator",
-      "community": 180,
+      "community": 31,
       "norm_label": "codegenerator"
     },
     {
@@ -12474,7 +12474,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_codegenerator_codegenerator_generate",
-      "community": 180,
+      "community": 31,
       "norm_label": ".generate()"
     },
     {
@@ -12484,7 +12484,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_codegenerator_java_map",
-      "community": 180,
+      "community": 31,
       "norm_label": "map"
     },
     {
@@ -12494,7 +12494,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_codegenerator_java_string",
-      "community": 180,
+      "community": 31,
       "norm_label": "string"
     },
     {
@@ -12504,7 +12504,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_codegenerator_java_object",
-      "community": 180,
+      "community": 31,
       "norm_label": "object"
     },
     {
@@ -12514,7 +12514,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_codegenerator_codegenerator_getname",
-      "community": 180,
+      "community": 31,
       "norm_label": ".getname()"
     },
     {
@@ -12524,7 +12524,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_codegenerator_codegenerator_getversion",
-      "community": 180,
+      "community": 31,
       "norm_label": ".getversion()"
     },
     {
@@ -12534,7 +12534,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_codegenerator_codegenerator_getlanguage",
-      "community": 180,
+      "community": 31,
       "norm_label": ".getlanguage()"
     },
     {
@@ -12544,7 +12544,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_codegenerator_codegenerator_getframework",
-      "community": 180,
+      "community": 31,
       "norm_label": ".getframework()"
     },
     {
@@ -12574,7 +12574,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_configurablegenerator_configurablegenerator",
-      "community": 180,
+      "community": 31,
       "norm_label": "configurablegenerator"
     },
     {
@@ -12824,7 +12824,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_common_openapipathutils",
-      "community": 180,
+      "community": 31,
       "norm_label": "openapipathutils.java"
     },
     {
@@ -13664,7 +13664,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_csharp_aspnetgenerator",
-      "community": 180,
+      "community": 31,
       "norm_label": "aspnetgenerator.java"
     },
     {
@@ -13804,7 +13804,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_go_gingenerator",
-      "community": 180,
+      "community": 31,
       "norm_label": "gingenerator.java"
     },
     {
@@ -14684,7 +14684,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseygenerator",
-      "community": 180,
+      "community": 31,
       "norm_label": "jerseygenerator.java"
     },
     {
@@ -15224,7 +15224,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseynamingutils_jerseynamingutils_tomodelfieldname",
-      "community": 42,
+      "community": 25,
       "norm_label": ".tomodelfieldname()"
     },
     {
@@ -15984,7 +15984,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector",
-      "community": 42,
+      "community": 82,
       "norm_label": "jerseyschemacollector.java"
     },
     {
@@ -15994,7 +15994,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector",
-      "community": 42,
+      "community": 82,
       "norm_label": "jerseyschemacollector"
     },
     {
@@ -16004,7 +16004,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_java_logger",
-      "community": 42,
+      "community": 82,
       "norm_label": "logger"
     },
     {
@@ -16024,7 +16024,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector_collectinlinedschemas",
-      "community": 42,
+      "community": 82,
       "norm_label": ".collectinlinedschemas()"
     },
     {
@@ -16034,7 +16034,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_java_map",
-      "community": 42,
+      "community": 82,
       "norm_label": "map"
     },
     {
@@ -16044,7 +16044,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_java_string",
-      "community": 42,
+      "community": 82,
       "norm_label": "string"
     },
     {
@@ -16054,7 +16054,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_java_object",
-      "community": 42,
+      "community": 82,
       "norm_label": "object"
     },
     {
@@ -16064,7 +16064,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector_collectinlinedschemasfromproperties",
-      "community": 42,
+      "community": 82,
       "norm_label": ".collectinlinedschemasfromproperties()"
     },
     {
@@ -16074,7 +16074,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_java_set",
-      "community": 42,
+      "community": 82,
       "norm_label": "set"
     },
     {
@@ -16084,7 +16084,7 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector_collectinlineschemasfromschemaproperties",
-      "community": 42,
+      "community": 82,
       "norm_label": ".collectinlineschemasfromschemaproperties()"
     },
     {
@@ -16094,7 +16094,7 @@
       "source_location": "L245",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector_generateinlineschemanamefromproperty",
-      "community": 42,
+      "community": 82,
       "norm_label": ".generateinlineschemanamefromproperty()"
     },
     {
@@ -16104,7 +16104,7 @@
       "source_location": "L269",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector_generateinlinedschemaname",
-      "community": 42,
+      "community": 82,
       "norm_label": ".generateinlinedschemaname()"
     },
     {
@@ -16114,7 +16114,7 @@
       "source_location": "L309",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector_collectcompositiononlyschemas",
-      "community": 42,
+      "community": 82,
       "norm_label": ".collectcompositiononlyschemas()"
     },
     {
@@ -16124,7 +16124,7 @@
       "source_location": "L382",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector_collectallreferencedschemanames",
-      "community": 42,
+      "community": 82,
       "norm_label": ".collectallreferencedschemanames()"
     },
     {
@@ -16134,7 +16134,7 @@
       "source_location": "L556",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector_collectschemasfromschemaobject",
-      "community": 42,
+      "community": 82,
       "norm_label": ".collectschemasfromschemaobject()"
     },
     {
@@ -16144,7 +16144,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_java_boolean",
-      "community": 42,
+      "community": 82,
       "norm_label": "boolean"
     },
     {
@@ -16154,7 +16154,7 @@
       "source_location": "L860",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector_addschemaandcollectnested",
-      "community": 42,
+      "community": 82,
       "norm_label": ".addschemaandcollectnested()"
     },
     {
@@ -16164,7 +16164,7 @@
       "source_location": "L895",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector_collectschemasreferencedinresponses",
-      "community": 42,
+      "community": 82,
       "norm_label": ".collectschemasreferencedinresponses()"
     },
     {
@@ -16174,7 +16174,7 @@
       "source_location": "L1103",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemacollector_jerseyschemacollector_resolveresponsereference",
-      "community": 42,
+      "community": 82,
       "norm_label": ".resolveresponsereference()"
     },
     {
@@ -16184,7 +16184,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemaoneofxor",
-      "community": 42,
+      "community": 97,
       "norm_label": "jerseyschemaoneofxor.java"
     },
     {
@@ -16194,7 +16194,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemaoneofxor_jerseyschemaoneofxor",
-      "community": 42,
+      "community": 97,
       "norm_label": "jerseyschemaoneofxor"
     },
     {
@@ -16204,7 +16204,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemaoneofxor_jerseyschemaoneofxor_jerseyschemaoneofxor",
-      "community": 42,
+      "community": 97,
       "norm_label": ".jerseyschemaoneofxor()"
     },
     {
@@ -16214,7 +16214,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemaoneofxor_simpleoneofxorinfo",
-      "community": 42,
+      "community": 97,
       "norm_label": "simpleoneofxorinfo"
     },
     {
@@ -16224,7 +16224,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemaoneofxor_java_string",
-      "community": 42,
+      "community": 97,
       "norm_label": "string"
     },
     {
@@ -16234,7 +16234,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemaoneofxor_simpleoneofxorinfo_from",
-      "community": 42,
+      "community": 97,
       "norm_label": ".from()"
     },
     {
@@ -16244,7 +16244,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemaoneofxor_jerseyschemaoneofxor_findsimpleoneofxorpair",
-      "community": 42,
+      "community": 97,
       "norm_label": ".findsimpleoneofxorpair()"
     },
     {
@@ -16254,7 +16254,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemaoneofxor_java_map",
-      "community": 42,
+      "community": 97,
       "norm_label": "map"
     },
     {
@@ -16264,7 +16264,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemaoneofxor_java_object",
-      "community": 42,
+      "community": 97,
       "norm_label": "object"
     },
     {
@@ -16274,7 +16274,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemaoneofxor_java_boolean",
-      "community": 42,
+      "community": 97,
       "norm_label": "boolean"
     },
     {
@@ -16284,7 +16284,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemaoneofxor_jerseyschemaoneofxor_findsimpleoneofxorinfo",
-      "community": 42,
+      "community": 97,
       "norm_label": ".findsimpleoneofxorinfo()"
     },
     {
@@ -16294,7 +16294,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils",
-      "community": 42,
+      "community": 52,
       "norm_label": "jerseyschemautils.java"
     },
     {
@@ -16304,7 +16304,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils",
-      "community": 42,
+      "community": 52,
       "norm_label": "jerseyschemautils"
     },
     {
@@ -16314,7 +16314,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_jerseyschemautils",
-      "community": 42,
+      "community": 52,
       "norm_label": ".jerseyschemautils()"
     },
     {
@@ -16324,7 +16324,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_objectwithsinglearrayinfo",
-      "community": 42,
+      "community": 52,
       "norm_label": "objectwithsinglearrayinfo"
     },
     {
@@ -16334,7 +16334,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_java_string",
-      "community": 42,
+      "community": 52,
       "norm_label": "string"
     },
     {
@@ -16344,7 +16344,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_objectwithsinglearrayinfo_objectwithsinglearrayinfo",
-      "community": 42,
+      "community": 52,
       "norm_label": ".objectwithsinglearrayinfo()"
     },
     {
@@ -16354,7 +16354,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_resolvecompositiontoeffectiveschema",
-      "community": 42,
+      "community": 52,
       "norm_label": ".resolvecompositiontoeffectiveschema()"
     },
     {
@@ -16364,7 +16364,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_java_map",
-      "community": 42,
+      "community": 52,
       "norm_label": "map"
     },
     {
@@ -16374,7 +16374,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_java_object",
-      "community": 42,
+      "community": 52,
       "norm_label": "object"
     },
     {
@@ -16384,7 +16384,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_resolverefinschema",
-      "community": 42,
+      "community": 52,
       "norm_label": ".resolverefinschema()"
     },
     {
@@ -16394,7 +16394,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_mergeintoeffectiveschema",
-      "community": 42,
+      "community": 52,
       "norm_label": ".mergeintoeffectiveschema()"
     },
     {
@@ -16404,7 +16404,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_mergepropertydefinitionsforcomposition",
-      "community": 42,
+      "community": 52,
       "norm_label": ".mergepropertydefinitionsforcomposition()"
     },
     {
@@ -16414,7 +16414,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_definesownpropertytype",
-      "community": 42,
+      "community": 52,
       "norm_label": ".definesownpropertytype()"
     },
     {
@@ -16424,7 +16424,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_mergepropertiesintoall",
-      "community": 42,
+      "community": 52,
       "norm_label": ".mergepropertiesintoall()"
     },
     {
@@ -16434,7 +16434,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_mergeschemaproperties",
-      "community": 42,
+      "community": 52,
       "norm_label": ".mergeschemaproperties()"
     },
     {
@@ -16444,7 +16444,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_java_list",
-      "community": 42,
+      "community": 52,
       "norm_label": "list"
     },
     {
@@ -16454,7 +16454,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_java_boolean",
-      "community": 42,
+      "community": 52,
       "norm_label": "boolean"
     },
     {
@@ -16464,7 +16464,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_isallofrefbranch",
-      "community": 42,
+      "community": 52,
       "norm_label": ".isallofrefbranch()"
     },
     {
@@ -16474,7 +16474,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_allofhaspropertyoverlaybranches",
-      "community": 42,
+      "community": 52,
       "norm_label": ".allofhaspropertyoverlaybranches()"
     },
     {
@@ -16484,7 +16484,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_findcomponentschemaname",
-      "community": 42,
+      "community": 52,
       "norm_label": ".findcomponentschemaname()"
     },
     {
@@ -16494,7 +16494,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_partitionallofbranches",
-      "community": 42,
+      "community": 52,
       "norm_label": ".partitionallofbranches()"
     },
     {
@@ -16504,7 +16504,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_mergeallofbranchesintoproperties",
-      "community": 42,
+      "community": 52,
       "norm_label": ".mergeallofbranchesintoproperties()"
     },
     {
@@ -16514,7 +16514,7 @@
       "source_location": "L127",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_isschemaflagtrue",
-      "community": 42,
+      "community": 52,
       "norm_label": ".isschemaflagtrue()"
     },
     {
@@ -16524,7 +16524,7 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_getschemanamefromref",
-      "community": 42,
+      "community": 52,
       "norm_label": ".getschemanamefromref()"
     },
     {
@@ -16534,7 +16534,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_deriveschemanamefromexternalref",
-      "community": 42,
+      "community": 52,
       "norm_label": ".deriveschemanamefromexternalref()"
     },
     {
@@ -16544,7 +16544,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_isobjectwithsinglearrayofref",
-      "community": 42,
+      "community": 52,
       "norm_label": ".isobjectwithsinglearrayofref()"
     },
     {
@@ -16554,7 +16554,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_getobjectwithsinglearrayinfo",
-      "community": 42,
+      "community": 52,
       "norm_label": ".getobjectwithsinglearrayinfo()"
     },
     {
@@ -16564,7 +16564,7 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_getwrapperclassname",
-      "community": 42,
+      "community": 52,
       "norm_label": ".getwrapperclassname()"
     },
     {
@@ -16574,7 +16574,7 @@
       "source_location": "L152",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_getlisttypeforobjectwithsinglearrayofref",
-      "community": 42,
+      "community": 52,
       "norm_label": ".getlisttypeforobjectwithsinglearrayofref()"
     },
     {
@@ -16584,7 +16584,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseyschemautils_jerseyschemautils_isschemareference",
-      "community": 42,
+      "community": 52,
       "norm_label": ".isschemareference()"
     },
     {
@@ -16594,7 +16594,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseytypeutils",
-      "community": 180,
+      "community": 53,
       "norm_label": "jerseytypeutils.java"
     },
     {
@@ -16774,7 +16774,7 @@
       "source_location": "L560",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_java_jerseytypeutils_jerseytypeutils_getlistfielddeclarationtype",
-      "community": 18,
+      "community": 53,
       "norm_label": ".getlistfielddeclarationtype()"
     },
     {
@@ -17814,7 +17814,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_python_fastapigenerator",
-      "community": 180,
+      "community": 31,
       "norm_label": "fastapigenerator.java"
     },
     {
@@ -18484,7 +18484,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_generators_python_flaskgenerator",
-      "community": 180,
+      "community": 31,
       "norm_label": "flaskgenerator.java"
     },
     {
@@ -20764,7 +20764,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_configurabletestgenerator",
-      "community": 39,
+      "community": 180,
       "norm_label": "configurabletestgenerator.java"
     },
     {
@@ -20794,7 +20794,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_configurabletestgenerator_configurabletestgenerator_getconfig",
-      "community": 39,
+      "community": 180,
       "norm_label": ".getconfig()"
     },
     {
@@ -22274,7 +22274,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testprofilesupport",
-      "community": 20,
+      "community": 180,
       "norm_label": "testprofilesupport.java"
     },
     {
@@ -22394,7 +22394,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_testspecutils",
-      "community": 36,
+      "community": 62,
       "norm_label": "testspecutils"
     },
     {
@@ -22404,7 +22404,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_java_pattern",
-      "community": 36,
+      "community": 62,
       "norm_label": "pattern"
     },
     {
@@ -22414,7 +22414,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_testspecutils_testspecutils",
-      "community": 36,
+      "community": 62,
       "norm_label": ".testspecutils()"
     },
     {
@@ -22424,7 +22424,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_testspecutils_getapititle",
-      "community": 36,
+      "community": 62,
       "norm_label": ".getapititle()"
     },
     {
@@ -22434,7 +22434,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_java_map",
-      "community": 36,
+      "community": 62,
       "norm_label": "map"
     },
     {
@@ -22444,7 +22444,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_java_string",
-      "community": 36,
+      "community": 62,
       "norm_label": "string"
     },
     {
@@ -22454,7 +22454,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_java_object",
-      "community": 36,
+      "community": 62,
       "norm_label": "object"
     },
     {
@@ -22464,7 +22464,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_testspecutils_getbaseurl",
-      "community": 36,
+      "community": 62,
       "norm_label": ".getbaseurl()"
     },
     {
@@ -22474,7 +22474,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_testspecutils_resolvebaseurl",
-      "community": 36,
+      "community": 62,
       "norm_label": ".resolvebaseurl()"
     },
     {
@@ -22484,7 +22484,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_testspecutils_isegainspec",
-      "community": 36,
+      "community": 62,
       "norm_label": ".isegainspec()"
     },
     {
@@ -22494,7 +22494,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_testspecutils_useegainauth",
-      "community": 36,
+      "community": 62,
       "norm_label": ".useegainauth()"
     },
     {
@@ -22504,7 +22504,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_testspecutils_defaultfromconfig",
-      "community": 36,
+      "community": 62,
       "norm_label": ".defaultfromconfig()"
     },
     {
@@ -22514,7 +22514,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_testspecutils_baseurlfromconfig",
-      "community": 36,
+      "community": 62,
       "norm_label": ".baseurlfromconfig()"
     },
     {
@@ -22524,7 +22524,7 @@
       "source_location": "L124",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_common_testspecutils_testspecutils_resolveservervariable",
-      "community": 36,
+      "community": 62,
       "norm_label": ".resolveservervariable()"
     },
     {
@@ -23664,7 +23664,7 @@
       "source_location": "L305",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_nfr_nfrtestgenerator_nfrtestgenerator_generatepomxml",
-      "community": 84,
+      "community": 41,
       "norm_label": ".generatepomxml()"
     },
     {
@@ -24454,7 +24454,7 @@
       "source_location": "L406",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_performance_performancetestgenerator_performancetestgenerator_generatepomxml",
-      "community": 84,
+      "community": 50,
       "norm_label": ".generatepomxml()"
     },
     {
@@ -26804,7 +26804,7 @@
       "source_location": "L641",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_security_securitytestgenerator_securitytestgenerator_generatepomxml",
-      "community": 84,
+      "community": 5,
       "norm_label": ".generatepomxml()"
     },
     {
@@ -27164,7 +27164,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_sequence_sequencechaintestgenerator_sequencechaintestgenerator_readchainconfig",
-      "community": 61,
+      "community": 27,
       "norm_label": ".readchainconfig()"
     },
     {
@@ -27384,7 +27384,7 @@
       "source_location": "L519",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_sequence_sequencechaintestgenerator_sequencechaintestgenerator_propstring",
-      "community": 61,
+      "community": 27,
       "norm_label": ".propstring()"
     },
     {
@@ -27394,7 +27394,7 @@
       "source_location": "L531",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_sequence_sequencechaintestgenerator_sequencechaintestgenerator_propint",
-      "community": 61,
+      "community": 27,
       "norm_label": ".propint()"
     },
     {
@@ -27404,7 +27404,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_sequence_sequencechaintestgenerator_java_integer",
-      "community": 61,
+      "community": 27,
       "norm_label": "integer"
     },
     {
@@ -27414,7 +27414,7 @@
       "source_location": "L543",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_sequence_sequencechaintestgenerator_sequencechaintestgenerator_propbool",
-      "community": 61,
+      "community": 27,
       "norm_label": ".propbool()"
     },
     {
@@ -27424,7 +27424,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_sequence_sequencechaintestgenerator_java_boolean",
-      "community": 61,
+      "community": 27,
       "norm_label": "boolean"
     },
     {
@@ -27484,7 +27484,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_support_testsupportgenerator",
-      "community": 4,
+      "community": 180,
       "norm_label": "testsupportgenerator.java"
     },
     {
@@ -27574,7 +27574,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_support_testsupportgenerator_testsupportgenerator_write",
-      "community": 84,
+      "community": 50,
       "norm_label": ".write()"
     },
     {
@@ -27584,7 +27584,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_main_java_egain_oassdk_testgenerators_support_testsupportgenerator_java_path",
-      "community": 84,
+      "community": 50,
       "norm_label": "path"
     },
     {
@@ -29774,7 +29774,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_oassdktest_oassdktest_testloadslawithvalidfile",
-      "community": 31,
+      "community": 17,
       "norm_label": ".testloadslawithvalidfile()"
     },
     {
@@ -29784,7 +29784,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_oassdktest_oassdktest_testloadslawithnullpath",
-      "community": 31,
+      "community": 17,
       "norm_label": ".testloadslawithnullpath()"
     },
     {
@@ -29794,7 +29794,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_oassdktest_oassdktest_testloadslawithinvalidfile",
-      "community": 31,
+      "community": 17,
       "norm_label": ".testloadslawithinvalidfile()"
     },
     {
@@ -29804,7 +29804,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_oassdktest_oassdktest_testloadslamethodchaining",
-      "community": 31,
+      "community": 17,
       "norm_label": ".testloadslamethodchaining()"
     },
     {
@@ -29854,7 +29854,7 @@
       "source_location": "L146",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_oassdktest_oassdktest_testclearfilters",
-      "community": 31,
+      "community": 17,
       "norm_label": ".testclearfilters()"
     },
     {
@@ -29924,7 +29924,7 @@
       "source_location": "L197",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_oassdktest_oassdktest_testgenerateapplicationwithoutpackagename",
-      "community": 17,
+      "community": 30,
       "norm_label": ".testgenerateapplicationwithoutpackagename()"
     },
     {
@@ -30194,7 +30194,7 @@
       "source_location": "L429",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_oassdktest_oassdktest_testoassdkwithzipinvalidpaththrows",
-      "community": 17,
+      "community": 9,
       "norm_label": ".testoassdkwithzipinvalidpaththrows()"
     },
     {
@@ -30258,10 +30258,20 @@
       "norm_label": ".testqueryparametervalidation()"
     },
     {
-      "label": ".checkValidationInfrastructure()",
+      "label": ".testRequiredQueryParamUsesL10nErrorKey()",
       "file_type": "code",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
       "source_location": "L72",
+      "_origin": "ast",
+      "id": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_testrequiredqueryparamusesl10nerrorkey",
+      "community": 99,
+      "norm_label": ".testrequiredqueryparamusesl10nerrorkey()"
+    },
+    {
+      "label": ".checkValidationInfrastructure()",
+      "file_type": "code",
+      "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
+      "source_location": "L95",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkvalidationinfrastructure",
       "community": 99,
@@ -30271,7 +30281,7 @@
       "label": ".checkValidationClassesGenerated()",
       "file_type": "code",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L104",
+      "source_location": "L131",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkvalidationclassesgenerated",
       "community": 99,
@@ -30281,7 +30291,7 @@
       "label": ".checkResourcesUseProgrammaticValidation()",
       "file_type": "code",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L129",
+      "source_location": "L156",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkresourcesuseprogrammaticvalidation",
       "community": 99,
@@ -30291,7 +30301,7 @@
       "label": ".checkQueryParametersInResources()",
       "file_type": "code",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L186",
+      "source_location": "L213",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkqueryparametersinresources",
       "community": 99,
@@ -30934,7 +30944,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest",
-      "community": 9,
+      "community": 63,
       "norm_label": "generatorconfigtest.java"
     },
     {
@@ -30944,7 +30954,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest",
-      "community": 9,
+      "community": 63,
       "norm_label": "generatorconfigtest"
     },
     {
@@ -30954,7 +30964,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testdefaultconstructor",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testdefaultconstructor()"
     },
     {
@@ -30964,7 +30974,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testmodelsonlygetterandsetter",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testmodelsonlygetterandsetter()"
     },
     {
@@ -30974,7 +30984,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testuseboxedprimitivesdefaultandbuilder",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testuseboxedprimitivesdefaultandbuilder()"
     },
     {
@@ -30984,7 +30994,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testspeczippathgetterandsetter",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testspeczippathgetterandsetter()"
     },
     {
@@ -30994,7 +31004,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testconstructorwithparameters",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testconstructorwithparameters()"
     },
     {
@@ -31004,7 +31014,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testgettersandsetters",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testgettersandsetters()"
     },
     {
@@ -31014,7 +31024,7 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testincludepaths",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testincludepaths()"
     },
     {
@@ -31034,7 +31044,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testbuilder",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testbuilder()"
     },
     {
@@ -31044,7 +31054,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testbuilderwithadditionalproperties",
-      "community": 40,
+      "community": 63,
       "norm_label": ".testbuilderwithadditionalproperties()"
     },
     {
@@ -31054,7 +31064,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testbuilderwithincludepaths",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testbuilderwithincludepaths()"
     },
     {
@@ -31064,7 +31074,7 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testbuilderwithincludeoperations",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testbuilderwithincludeoperations()"
     },
     {
@@ -31074,7 +31084,7 @@
       "source_location": "L193",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testbuilderwithmodelsonly",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testbuilderwithmodelsonly()"
     },
     {
@@ -31084,7 +31094,7 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testbuilderwithspeczippath",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testbuilderwithspeczippath()"
     },
     {
@@ -31104,7 +31114,7 @@
       "source_location": "L227",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testtostring",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testtostring()"
     },
     {
@@ -31114,7 +31124,7 @@
       "source_location": "L237",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_generatorconfigtest_generatorconfigtest_testnulladditionalproperties",
-      "community": 9,
+      "community": 63,
       "norm_label": ".testnulladditionalproperties()"
     },
     {
@@ -31344,7 +31354,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_testconfigtest",
-      "community": 39,
+      "community": 65,
       "norm_label": "testconfigtest.java"
     },
     {
@@ -31354,7 +31364,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_testconfigtest_testconfigtest",
-      "community": 39,
+      "community": 65,
       "norm_label": "testconfigtest"
     },
     {
@@ -31394,7 +31404,7 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_testconfigtest_testconfigtest_testbuilder",
-      "community": 39,
+      "community": 65,
       "norm_label": ".testbuilder()"
     },
     {
@@ -31404,7 +31414,7 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_testconfigtest_testconfigtest_testbuilderwithadditionalproperties",
-      "community": 39,
+      "community": 65,
       "norm_label": ".testbuilderwithadditionalproperties()"
     },
     {
@@ -31414,7 +31424,7 @@
       "source_location": "L161",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_testconfigtest_testconfigtest_testbuilderchaining",
-      "community": 39,
+      "community": 65,
       "norm_label": ".testbuilderchaining()"
     },
     {
@@ -31424,7 +31434,7 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_testconfigtest_testconfigtest_testtostring",
-      "community": 39,
+      "community": 65,
       "norm_label": ".testtostring()"
     },
     {
@@ -31434,7 +31444,7 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_testconfigtest_testconfigtest_testplaywrighttestsdefaultfalse",
-      "community": 39,
+      "community": 65,
       "norm_label": ".testplaywrighttestsdefaultfalse()"
     },
     {
@@ -31444,7 +31454,7 @@
       "source_location": "L198",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_config_testconfigtest_testconfigtest_testnulladditionalproperties",
-      "community": 39,
+      "community": 65,
       "norm_label": ".testnulladditionalproperties()"
     },
     {
@@ -31554,7 +31564,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_connectors_businesslogicconnectortest_businesslogicconnectortest_testprocessrequestwithmonitoring_success",
-      "community": 140,
+      "community": 45,
       "norm_label": ".testprocessrequestwithmonitoring_success()"
     },
     {
@@ -31604,7 +31614,7 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_connectors_businesslogicconnectortest_businesslogicconnectortest_testmonitoringconfig_settersandgetters",
-      "community": 140,
+      "community": 45,
       "norm_label": ".testmonitoringconfig_settersandgetters()"
     },
     {
@@ -32454,7 +32464,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_core_parser_oasparsertest_oasparsertest_testparsevalidyamlfile",
-      "community": 79,
+      "community": 43,
       "norm_label": ".testparsevalidyamlfile()"
     },
     {
@@ -32464,7 +32474,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_core_parser_oasparsertest_oasparsertest_testparsevalidjsonfile",
-      "community": 79,
+      "community": 43,
       "norm_label": ".testparsevalidjsonfile()"
     },
     {
@@ -32474,7 +32484,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_core_parser_oasparsertest_oasparsertest_testparsenonexistentfile",
-      "community": 79,
+      "community": 43,
       "norm_label": ".testparsenonexistentfile()"
     },
     {
@@ -32684,7 +32694,7 @@
       "source_location": "L263",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_core_parser_oasparsertest_oasparsertest_testresolvereferenceswithemptyspec",
-      "community": 79,
+      "community": 43,
       "norm_label": ".testresolvereferenceswithemptyspec()"
     },
     {
@@ -33354,7 +33364,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_core_sequence_chainenumeratortest_chainenumeratortest_twolevelnested_prefixchainsrecursively",
-      "community": 54,
+      "community": 20,
       "norm_label": ".twolevelnested_prefixchainsrecursively()"
     },
     {
@@ -34104,7 +34114,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_dev_devsdktest_devsdktest_testloadopenapispecwithvalidfile",
-      "community": 56,
+      "community": 100,
       "norm_label": ".testloadopenapispecwithvalidfile()"
     },
     {
@@ -34244,7 +34254,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_dev_devsdktest_devsdktest_testgetopenapispec",
-      "community": 56,
+      "community": 100,
       "norm_label": ".testgetopenapispec()"
     },
     {
@@ -34254,7 +34264,7 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_dev_devsdktest_devsdktest_testgetslaspec",
-      "community": 56,
+      "community": 100,
       "norm_label": ".testgetslaspec()"
     },
     {
@@ -34544,7 +34554,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest",
-      "community": 180,
+      "community": 31,
       "norm_label": "documentationgeneratortest.java"
     },
     {
@@ -34554,7 +34564,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_documentationgeneratortest",
-      "community": 127,
+      "community": 3,
       "norm_label": "documentationgeneratortest"
     },
     {
@@ -34564,7 +34574,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_java_map",
-      "community": 127,
+      "community": 3,
       "norm_label": "map"
     },
     {
@@ -34574,7 +34584,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_java_string",
-      "community": 127,
+      "community": 3,
       "norm_label": "string"
     },
     {
@@ -34584,7 +34594,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_java_object",
-      "community": 127,
+      "community": 3,
       "norm_label": "object"
     },
     {
@@ -34594,7 +34604,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_documentationgeneratortest_setup",
-      "community": 127,
+      "community": 3,
       "norm_label": ".setup()"
     },
     {
@@ -34604,7 +34614,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_java_beforeeach",
-      "community": 127,
+      "community": 3,
       "norm_label": "beforeeach"
     },
     {
@@ -34614,7 +34624,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_documentationgeneratortest_testgeneratorinitialization",
-      "community": 127,
+      "community": 3,
       "norm_label": ".testgeneratorinitialization()"
     },
     {
@@ -34624,7 +34634,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_documentationgeneratortest_testgeneratewithalloptions",
-      "community": 127,
+      "community": 3,
       "norm_label": ".testgeneratewithalloptions()"
     },
     {
@@ -34634,7 +34644,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_java_path",
-      "community": 127,
+      "community": 3,
       "norm_label": "path"
     },
     {
@@ -34644,7 +34654,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_documentationgeneratortest_testgeneratewithapidocsonly",
-      "community": 127,
+      "community": 3,
       "norm_label": ".testgeneratewithapidocsonly()"
     },
     {
@@ -34654,7 +34664,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_documentationgeneratortest_testgeneratewithtestdocsonly",
-      "community": 127,
+      "community": 3,
       "norm_label": ".testgeneratewithtestdocsonly()"
     },
     {
@@ -34664,7 +34674,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_documentationgeneratortest_testgeneratewithprojectdocsonly",
-      "community": 127,
+      "community": 3,
       "norm_label": ".testgeneratewithprojectdocsonly()"
     },
     {
@@ -34674,7 +34684,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_documentationgeneratortest_testgeneratewithnullspec",
-      "community": 127,
+      "community": 3,
       "norm_label": ".testgeneratewithnullspec()"
     },
     {
@@ -34684,7 +34694,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_docs_documentationgeneratortest_documentationgeneratortest_testgeneratewithnulloutputdir",
-      "community": 127,
+      "community": 3,
       "norm_label": ".testgeneratewithnulloutputdir()"
     },
     {
@@ -35594,7 +35604,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_csharp_aspnetgeneratortest",
-      "community": 180,
+      "community": 31,
       "norm_label": "aspnetgeneratortest.java"
     },
     {
@@ -35764,7 +35774,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_go_gingeneratortest",
-      "community": 180,
+      "community": 31,
       "norm_label": "gingeneratortest.java"
     },
     {
@@ -35934,7 +35944,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_aliasmodelfromyamltest",
-      "community": 129,
+      "community": 117,
       "norm_label": "aliasmodelfromyamltest.java"
     },
     {
@@ -35944,7 +35954,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_aliasmodelfromyamltest_aliasmodelfromyamltest",
-      "community": 129,
+      "community": 117,
       "norm_label": "aliasmodelfromyamltest"
     },
     {
@@ -35954,7 +35964,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_aliasmodelfromyamltest_java_displayname",
-      "community": 129,
+      "community": 117,
       "norm_label": "displayname"
     },
     {
@@ -35964,7 +35974,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_aliasmodelfromyamltest_java_string",
-      "community": 129,
+      "community": 117,
       "norm_label": "string"
     },
     {
@@ -35974,7 +35984,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_aliasmodelfromyamltest_java_path",
-      "community": 129,
+      "community": 117,
       "norm_label": "path"
     },
     {
@@ -35984,7 +35994,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_aliasmodelfromyamltest_aliasmodelfromyamltest_aliasmodelhasidnamedescriptionasstring",
-      "community": 129,
+      "community": 117,
       "norm_label": ".aliasmodelhasidnamedescriptionasstring()"
     },
     {
@@ -36084,7 +36094,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyacceptheadervalidationtest",
-      "community": 20,
+      "community": 106,
       "norm_label": "jerseyacceptheadervalidationtest.java"
     },
     {
@@ -36094,7 +36104,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyacceptheadervalidationtest_jerseyacceptheadervalidationtest",
-      "community": 20,
+      "community": 106,
       "norm_label": "jerseyacceptheadervalidationtest"
     },
     {
@@ -36104,7 +36114,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyacceptheadervalidationtest_java_displayname",
-      "community": 20,
+      "community": 106,
       "norm_label": "displayname"
     },
     {
@@ -36114,7 +36124,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyacceptheadervalidationtest_java_path",
-      "community": 20,
+      "community": 106,
       "norm_label": "path"
     },
     {
@@ -36124,7 +36134,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyacceptheadervalidationtest_java_string",
-      "community": 20,
+      "community": 106,
       "norm_label": "string"
     },
     {
@@ -36134,7 +36144,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyacceptheadervalidationtest_jerseyacceptheadervalidationtest_testrequiredacceptemitsvalidator",
-      "community": 20,
+      "community": 106,
       "norm_label": ".testrequiredacceptemitsvalidator()"
     },
     {
@@ -36144,7 +36154,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyacceptheadervalidationtest_jerseyacceptheadervalidationtest_testacceptonlyoperationmapped",
-      "community": 20,
+      "community": 106,
       "norm_label": ".testacceptonlyoperationmapped()"
     },
     {
@@ -36154,7 +36164,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyacceptheadervalidationtest_jerseyacceptheadervalidationtest_testnonacceptandoptionalacceptskipped",
-      "community": 20,
+      "community": 106,
       "norm_label": ".testnonacceptandoptionalacceptskipped()"
     },
     {
@@ -36164,7 +36174,7 @@
       "source_location": "L200",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyacceptheadervalidationtest_jerseyacceptheadervalidationtest_testpostmanemptyacceptnegativecase",
-      "community": 20,
+      "community": 106,
       "norm_label": ".testpostmanemptyacceptnegativecase()"
     },
     {
@@ -36174,7 +36184,7 @@
       "source_location": "L219",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyacceptheadervalidationtest_jerseyacceptheadervalidationtest_testresourcestillexcludesacceptheaderparam",
-      "community": 20,
+      "community": 106,
       "norm_label": ".testresourcestillexcludesacceptheaderparam()"
     },
     {
@@ -36184,7 +36194,7 @@
       "source_location": "L258",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyacceptheadervalidationtest_jerseyacceptheadervalidationtest_generatefromyaml",
-      "community": 20,
+      "community": 106,
       "norm_label": ".generatefromyaml()"
     },
     {
@@ -36274,7 +36284,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyfoldersresourcegenerationtest",
-      "community": 117,
+      "community": 113,
       "norm_label": "jerseyfoldersresourcegenerationtest.java"
     },
     {
@@ -36284,7 +36294,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyfoldersresourcegenerationtest_jerseyfoldersresourcegenerationtest",
-      "community": 117,
+      "community": 113,
       "norm_label": "jerseyfoldersresourcegenerationtest"
     },
     {
@@ -36294,7 +36304,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyfoldersresourcegenerationtest_java_displayname",
-      "community": 117,
+      "community": 113,
       "norm_label": "displayname"
     },
     {
@@ -36304,7 +36314,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyfoldersresourcegenerationtest_java_path",
-      "community": 117,
+      "community": 113,
       "norm_label": "path"
     },
     {
@@ -36314,7 +36324,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyfoldersresourcegenerationtest_jerseyfoldersresourcegenerationtest_foldersresourcematchescontentmgrstyle",
-      "community": 117,
+      "community": 113,
       "norm_label": ".foldersresourcematchescontentmgrstyle()"
     },
     {
@@ -36324,7 +36334,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyfoldersresourcegenerationtest_jerseyfoldersresourcegenerationtest_resourceclassnameextensionoverridesheuristic",
-      "community": 117,
+      "community": 113,
       "norm_label": ".resourceclassnameextensionoverridesheuristic()"
     },
     {
@@ -36554,7 +36564,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest",
-      "community": 52,
+      "community": 30,
       "norm_label": "jerseygeneratorarraytypesandsettest.java"
     },
     {
@@ -36564,7 +36574,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest",
-      "community": 52,
+      "community": 30,
       "norm_label": "jerseygeneratorarraytypesandsettest"
     },
     {
@@ -36574,7 +36584,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_java_displayname",
-      "community": 52,
+      "community": 30,
       "norm_label": "displayname"
     },
     {
@@ -36584,7 +36594,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_java_path",
-      "community": 52,
+      "community": 30,
       "norm_label": "path"
     },
     {
@@ -36594,7 +36604,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testarraytypesreferencedinresponsesgeneratemodel",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testarraytypesreferencedinresponsesgeneratemodel()"
     },
     {
@@ -36604,7 +36614,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testgetattributenamesreturnslist",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testgetattributenamesreturnslist()"
     },
     {
@@ -36614,7 +36624,7 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testarraytypemodeljaxbannotations",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testarraytypemodeljaxbannotations()"
     },
     {
@@ -36624,7 +36634,7 @@
       "source_location": "L258",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testgetattributenamesusesarraylist",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testgetattributenamesusesarraylist()"
     },
     {
@@ -36634,7 +36644,7 @@
       "source_location": "L316",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testunreferencedarraytypesareskipped",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testunreferencedarraytypesareskipped()"
     },
     {
@@ -36644,7 +36654,7 @@
       "source_location": "L370",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testcollectschemasreferencedinresponses",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testcollectschemasreferencedinresponses()"
     },
     {
@@ -36654,7 +36664,7 @@
       "source_location": "L439",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testarticletypesfrombundleopenapi3",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testarticletypesfrombundleopenapi3()"
     },
     {
@@ -36664,7 +36674,7 @@
       "source_location": "L501",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testarticletypescollectedfromresponsecomponents",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testarticletypescollectedfromresponsecomponents()"
     },
     {
@@ -36674,7 +36684,7 @@
       "source_location": "L585",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testobjectfactoryhasnoargcreatemethods",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testobjectfactoryhasnoargcreatemethods()"
     },
     {
@@ -36684,7 +36694,7 @@
       "source_location": "L643",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testschemanamenottitleformodelclass",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testschemanamenottitleformodelclass()"
     },
     {
@@ -36694,7 +36704,7 @@
       "source_location": "L692",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testinlineprimitiverefnoseparatemodel",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testinlineprimitiverefnoseparatemodel()"
     },
     {
@@ -36704,7 +36714,7 @@
       "source_location": "L747",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testrefedobjectwithsinglearrayasseparateclass",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testrefedobjectwithsinglearrayasseparateclass()"
     },
     {
@@ -36714,7 +36724,7 @@
       "source_location": "L813",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testobjectwithsinglearrayofrefgenerateswrappertype",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testobjectwithsinglearrayofrefgenerateswrappertype()"
     },
     {
@@ -36724,7 +36734,7 @@
       "source_location": "L935",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testgetjavatypereturnslistforinlinedobjectwithsinglearrayresponse",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testgetjavatypereturnslistforinlinedobjectwithsinglearrayresponse()"
     },
     {
@@ -36734,7 +36744,7 @@
       "source_location": "L975",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorarraytypesandsettest_jerseygeneratorarraytypesandsettest_testreferencedschemasincludearrayitemobjectwhenentryvisitedfirst",
-      "community": 52,
+      "community": 30,
       "norm_label": ".testreferencedschemasincludearrayitemobjectwhenentryvisitedfirst()"
     },
     {
@@ -36844,7 +36854,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest",
-      "community": 139,
+      "community": 30,
       "norm_label": "jerseygeneratorframeworktest.java"
     },
     {
@@ -36854,7 +36864,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest_jerseygeneratorframeworktest",
-      "community": 139,
+      "community": 30,
       "norm_label": "jerseygeneratorframeworktest"
     },
     {
@@ -36864,7 +36874,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest_java_displayname",
-      "community": 139,
+      "community": 30,
       "norm_label": "displayname"
     },
     {
@@ -36874,7 +36884,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest_java_path",
-      "community": 139,
+      "community": 30,
       "norm_label": "path"
     },
     {
@@ -36884,7 +36894,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest_jerseygeneratorframeworktest_testresourceframeworkimports",
-      "community": 139,
+      "community": 30,
       "norm_label": ".testresourceframeworkimports()"
     },
     {
@@ -36894,7 +36904,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest_jerseygeneratorframeworktest_testactorannotationgenerated",
-      "community": 139,
+      "community": 30,
       "norm_label": ".testactorannotationgenerated()"
     },
     {
@@ -36904,7 +36914,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest_jerseygeneratorframeworktest_testactorannotationwithsecurity",
-      "community": 139,
+      "community": 30,
       "norm_label": ".testactorannotationwithsecurity()"
     },
     {
@@ -36914,7 +36924,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest_jerseygeneratorframeworktest_testheaderparametersexcluded",
-      "community": 139,
+      "community": 30,
       "norm_label": ".testheaderparametersexcluded()"
     },
     {
@@ -36924,7 +36934,7 @@
       "source_location": "L247",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest_jerseygeneratorframeworktest_testvalidationframeworkimports",
-      "community": 139,
+      "community": 30,
       "norm_label": ".testvalidationframeworkimports()"
     },
     {
@@ -36934,7 +36944,7 @@
       "source_location": "L284",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest_jerseygeneratorframeworktest_testqueryparamvalidatorsframeworkimports",
-      "community": 139,
+      "community": 30,
       "norm_label": ".testqueryparamvalidatorsframeworkimports()"
     },
     {
@@ -36944,7 +36954,7 @@
       "source_location": "L307",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest_jerseygeneratorframeworktest_testvalidationmaphelperframeworkimports",
-      "community": 139,
+      "community": 30,
       "norm_label": ".testvalidationmaphelperframeworkimports()"
     },
     {
@@ -36954,7 +36964,7 @@
       "source_location": "L339",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseygeneratorframeworktest_jerseygeneratorframeworktest_testinlineobjectpropertiesgenerateinnerclasses",
-      "community": 139,
+      "community": 30,
       "norm_label": ".testinlineobjectpropertiesgenerateinnerclasses()"
     },
     {
@@ -37594,7 +37604,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseymodelgeneratoroneofxortest",
-      "community": 42,
+      "community": 117,
       "norm_label": "jerseymodelgeneratoroneofxortest.java"
     },
     {
@@ -37604,7 +37614,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseymodelgeneratoroneofxortest_jerseymodelgeneratoroneofxortest",
-      "community": 42,
+      "community": 117,
       "norm_label": "jerseymodelgeneratoroneofxortest"
     },
     {
@@ -37614,7 +37624,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseymodelgeneratoroneofxortest_java_displayname",
-      "community": 42,
+      "community": 117,
       "norm_label": "displayname"
     },
     {
@@ -37624,7 +37634,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseymodelgeneratoroneofxortest_java_path",
-      "community": 42,
+      "community": 117,
       "norm_label": "path"
     },
     {
@@ -37634,7 +37644,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseymodelgeneratoroneofxortest_jerseymodelgeneratoroneofxortest_stringopenapitypeoverridesdoublejavatype",
-      "community": 42,
+      "community": 117,
       "norm_label": ".stringopenapitypeoverridesdoublejavatype()"
     },
     {
@@ -37644,7 +37654,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseymodelgeneratoroneofxortest_jerseymodelgeneratoroneofxortest_defaultprimitivedoubleusesnonzerocheck",
-      "community": 42,
+      "community": 117,
       "norm_label": ".defaultprimitivedoubleusesnonzerocheck()"
     },
     {
@@ -37654,7 +37664,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseymodelgeneratoroneofxortest_jerseymodelgeneratoroneofxortest_legacyparentbranch",
-      "community": 42,
+      "community": 117,
       "norm_label": ".legacyparentbranch()"
     },
     {
@@ -37664,7 +37674,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseymodelgeneratoroneofxortest_jerseymodelgeneratoroneofxortest_legacydepartmentstringid",
-      "community": 42,
+      "community": 117,
       "norm_label": ".legacydepartmentstringid()"
     },
     {
@@ -37674,7 +37684,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseymodelgeneratoroneofxortest_jerseymodelgeneratoroneofxortest_integrationcreatefolderusesissetidforstringopenapiid",
-      "community": 42,
+      "community": 117,
       "norm_label": ".integrationcreatefolderusesissetidforstringopenapiid()"
     },
     {
@@ -37684,7 +37694,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseymodelgeneratoroneofxortest_jerseymodelgeneratoroneofxortest_integrationlegacymessages",
-      "community": 42,
+      "community": 117,
       "norm_label": ".integrationlegacymessages()"
     },
     {
@@ -38834,7 +38844,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyschemautilsreferencetest",
-      "community": 167,
+      "community": 108,
       "norm_label": "jerseyschemautilsreferencetest.java"
     },
     {
@@ -38844,7 +38854,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyschemautilsreferencetest_jerseyschemautilsreferencetest",
-      "community": 167,
+      "community": 108,
       "norm_label": "jerseyschemautilsreferencetest"
     },
     {
@@ -38854,7 +38864,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyschemautilsreferencetest_jerseyschemautilsreferencetest_findcomponentschemaname_byidentity",
-      "community": 167,
+      "community": 108,
       "norm_label": ".findcomponentschemaname_byidentity()"
     },
     {
@@ -38864,7 +38874,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyschemautilsreferencetest_java_displayname",
-      "community": 167,
+      "community": 108,
       "norm_label": "displayname"
     },
     {
@@ -38874,7 +38884,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyschemautilsreferencetest_jerseyschemautilsreferencetest_isschemareference_matches",
-      "community": 167,
+      "community": 108,
       "norm_label": ".isschemareference_matches()"
     },
     {
@@ -38884,7 +38894,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyschemautilsreferencetest_jerseyschemautilsreferencetest_isschemareference_different",
-      "community": 167,
+      "community": 108,
       "norm_label": ".isschemareference_different()"
     },
     {
@@ -38894,7 +38904,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_java_jerseyschemautilsreferencetest_jerseyschemautilsreferencetest_isschemareference_null",
-      "community": 167,
+      "community": 108,
       "norm_label": ".isschemareference_null()"
     },
     {
@@ -39574,7 +39584,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_nodejs_expressgeneratortest",
-      "community": 180,
+      "community": 31,
       "norm_label": "expressgeneratortest.java"
     },
     {
@@ -39734,7 +39744,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_python_fastapigeneratortest",
-      "community": 180,
+      "community": 31,
       "norm_label": "fastapigeneratortest.java"
     },
     {
@@ -40004,7 +40014,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_generators_python_flaskgeneratortest",
-      "community": 180,
+      "community": 31,
       "norm_label": "flaskgeneratortest.java"
     },
     {
@@ -40204,7 +40214,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_integration_generatebundlesdktest",
-      "community": 63,
+      "community": 117,
       "norm_label": "generatebundlesdktest.java"
     },
     {
@@ -40214,7 +40224,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_integration_generatebundlesdktest_generatebundlesdktest",
-      "community": 63,
+      "community": 117,
       "norm_label": "generatebundlesdktest"
     },
     {
@@ -40224,7 +40234,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_integration_generatebundlesdktest_java_displayname",
-      "community": 63,
+      "community": 117,
       "norm_label": "displayname"
     },
     {
@@ -40234,7 +40244,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_integration_generatebundlesdktest_java_path",
-      "community": 63,
+      "community": 117,
       "norm_label": "path"
     },
     {
@@ -40244,7 +40254,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_integration_generatebundlesdktest_generatebundlesdktest_testgeneratebundlesdk",
-      "community": 63,
+      "community": 117,
       "norm_label": ".testgeneratebundlesdk()"
     },
     {
@@ -40254,7 +40264,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_integration_generateopenapi12sdktest",
-      "community": 113,
+      "community": 117,
       "norm_label": "generateopenapi12sdktest.java"
     },
     {
@@ -40264,7 +40274,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_integration_generateopenapi12sdktest_generateopenapi12sdktest",
-      "community": 113,
+      "community": 117,
       "norm_label": "generateopenapi12sdktest"
     },
     {
@@ -40274,7 +40284,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_integration_generateopenapi12sdktest_java_displayname",
-      "community": 113,
+      "community": 117,
       "norm_label": "displayname"
     },
     {
@@ -40284,7 +40294,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_integration_generateopenapi12sdktest_generateopenapi12sdktest_testgenerateopenapi4sdk",
-      "community": 113,
+      "community": 117,
       "norm_label": ".testgenerateopenapi4sdk()"
     },
     {
@@ -40444,7 +40454,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_sla_slaprocessortest",
-      "community": 180,
+      "community": 31,
       "norm_label": "slaprocessortest.java"
     },
     {
@@ -41294,7 +41304,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_common_testprofilesupporttest",
-      "community": 20,
+      "community": 31,
       "norm_label": "testprofilesupporttest.java"
     },
     {
@@ -41424,7 +41434,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest",
-      "community": 49,
+      "community": 44,
       "norm_label": "integrationtestgeneratortest.java"
     },
     {
@@ -41434,7 +41444,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest",
-      "community": 49,
+      "community": 44,
       "norm_label": "integrationtestgeneratortest"
     },
     {
@@ -41444,7 +41454,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_java_map",
-      "community": 49,
+      "community": 44,
       "norm_label": "map"
     },
     {
@@ -41454,7 +41464,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_java_string",
-      "community": 49,
+      "community": 44,
       "norm_label": "string"
     },
     {
@@ -41464,7 +41474,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_java_object",
-      "community": 49,
+      "community": 44,
       "norm_label": "object"
     },
     {
@@ -41474,7 +41484,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_setup",
-      "community": 49,
+      "community": 44,
       "norm_label": ".setup()"
     },
     {
@@ -41484,7 +41494,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_java_beforeeach",
-      "community": 49,
+      "community": 44,
       "norm_label": "beforeeach"
     },
     {
@@ -41494,7 +41504,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_testgeneratorinitialization",
-      "community": 49,
+      "community": 44,
       "norm_label": ".testgeneratorinitialization()"
     },
     {
@@ -41514,7 +41524,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_testgetversion",
-      "community": 49,
+      "community": 44,
       "norm_label": ".testgetversion()"
     },
     {
@@ -41524,7 +41534,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_testgettesttype",
-      "community": 49,
+      "community": 44,
       "norm_label": ".testgettesttype()"
     },
     {
@@ -41534,7 +41544,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_testgenerate_success",
-      "community": 49,
+      "community": 44,
       "norm_label": ".testgenerate_success()"
     },
     {
@@ -41544,7 +41554,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_java_path",
-      "community": 49,
+      "community": 44,
       "norm_label": "path"
     },
     {
@@ -41554,7 +41564,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_testgenerate_withemptyspec",
-      "community": 49,
+      "community": 44,
       "norm_label": ".testgenerate_withemptyspec()"
     },
     {
@@ -41564,7 +41574,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_testgenerate_withpaths",
-      "community": 49,
+      "community": 44,
       "norm_label": ".testgenerate_withpaths()"
     },
     {
@@ -41574,7 +41584,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_testsetconfig",
-      "community": 49,
+      "community": 44,
       "norm_label": ".testsetconfig()"
     },
     {
@@ -41584,7 +41594,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_testgenerate_withcustompackagename",
-      "community": 49,
+      "community": 44,
       "norm_label": ".testgenerate_withcustompackagename()"
     },
     {
@@ -41594,7 +41604,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_testgenerate_expandedintegrationpatterns",
-      "community": 49,
+      "community": 44,
       "norm_label": ".testgenerate_expandedintegrationpatterns()"
     },
     {
@@ -41604,7 +41614,7 @@
       "source_location": "L146",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_testgenerate_composedschemapost",
-      "community": 49,
+      "community": 44,
       "norm_label": ".testgenerate_composedschemapost()"
     },
     {
@@ -41614,7 +41624,7 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_testgenerate_withservers",
-      "community": 49,
+      "community": 44,
       "norm_label": ".testgenerate_withservers()"
     },
     {
@@ -41624,7 +41634,7 @@
       "source_location": "L180",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_createvalidopenapispec",
-      "community": 49,
+      "community": 44,
       "norm_label": ".createvalidopenapispec()"
     },
     {
@@ -41634,7 +41644,7 @@
       "source_location": "L199",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_buildrichsecuredpostspec",
-      "community": 49,
+      "community": 44,
       "norm_label": ".buildrichsecuredpostspec()"
     },
     {
@@ -41644,7 +41654,7 @@
       "source_location": "L250",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_integration_integrationtestgeneratortest_integrationtestgeneratortest_buildcomposedschemapostspec",
-      "community": 49,
+      "community": 44,
       "norm_label": ".buildcomposedschemapostspec()"
     },
     {
@@ -41814,7 +41824,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest",
-      "community": 82,
+      "community": 36,
       "norm_label": "jestintegrationtestgeneratortest.java"
     },
     {
@@ -41824,7 +41834,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest",
-      "community": 82,
+      "community": 36,
       "norm_label": "jestintegrationtestgeneratortest"
     },
     {
@@ -41834,7 +41844,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_java_map",
-      "community": 82,
+      "community": 36,
       "norm_label": "map"
     },
     {
@@ -41844,7 +41854,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_java_string",
-      "community": 82,
+      "community": 36,
       "norm_label": "string"
     },
     {
@@ -41854,7 +41864,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_java_object",
-      "community": 82,
+      "community": 36,
       "norm_label": "object"
     },
     {
@@ -41864,7 +41874,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_setup",
-      "community": 82,
+      "community": 36,
       "norm_label": ".setup()"
     },
     {
@@ -41874,7 +41884,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_java_beforeeach",
-      "community": 82,
+      "community": 36,
       "norm_label": "beforeeach"
     },
     {
@@ -41884,7 +41894,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_testgeneratorinitialization",
-      "community": 82,
+      "community": 36,
       "norm_label": ".testgeneratorinitialization()"
     },
     {
@@ -41894,7 +41904,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_testgetname",
-      "community": 82,
+      "community": 36,
       "norm_label": ".testgetname()"
     },
     {
@@ -41904,7 +41914,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_testgetversion",
-      "community": 82,
+      "community": 36,
       "norm_label": ".testgetversion()"
     },
     {
@@ -41914,7 +41924,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_testgettesttype",
-      "community": 82,
+      "community": 36,
       "norm_label": ".testgettesttype()"
     },
     {
@@ -41924,7 +41934,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_testgenerate_success",
-      "community": 82,
+      "community": 36,
       "norm_label": ".testgenerate_success()"
     },
     {
@@ -41934,7 +41944,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_java_path",
-      "community": 82,
+      "community": 36,
       "norm_label": "path"
     },
     {
@@ -41944,7 +41954,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_testgenerate_withemptyspec",
-      "community": 82,
+      "community": 36,
       "norm_label": ".testgenerate_withemptyspec()"
     },
     {
@@ -41954,7 +41964,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_testgenerate_withpaths",
-      "community": 82,
+      "community": 36,
       "norm_label": ".testgenerate_withpaths()"
     },
     {
@@ -41964,7 +41974,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_testgenerate_withservers",
-      "community": 82,
+      "community": 36,
       "norm_label": ".testgenerate_withservers()"
     },
     {
@@ -41974,7 +41984,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_testsetconfig",
-      "community": 82,
+      "community": 36,
       "norm_label": ".testsetconfig()"
     },
     {
@@ -41984,7 +41994,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_createvalidopenapispec",
-      "community": 82,
+      "community": 36,
       "norm_label": ".createvalidopenapispec()"
     },
     {
@@ -41994,7 +42004,7 @@
       "source_location": "L134",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_nodejs_jestintegrationtestgeneratortest_jestintegrationtestgeneratortest_buildrichsecuredpostspec",
-      "community": 82,
+      "community": 36,
       "norm_label": ".buildrichsecuredpostspec()"
     },
     {
@@ -42264,7 +42274,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_performance_performancetestgeneratortest_performancetestgeneratortest_testgetname",
-      "community": 108,
+      "community": 98,
       "norm_label": ".testgetname()"
     },
     {
@@ -42524,7 +42534,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest",
-      "community": 20,
+      "community": 49,
       "norm_label": "postmantestgeneratortest.java"
     },
     {
@@ -42534,7 +42544,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest",
-      "community": 20,
+      "community": 49,
       "norm_label": "postmantestgeneratortest"
     },
     {
@@ -42544,7 +42554,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_java_displayname",
-      "community": 20,
+      "community": 49,
       "norm_label": "displayname"
     },
     {
@@ -42554,7 +42564,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_java_objectmapper",
-      "community": 20,
+      "community": 49,
       "norm_label": "objectmapper"
     },
     {
@@ -42564,7 +42574,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_setup",
-      "community": 20,
+      "community": 49,
       "norm_label": ".setup()"
     },
     {
@@ -42574,7 +42584,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_java_beforeeach",
-      "community": 20,
+      "community": 49,
       "norm_label": "beforeeach"
     },
     {
@@ -42584,7 +42594,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_testdescriptionescaping",
-      "community": 20,
+      "community": 49,
       "norm_label": ".testdescriptionescaping()"
     },
     {
@@ -42594,7 +42604,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_testvariablenamingconflicts",
-      "community": 20,
+      "community": 49,
       "norm_label": ".testvariablenamingconflicts()"
     },
     {
@@ -42604,7 +42614,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_testexampleextraction",
-      "community": 20,
+      "community": 49,
       "norm_label": ".testexampleextraction()"
     },
     {
@@ -42614,7 +42624,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_testvalidjsongeneration",
-      "community": 20,
+      "community": 49,
       "norm_label": ".testvalidjsongeneration()"
     },
     {
@@ -42624,7 +42634,7 @@
       "source_location": "L177",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_testenvironmentfilegeneration",
-      "community": 20,
+      "community": 49,
       "norm_label": ".testenvironmentfilegeneration()"
     },
     {
@@ -42634,7 +42644,7 @@
       "source_location": "L212",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_testopenapi4negativesuitestructure",
-      "community": 20,
+      "community": 49,
       "norm_label": ".testopenapi4negativesuitestructure()"
     },
     {
@@ -42644,7 +42654,7 @@
       "source_location": "L239",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_testdisablenegativetestsviaconfig",
-      "community": 20,
+      "community": 49,
       "norm_label": ".testdisablenegativetestsviaconfig()"
     },
     {
@@ -42654,7 +42664,7 @@
       "source_location": "L261",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_findnegativetcfoldercount",
-      "community": 20,
+      "community": 49,
       "norm_label": ".findnegativetcfoldercount()"
     },
     {
@@ -42664,7 +42674,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_java_map",
-      "community": 20,
+      "community": 49,
       "norm_label": "map"
     },
     {
@@ -42674,7 +42684,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_java_string",
-      "community": 20,
+      "community": 49,
       "norm_label": "string"
     },
     {
@@ -42684,7 +42694,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_java_object",
-      "community": 20,
+      "community": 49,
       "norm_label": "object"
     },
     {
@@ -42694,7 +42704,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_java_suppresswarnings",
-      "community": 20,
+      "community": 49,
       "norm_label": "suppresswarnings"
     },
     {
@@ -42704,7 +42714,7 @@
       "source_location": "L288",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_testwithopenapi3file",
-      "community": 20,
+      "community": 49,
       "norm_label": ".testwithopenapi3file()"
     },
     {
@@ -42714,7 +42724,7 @@
       "source_location": "L333",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_createbasicspec",
-      "community": 20,
+      "community": 49,
       "norm_label": ".createbasicspec()"
     },
     {
@@ -42724,7 +42734,7 @@
       "source_location": "L344",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_createspecwithmultilinedescription",
-      "community": 20,
+      "community": 49,
       "norm_label": ".createspecwithmultilinedescription()"
     },
     {
@@ -42734,7 +42744,7 @@
       "source_location": "L362",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_createspecwithservers",
-      "community": 20,
+      "community": 49,
       "norm_label": ".createspecwithservers()"
     },
     {
@@ -42744,7 +42754,7 @@
       "source_location": "L370",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_createspecwithexamples",
-      "community": 20,
+      "community": 49,
       "norm_label": ".createspecwithexamples()"
     },
     {
@@ -42754,7 +42764,7 @@
       "source_location": "L417",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_testcomposedschemarequestbody",
-      "community": 20,
+      "community": 49,
       "norm_label": ".testcomposedschemarequestbody()"
     },
     {
@@ -42764,7 +42774,7 @@
       "source_location": "L474",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_testarrayenumquerydefault",
-      "community": 20,
+      "community": 49,
       "norm_label": ".testarrayenumquerydefault()"
     },
     {
@@ -42774,7 +42784,7 @@
       "source_location": "L516",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_flattenpostmanitems",
-      "community": 20,
+      "community": 49,
       "norm_label": ".flattenpostmanitems()"
     },
     {
@@ -42784,7 +42794,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_java_list",
-      "community": 20,
+      "community": 49,
       "norm_label": "list"
     },
     {
@@ -42794,7 +42804,7 @@
       "source_location": "L537",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_findpostmancollectionfile",
-      "community": 20,
+      "community": 49,
       "norm_label": ".findpostmancollectionfile()"
     },
     {
@@ -42804,7 +42814,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_java_path",
-      "community": 20,
+      "community": 49,
       "norm_label": "path"
     },
     {
@@ -42814,7 +42824,7 @@
       "source_location": "L546",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_findpostmanenvironmentfile",
-      "community": 20,
+      "community": 49,
       "norm_label": ".findpostmanenvironmentfile()"
     },
     {
@@ -42824,7 +42834,7 @@
       "source_location": "L555",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_postman_postmantestgeneratortest_postmantestgeneratortest_deletedirectory",
-      "community": 20,
+      "community": 49,
       "norm_label": ".deletedirectory()"
     },
     {
@@ -43024,7 +43034,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest",
-      "community": 106,
+      "community": 66,
       "norm_label": "pytestunittestgeneratortest.java"
     },
     {
@@ -43034,7 +43044,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest",
-      "community": 106,
+      "community": 66,
       "norm_label": "pytestunittestgeneratortest"
     },
     {
@@ -43044,7 +43054,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_java_map",
-      "community": 106,
+      "community": 66,
       "norm_label": "map"
     },
     {
@@ -43054,7 +43064,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_java_string",
-      "community": 106,
+      "community": 66,
       "norm_label": "string"
     },
     {
@@ -43064,7 +43074,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_java_object",
-      "community": 106,
+      "community": 66,
       "norm_label": "object"
     },
     {
@@ -43074,7 +43084,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest_setup",
-      "community": 106,
+      "community": 66,
       "norm_label": ".setup()"
     },
     {
@@ -43084,7 +43094,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_java_beforeeach",
-      "community": 106,
+      "community": 66,
       "norm_label": "beforeeach"
     },
     {
@@ -43094,7 +43104,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest_testgeneratorinitialization",
-      "community": 106,
+      "community": 66,
       "norm_label": ".testgeneratorinitialization()"
     },
     {
@@ -43104,7 +43114,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest_testgetname",
-      "community": 106,
+      "community": 66,
       "norm_label": ".testgetname()"
     },
     {
@@ -43114,7 +43124,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest_testgetversion",
-      "community": 106,
+      "community": 66,
       "norm_label": ".testgetversion()"
     },
     {
@@ -43124,7 +43134,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest_testgettesttype",
-      "community": 106,
+      "community": 66,
       "norm_label": ".testgettesttype()"
     },
     {
@@ -43134,7 +43144,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest_testgenerate_success",
-      "community": 106,
+      "community": 66,
       "norm_label": ".testgenerate_success()"
     },
     {
@@ -43144,7 +43154,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_java_path",
-      "community": 106,
+      "community": 66,
       "norm_label": "path"
     },
     {
@@ -43154,7 +43164,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest_testgenerate_withemptyspec",
-      "community": 106,
+      "community": 66,
       "norm_label": ".testgenerate_withemptyspec()"
     },
     {
@@ -43164,7 +43174,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest_testgenerate_withpaths",
-      "community": 106,
+      "community": 66,
       "norm_label": ".testgenerate_withpaths()"
     },
     {
@@ -43174,7 +43184,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest_testgenerate_createsconftestandrequirements",
-      "community": 106,
+      "community": 66,
       "norm_label": ".testgenerate_createsconftestandrequirements()"
     },
     {
@@ -43184,7 +43194,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest_testsetconfig",
-      "community": 106,
+      "community": 66,
       "norm_label": ".testsetconfig()"
     },
     {
@@ -43194,7 +43204,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_python_pytestunittestgeneratortest_pytestunittestgeneratortest_createvalidopenapispec",
-      "community": 106,
+      "community": 66,
       "norm_label": ".createvalidopenapispec()"
     },
     {
@@ -43314,7 +43324,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest",
-      "community": 97,
+      "community": 44,
       "norm_label": "securitytestgeneratortest.java"
     },
     {
@@ -43324,7 +43334,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest",
-      "community": 97,
+      "community": 44,
       "norm_label": "securitytestgeneratortest"
     },
     {
@@ -43334,7 +43344,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_java_map",
-      "community": 97,
+      "community": 44,
       "norm_label": "map"
     },
     {
@@ -43344,7 +43354,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_java_string",
-      "community": 97,
+      "community": 44,
       "norm_label": "string"
     },
     {
@@ -43354,7 +43364,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_java_object",
-      "community": 97,
+      "community": 44,
       "norm_label": "object"
     },
     {
@@ -43364,7 +43374,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest_setup",
-      "community": 97,
+      "community": 44,
       "norm_label": ".setup()"
     },
     {
@@ -43374,7 +43384,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_java_beforeeach",
-      "community": 97,
+      "community": 44,
       "norm_label": "beforeeach"
     },
     {
@@ -43384,7 +43394,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest_testgeneratorinitialization",
-      "community": 97,
+      "community": 44,
       "norm_label": ".testgeneratorinitialization()"
     },
     {
@@ -43394,7 +43404,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest_testgetname",
-      "community": 108,
+      "community": 44,
       "norm_label": ".testgetname()"
     },
     {
@@ -43404,7 +43414,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest_testgetversion",
-      "community": 97,
+      "community": 44,
       "norm_label": ".testgetversion()"
     },
     {
@@ -43414,7 +43424,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest_testgettesttype",
-      "community": 97,
+      "community": 44,
       "norm_label": ".testgettesttype()"
     },
     {
@@ -43424,7 +43434,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest_testgenerate_success",
-      "community": 97,
+      "community": 44,
       "norm_label": ".testgenerate_success()"
     },
     {
@@ -43434,7 +43444,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_java_path",
-      "community": 97,
+      "community": 44,
       "norm_label": "path"
     },
     {
@@ -43444,7 +43454,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest_testgenerate_withemptyspec",
-      "community": 97,
+      "community": 44,
       "norm_label": ".testgenerate_withemptyspec()"
     },
     {
@@ -43454,7 +43464,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest_testgenerate_withsecurityschemes",
-      "community": 97,
+      "community": 44,
       "norm_label": ".testgenerate_withsecurityschemes()"
     },
     {
@@ -43464,7 +43474,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_java_suppresswarnings",
-      "community": 97,
+      "community": 44,
       "norm_label": "suppresswarnings"
     },
     {
@@ -43474,7 +43484,7 @@
       "source_location": "L122",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest_testsetconfig",
-      "community": 97,
+      "community": 44,
       "norm_label": ".testsetconfig()"
     },
     {
@@ -43484,7 +43494,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest_testgenerate_withcustompackagename",
-      "community": 97,
+      "community": 44,
       "norm_label": ".testgenerate_withcustompackagename()"
     },
     {
@@ -43494,7 +43504,7 @@
       "source_location": "L152",
       "_origin": "ast",
       "id": "src_test_java_egain_oassdk_testgenerators_security_securitytestgeneratortest_securitytestgeneratortest_createvalidopenapispec",
-      "community": 97,
+      "community": 44,
       "norm_label": ".createvalidopenapispec()"
     },
     {
@@ -55724,6 +55734,17 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
+      "source_location": "L72",
+      "weight": 1.0,
+      "context": "attribute",
+      "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_testrequiredqueryparamusesl10nerrorkey",
+      "target": "generated_playwright_contentmgr_v4_playwright_package_scripts_test",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
@@ -64661,6 +64682,17 @@
       "context": "call",
       "confidence": "INFERRED",
       "confidence_score": 0.8,
+      "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
+      "source_location": "L80",
+      "weight": 1.0,
+      "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_testrequiredqueryparamusesl10nerrorkey",
+      "target": "src_main_java_egain_oassdk_oassdk_oassdk_loadspec"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
       "source_file": "src/test/java/egain/oassdk/RegressionTest.java",
       "source_location": "L177",
       "weight": 1.0,
@@ -65611,6 +65643,17 @@
       "source_location": "L47",
       "weight": 1.0,
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_testqueryparametervalidation",
+      "target": "src_main_java_egain_oassdk_oassdk_oassdk_generateapplication"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
+      "source_location": "L81",
+      "weight": 1.0,
+      "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_testrequiredqueryparamusesl10nerrorkey",
       "target": "src_main_java_egain_oassdk_oassdk_oassdk_generateapplication"
     },
     {
@@ -176053,7 +176096,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L186",
+      "source_location": "L213",
       "weight": 1.0,
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest",
       "target": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkqueryparametersinresources",
@@ -176063,7 +176106,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L129",
+      "source_location": "L156",
       "weight": 1.0,
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest",
       "target": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkresourcesuseprogrammaticvalidation",
@@ -176073,7 +176116,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L104",
+      "source_location": "L131",
       "weight": 1.0,
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest",
       "target": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkvalidationclassesgenerated",
@@ -176083,7 +176126,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L72",
+      "source_location": "L95",
       "weight": 1.0,
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest",
       "target": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkvalidationinfrastructure",
@@ -176097,6 +176140,16 @@
       "weight": 1.0,
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest",
       "target": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_testqueryparametervalidation",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
+      "source_location": "L72",
+      "weight": 1.0,
+      "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest",
+      "target": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_testrequiredqueryparamusesl10nerrorkey",
       "confidence_score": 1.0
     },
     {
@@ -176114,7 +176167,18 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L186",
+      "source_location": "L72",
+      "weight": 1.0,
+      "context": "attribute",
+      "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_testrequiredqueryparamusesl10nerrorkey",
+      "target": "src_test_java_egain_oassdk_queryparametervalidationtest_java_displayname",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
+      "source_location": "L213",
       "weight": 1.0,
       "context": "parameter_type",
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkqueryparametersinresources",
@@ -176125,7 +176189,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L129",
+      "source_location": "L156",
       "weight": 1.0,
       "context": "parameter_type",
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkresourcesuseprogrammaticvalidation",
@@ -176136,7 +176200,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L104",
+      "source_location": "L131",
       "weight": 1.0,
       "context": "parameter_type",
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkvalidationclassesgenerated",
@@ -176147,7 +176211,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L72",
+      "source_location": "L95",
       "weight": 1.0,
       "context": "parameter_type",
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkvalidationinfrastructure",
@@ -176158,7 +176222,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L186",
+      "source_location": "L213",
       "weight": 1.0,
       "context": "parameter_type",
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkqueryparametersinresources",
@@ -176169,7 +176233,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L129",
+      "source_location": "L156",
       "weight": 1.0,
       "context": "parameter_type",
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkresourcesuseprogrammaticvalidation",
@@ -176180,7 +176244,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L104",
+      "source_location": "L131",
       "weight": 1.0,
       "context": "parameter_type",
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkvalidationclassesgenerated",
@@ -176191,7 +176255,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src/test/java/egain/oassdk/QueryParameterValidationTest.java",
-      "source_location": "L72",
+      "source_location": "L95",
       "weight": 1.0,
       "context": "parameter_type",
       "source": "src_test_java_egain_oassdk_queryparametervalidationtest_queryparametervalidationtest_checkvalidationinfrastructure",
@@ -200254,5 +200318,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "943909f10e604568d64b86285a62addca0290268"
+  "built_at_commit": "8eefc40cac21c9fddc32107804b8e2b2916d40e0"
 }
