@@ -68,6 +68,29 @@ public class QueryParameterValidationTest {
         
         System.out.println("\n=== All Validation Checks Passed ===");
     }
+
+    @Test
+    @DisplayName("Required query parameter validation emits L10N error key")
+    public void testRequiredQueryParamUsesL10nErrorKey() throws OASSDKException, IOException {
+        String yamlFile = "src/test/resources/openapi-required-query-param.yaml";
+        String packageName = "com.egain.openapi.requiredquery.api";
+        Path outputDir = tempOutputDir.resolve("generated-code/required-query");
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(yamlFile);
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path queryParamValidators = outputDir.resolve("src/main/java")
+            .resolve(packageName.replace(".", "/"))
+            .resolve("QueryParamValidators.java");
+        assertTrue(Files.exists(queryParamValidators), "QueryParamValidators.java should exist");
+
+        String validatorsContent = Files.readString(queryParamValidators);
+        assertTrue(validatorsContent.contains("L10N_REQUIRED_QUERY_PARAM_MISSING"),
+            "Required query param validation should use L10N error key");
+        assertFalse(validatorsContent.contains("I18N_REQUIRED_QUERY_PARAM_MISSING"),
+            "Required query param validation must not use legacy I18N error key");
+    }
     
     private void checkValidationInfrastructure(Path outputDir, String packageName) throws IOException {
         String packagePath = packageName.replace(".", "/");
@@ -85,6 +108,10 @@ public class QueryParameterValidationTest {
             "Should import validation classes from package " + VALIDATION_PACKAGE);
         assertTrue(validatorsContent.contains("import " + VALIDATION_PACKAGE + ".PatternValidator;"),
             "Should import PatternValidator from package " + VALIDATION_PACKAGE);
+        assertTrue(validatorsContent.contains("L10N_UNSUPPORTED_QUERY_PARAM"),
+            "AllowedParameterValidator should use L10N_UNSUPPORTED_QUERY_PARAM");
+        assertFalse(validatorsContent.contains("L10N_INVALID_QUERY_PARAMETER"),
+            "Must not use legacy L10N_INVALID_QUERY_PARAMETER key");
 
         // Check ValidationMapHelper.java exists and has validate() method (under passed-in package)
         Path validationMapHelper = packageDir.resolve("ValidationMapHelper.java");

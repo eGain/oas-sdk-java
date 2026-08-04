@@ -1,0 +1,33 @@
+openapi: 3.0.0
+info:
+  title: Required Query Param Sample
+  version: 1.0.0
+  license:
+    name: Test License is required
+  description: Minimal spec with a required query parameter for L10N key checks
+servers:
+  - url: https://api.example.com/knowledge/contentmgr/v4
+    description: Production Server
+paths:
+  /items:
+    get:
+      summary: List items
+      description: Requires a filter query parameter
+      operationId: listItems
+      parameters:
+        - name: filter
+          in: query
+          description: Required filter expression
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
