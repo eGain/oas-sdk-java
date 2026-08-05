@@ -304,16 +304,30 @@ class JerseyQueryParamValidatorGenerator {
 
 			if (ctx.modelsOnly)
 			{
-				// have fixed validation for integer number with at least 1 digit
-				String format = "^-?\\\\d+$";
-				String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_FORMAT";
-				sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(
-												paramName)
-								.append("\", \"").append(format).append("\");\n");
-				sb.append("    v.add(new FormatValidator(\"").append(paramName).append("\", \"").append(format)
-								.append("\", \"").append(errorCode).append("\", arguments").append(
-												getCurrentArgCounter())
-								.append(", Collections.emptyList(), \"").append(paramType).append("\", false));\n");
+				String format = (String) schema.get("format");
+				if (format != null && !format.isEmpty())
+				{
+					String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_FORMAT";
+					sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(
+											paramName)
+							.append("\", \"").append(format).append("\");\n");
+					sb.append("    v.add(new FormatValidator(\"").append(paramName).append("\", \"").append(format)
+							.append("\", \"").append(errorCode).append("\", arguments").append(
+											getCurrentArgCounter())
+							.append(", Collections.emptyList(), \"").append(paramType).append("\", false));\n");
+				}
+				else
+				{
+					String pattern = "^-?\\\\d+$";
+					String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_PATTERN";
+					sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(
+											paramName)
+							.append("\", \"").append(pattern).append("\");\n");
+					sb.append("    v.add(new PatternValidator(\"").append(paramName).append("\", \"").append(pattern)
+							.append("\", \"").append(errorCode).append("\", arguments").append(
+											getCurrentArgCounter())
+							.append(", Collections.emptyList(), \"").append(paramType).append("\",false));\n");
+				}
 			}
 			else
 			{
