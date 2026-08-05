@@ -150,4 +150,55 @@ public class JerseyGeneratorConfigTest {
             generator.generate(resolvedSpec, null, new GeneratorConfig(), PACKAGE_NAME)
         );
     }
+
+    @Test
+    @DisplayName("EGS-99382: modelsOnly uses numeric formats and integer fallback patterns")
+    public void testModelsOnlyIntegerQueryParamValidation() throws Exception {
+        String yamlContent = """
+            openapi: 3.0.0
+            info:
+              title: Integer query parameter validation
+              version: 1.0.0
+            paths:
+              /articles:
+                get:
+                  operationId: listArticles
+                  parameters:
+                    - name: pagenum
+                      in: query
+                      schema:
+                        type: integer
+                        format: int64
+                    - name: pagesize
+                      in: query
+                      schema:
+                        type: integer
+                  responses:
+                    '200':
+                      description: OK
+            """;
+        Path specFile = tempDir.resolve("integer-query-param.yaml");
+        Files.writeString(specFile, yamlContent);
+
+        OASParser parser = new OASParser();
+        Map<String, Object> spec = parser.parse(specFile.toString());
+        Map<String, Object> resolvedSpec = parser.resolveReferences(spec, specFile.toString());
+        Path outputDir = tempDir.resolve("models-only-integer-query-param");
+        GeneratorConfig config = GeneratorConfig.builder().modelsOnly(true).build();
+        config.setPackageName(PACKAGE_NAME);
+
+        new JerseyGenerator().generate(resolvedSpec, outputDir.toString(), config, PACKAGE_NAME);
+
+        Path validators = outputDir.resolve(PACKAGE_NAME.replace(".", "/") + "/QueryParamValidators.txt");
+        assertTrue(Files.exists(validators), "QueryParamValidators.txt should exist");
+        String content = Files.readString(validators);
+
+        assertTrue(content.contains("new FormatValidator(\"pagenum\", \"int64\""),
+                "Formatted integer query params should use FormatValidator with their schema format");
+        assertTrue(content.contains("new PatternValidator(\"pagesize\", \"^-?\\\\d+$\""),
+                "Integer query params without a format should use PatternValidator");
+        assertFalse(content.contains("new FormatValidator(\"pagesize\""),
+                "Custom integer regex must not be passed to FormatValidator");
+    }
+
 }
