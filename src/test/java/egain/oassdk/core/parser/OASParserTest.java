@@ -481,5 +481,73 @@ public class OASParserTest {
         assertFalse(schemas.containsKey("ImplicitObjectListRef"),
             "Inline array with implicit object items must not register ImplicitObjectListRef when inlined");
     }
+
+    @Test
+    public void testDistinctAnswerYamlFilesKeepBothSchemaKeys(@TempDir Path tempDir) throws IOException, OASSDKException {
+        Path commonDir = tempDir.resolve("common");
+        Path schemasDir = tempDir.resolve("schemas");
+        Files.createDirectories(commonDir);
+        Files.createDirectories(schemasDir);
+
+        Files.writeString(commonDir.resolve("Answer.yaml"), """
+                type: object
+                title: Answer
+                properties:
+                  id:
+                    type: string
+                  value:
+                    type: string
+                """);
+        Files.writeString(schemasDir.resolve("Answer.yaml"), """
+                type: object
+                title: Answer
+                properties:
+                  id:
+                    type: string
+                  text:
+                    type: string
+                  image:
+                    type: object
+                """);
+
+        Files.writeString(tempDir.resolve("api.yaml"), """
+                openapi: 3.0.0
+                info:
+                  title: Answer collision
+                  version: 1.0.0
+                paths: {}
+                components:
+                  schemas:
+                    Wrapper:
+                      type: object
+                      properties:
+                        common:
+                          $ref: common/Answer.yaml
+                        gh:
+                          $ref: schemas/Answer.yaml
+                """);
+
+        OASParser parserWithSearch = new OASParser(List.of(tempDir.toString()));
+        Map<String, Object> spec = parserWithSearch.parse(tempDir.resolve("api.yaml").toString());
+        Map<String, Object> resolved = parserWithSearch.resolveReferences(spec, tempDir.resolve("api.yaml").toString());
+
+        Map<String, Object> schemas = Util.asStringObjectMap(
+                Util.asStringObjectMap(resolved.get("components")).get("schemas"));
+        assertNotNull(schemas);
+        assertTrue(schemas.containsKey("Answer"), "common Answer.yaml should keep the short name");
+        assertTrue(schemas.containsKey("schemas-Answer"),
+                "guided-help Answer.yaml should be registered as schemas-Answer");
+
+        Map<String, Object> commonAnswer = Util.asStringObjectMap(schemas.get("Answer"));
+        Map<String, Object> commonProps = Util.asStringObjectMap(commonAnswer.get("properties"));
+        assertTrue(commonProps.containsKey("value"), "Answer must keep common id+value fields");
+        assertFalse(commonProps.containsKey("text"), "Answer must not be overwritten by GH fields");
+
+        Map<String, Object> ghAnswer = Util.asStringObjectMap(schemas.get("schemas-Answer"));
+        Map<String, Object> ghProps = Util.asStringObjectMap(ghAnswer.get("properties"));
+        assertTrue(ghProps.containsKey("text"), "schemas-Answer must keep GH text");
+        assertTrue(ghProps.containsKey("image"), "schemas-Answer must keep GH image");
+        assertFalse(ghProps.containsKey("value"), "schemas-Answer must not be the common schema");
+    }
 }
 
