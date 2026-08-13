@@ -1,5 +1,6 @@
 package __PACKAGE__.exception;
 
+import __WS_NS__.WebApplicationException;
 import __WS_NS__.core.MediaType;
 import __WS_NS__.core.Response;
 import __WS_NS__.ext.ExceptionMapper;
@@ -13,6 +14,9 @@ public class GenericExceptionMapper implements ExceptionMapper<Exception> {
 
     @Override
     public Response toResponse(Exception exception) {
+        if (exception instanceof WebApplicationException wae) {
+            return wae.getResponse();
+        }
         logger.log(Level.SEVERE, "Unhandled exception", exception);
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                 .entity("{\"error\": \"Internal server error\"}")

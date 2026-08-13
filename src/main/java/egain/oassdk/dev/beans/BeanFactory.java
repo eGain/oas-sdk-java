@@ -312,6 +312,7 @@ public class BeanFactory {
         String exceptionContent = """
                 package %s.exception;
                 
+                import jakarta.ws.rs.WebApplicationException;
                 import jakarta.ws.rs.core.Response;
                 import jakarta.ws.rs.ext.ExceptionMapper;
                 import jakarta.ws.rs.ext.Provider;
@@ -321,6 +322,9 @@ public class BeanFactory {
                 
                     @Override
                     public Response toResponse(Exception exception) {
+                        if (exception instanceof WebApplicationException wae) {
+                            return wae.getResponse();
+                        }
                         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                                 .entity("An error occurred: " + exception.getMessage())
                                 .build();

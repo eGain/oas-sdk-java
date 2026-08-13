@@ -362,14 +362,14 @@ class JerseyResourceGenerator {
         }
 
         if (collected.isEmpty()) {
-            content.append("@Produces({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})\n");
-            content.append("@Consumes({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})\n");
+            content.append("@Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})\n");
+            content.append("@Consumes({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})\n");
             return;
         }
 
         if (hasXml) {
-            content.append("@Produces({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})\n");
-            content.append("@Consumes({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})\n");
+            content.append("@Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})\n");
+            content.append("@Consumes({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})\n");
         } else {
             content.append("@Produces(MediaType.APPLICATION_JSON)\n");
             content.append("@Consumes(MediaType.APPLICATION_JSON)\n");
@@ -388,18 +388,23 @@ class JerseyResourceGenerator {
         if (requestBody != null) {
             extractContentMediaTypeKeys(requestBody, out);
         }
+        collectResponseMediaTypes(operation, spec, out);
+    }
+
+    private void collectResponseMediaTypes(Map<String, Object> operation, Map<String, Object> spec, Set<String> out) {
         Map<String, Object> responses = Util.asStringObjectMap(operation.get("responses"));
-        if (responses != null) {
-            for (Object respObj : responses.values()) {
-                Map<String, Object> resp = Util.asStringObjectMap(respObj);
-                if (resp == null) {
-                    continue;
-                }
-                if (resp.containsKey("$ref") && spec != null) {
-                    resp = resolveResponseRef(resp, spec);
-                }
-                extractContentMediaTypeKeys(resp, out);
+        if (responses == null) {
+            return;
+        }
+        for (Object respObj : responses.values()) {
+            Map<String, Object> resp = Util.asStringObjectMap(respObj);
+            if (resp == null) {
+                continue;
             }
+            if (resp.containsKey("$ref") && spec != null) {
+                resp = resolveResponseRef(resp, spec);
+            }
+            extractContentMediaTypeKeys(resp, out);
         }
     }
 
@@ -526,6 +531,8 @@ class JerseyResourceGenerator {
             content.append("    @Consumes\n");
         }
 
+        appendMethodLevelProduces(operation, content);
+
         content.append(generateActorAnnotationForOperation(operation));
 
         List<Map<String, Object>> params = Util.asStringObjectMapList(operation.get("parameters"));
@@ -587,6 +594,25 @@ class JerseyResourceGenerator {
         content.append("    }\n\n");
 
         return needsList;
+    }
+
+    private void appendMethodLevelProduces(Map<String, Object> operation, StringBuilder content) {
+        boolean jsonOnlyConfig = ctx.config != null && ctx.config.isJsonOnlyResourceMediaTypes();
+        if (jsonOnlyConfig) {
+            content.append("    @Produces(MediaType.APPLICATION_JSON)\n");
+            return;
+        }
+        Set<String> collected = new LinkedHashSet<>();
+        collectResponseMediaTypes(operation, ctx.spec, collected);
+        if (collected.isEmpty()) {
+            return;
+        }
+        boolean hasXml = collected.stream().anyMatch(JerseyResourceGenerator::mediaTypeImpliesXml);
+        if (hasXml) {
+            content.append("    @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})\n");
+        } else {
+            content.append("    @Produces(MediaType.APPLICATION_JSON)\n");
+        }
     }
 
     /**
