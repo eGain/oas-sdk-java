@@ -12,11 +12,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.logging.Logger;
 
 /**
  * Parser for OpenAPI and SLA YAML files
  */
 public class OASParser {
+
+    private static final Logger logger = egain.oassdk.core.logging.LoggerConfig.getLogger(OASParser.class);
 
     private final ObjectMapper yamlMapper;
     private final ObjectMapper jsonMapper;
@@ -421,8 +424,10 @@ public class OASParser {
                                 if (schemaName == null || schemaName.isEmpty()) {
                                     schemaName = deriveSchemaNameFromRef(ref);
                                 }
-                                if (schemaName != null && !schemaName.isEmpty()) {
-                                    map.put("x-resolved-ref", "#/components/schemas/" + schemaName);
+                                String registered = addResolvedExternalSchemaToMainSpec(ref, resolvedCopy, loadedFiles, baseFileKey);
+                                String refName = (registered != null && !registered.isEmpty()) ? registered : schemaName;
+                                if (refName != null && !refName.isEmpty()) {
+                                    map.put("x-resolved-ref", "#/components/schemas/" + refName);
                                 }
                             } else if (ref != null && ref.contains("#/components/schemas/")) {
                                 // External ref with fragment (e.g. common.yaml#/components/schemas/L10NString) that did not
@@ -439,10 +444,8 @@ public class OASParser {
                                 }
                             }
                             
-                            // When we inline an external schema file, register it in the main spec's components/schemas
-                            // so that the full schema (e.g. User from User.yaml) is available even if the main spec
-                            // had a wrong or missing entry for that name (e.g. User pointing at Users.yaml).
-                            if (isExternalFileRef && ref != null) {
+                            // Whole-file external refs are registered above (x-resolved-ref uses the registered key).
+                            if (isExternalFileRef && ref != null && !map.containsKey("x-resolved-ref")) {
                                 addResolvedExternalSchemaToMainSpec(ref, resolvedCopy, loadedFiles, baseFileKey);
                             }
                         }
@@ -570,26 +573,28 @@ public class OASParser {
      * When an external file ref (e.g. User.yaml) is resolved and inlined, register that schema
      * in the main spec's components/schemas under the derived name. This ensures the full schema
      * is available to generators even when the only reference was nested (e.g. Users.user.items).
+     *
+     * @return the components/schemas key actually used, or {@code null} if nothing was registered
      */
-    private void addResolvedExternalSchemaToMainSpec(String ref, Map<String, Object> resolvedCopy,
+    private String addResolvedExternalSchemaToMainSpec(String ref, Map<String, Object> resolvedCopy,
                                                      Map<String, Map<String, Object>> loadedFiles, String baseFileKey) {
         if (ref == null || resolvedCopy == null || loadedFiles == null || baseFileKey == null) {
-            return;
+            return null;
         }
         if (isPrimitiveSchema(resolvedCopy)) {
-            return;
+            return null;
         }
         // Only register if the resolved content looks like a schema definition (type or properties at top level)
         if (!resolvedCopy.containsKey("type") && !resolvedCopy.containsKey("properties")) {
-            return;
+            return null;
         }
         String schemaName = deriveSchemaNameFromRef(ref);
         if (schemaName == null || schemaName.isEmpty()) {
-            return;
+            return null;
         }
         Map<String, Object> mainSpec = loadedFiles.get(baseFileKey);
         if (mainSpec == null) {
-            return;
+            return null;
         }
         // Use the actual map from the spec so we modify in place (Util.asStringObjectMap would copy)
         @SuppressWarnings("unchecked")
@@ -604,7 +609,7 @@ public class OASParser {
             mainSchemas = new HashMap<>();
             mainComponents.put("schemas", mainSchemas);
         }
-        mainSchemas.put(schemaName, new HashMap<>(resolvedCopy));
+        return registerSchemaAvoidingCollision(mainSchemas, schemaName, new HashMap<>(resolvedCopy), ref);
     }
 
     /**
@@ -665,6 +670,103 @@ public class OASParser {
             return segment.substring(0, segment.length() - 5);
         }
         return segment;
+    }
+
+    /**
+     * Register {@code incoming} under {@code schemaName}, or a parent-path-qualified name when that
+     * key already holds a different schema (e.g. two {@code Answer.yaml} files → {@code Answer} and
+     * {@code schemas-Answer}). A richer incoming schema still overwrites a placeholder at the same key.
+     */
+    private String registerSchemaAvoidingCollision(Map<String, Object> mainSchemas, String schemaName,
+                                                   Map<String, Object> incoming, String refOrFileKey) {
+        Object existing = mainSchemas.get(schemaName);
+        if (existing == null) {
+            mainSchemas.put(schemaName, incoming);
+            return schemaName;
+        }
+        if (Objects.equals(existing, incoming) || samePropertyKeys(existing, incoming)) {
+            return schemaName;
+        }
+        if (incomingReplacesPlaceholder(existing, incoming)) {
+            mainSchemas.put(schemaName, incoming);
+            return schemaName;
+        }
+        String unique = uniqueCollidingSchemaName(schemaName, refOrFileKey, mainSchemas, incoming);
+        if (!unique.equals(schemaName)) {
+            logger.warning("Schema name collision for '" + schemaName + "' from " + refOrFileKey
+                    + "; registering as '" + unique + "'");
+        }
+        mainSchemas.put(unique, incoming);
+        return unique;
+    }
+
+    private static boolean incomingReplacesPlaceholder(Object existing, Map<String, Object> incoming) {
+        if (!(existing instanceof Map<?, ?> existingMap)) {
+            return true;
+        }
+        Map<String, Object> existingProps = Util.asStringObjectMap(existingMap.get("properties"));
+        Map<String, Object> incomingProps = Util.asStringObjectMap(incoming.get("properties"));
+        if (existingProps == null || existingProps.isEmpty()) {
+            return true;
+        }
+        if (incomingProps == null) {
+            return false;
+        }
+        return incomingProps.keySet().containsAll(existingProps.keySet())
+                && incomingProps.size() > existingProps.size();
+    }
+
+    /** Same property names: keep the first registration instead of inventing a colliding key. */
+    private static boolean samePropertyKeys(Object existing, Map<String, Object> incoming) {
+        if (!(existing instanceof Map<?, ?> existingMap)) {
+            return false;
+        }
+        Map<String, Object> existingProps = Util.asStringObjectMap(existingMap.get("properties"));
+        Map<String, Object> incomingProps = Util.asStringObjectMap(incoming.get("properties"));
+        if (existingProps == null || incomingProps == null) {
+            return existingProps == incomingProps;
+        }
+        return existingProps.keySet().equals(incomingProps.keySet());
+    }
+
+    private static String uniqueCollidingSchemaName(String basename, String refOrFileKey,
+                                                    Map<String, Object> mainSchemas, Map<String, Object> incoming) {
+        List<String> parents = parentPathSegments(refOrFileKey);
+        String candidate = basename;
+        for (int i = parents.size() - 1; i >= 0; i--) {
+            candidate = parents.get(i) + "-" + candidate;
+            Object existing = mainSchemas.get(candidate);
+            if (existing == null || Objects.equals(existing, incoming)) {
+                return candidate;
+            }
+        }
+        int n = 2;
+        String numbered = candidate + "-" + n;
+        while (mainSchemas.containsKey(numbered) && !Objects.equals(mainSchemas.get(numbered), incoming)) {
+            n++;
+            numbered = candidate + "-" + n;
+        }
+        return numbered;
+    }
+
+    private static List<String> parentPathSegments(String refOrFileKey) {
+        if (refOrFileKey == null || refOrFileKey.isEmpty()) {
+            return List.of();
+        }
+        String path = refOrFileKey.contains("#") ? refOrFileKey.split("#", 2)[0] : refOrFileKey;
+        path = path.replace('\\', '/');
+        int lastSlash = path.lastIndexOf('/');
+        if (lastSlash <= 0) {
+            return List.of();
+        }
+        List<String> segments = new ArrayList<>();
+        for (String part : path.substring(0, lastSlash).split("/")) {
+            if (part.isEmpty() || ".".equals(part) || "..".equals(part)) {
+                continue;
+            }
+            segments.add(part);
+        }
+        return segments;
     }
 
     /** Max depth for collectSchemaRefPaths to avoid stack overflow on deep or cyclic structures. */
@@ -1090,8 +1192,9 @@ public class OASParser {
             }
             
             // Overwrite with external schema definition so full schema from file wins
-            // (e.g. User.yaml provides full User with many properties, not an inlined placeholder)
-            mainSchemas.put(schemaName, new HashMap<>(externalSpec));
+            // (e.g. User.yaml provides full User with many properties, not an inlined placeholder).
+            // Distinct files that share a basename (Answer.yaml vs schemas/Answer.yaml) keep both keys.
+            registerSchemaAvoidingCollision(mainSchemas, schemaName, new HashMap<>(externalSpec), fileKey);
             return;
         }
 
