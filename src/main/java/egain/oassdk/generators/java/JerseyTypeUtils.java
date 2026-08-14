@@ -1,6 +1,7 @@
 package egain.oassdk.generators.java;
 
 import egain.oassdk.Util;
+import egain.oassdk.generators.common.OpenApiSchemaUtils;
 
 import java.util.*;
 
@@ -218,9 +219,12 @@ public final class JerseyTypeUtils {
                             itemType = getJavaTypeInternal(items);
                         }
 
-                        // Fallback: If still Object but items has $ref or x-resolved-ref, resolve it manually
+                        // Fallback: If still Object but items has $ref, x-resolved-ref, or title matching a component
                         if ("Object".equals(itemType)) {
                             String fallbackName = JerseySchemaUtils.getSchemaNameFromRef(items);
+                            if (fallbackName == null) {
+                                fallbackName = OpenApiSchemaUtils.findComponentSchemaNameByTitle(items, ctx.spec);
+                            }
                             if (fallbackName == null && items.containsKey("$ref")) {
                                 String itemsRef = (String) items.get("$ref");
                                 if (itemsRef != null && itemsRef.startsWith("#/components/schemas/")) {
@@ -274,6 +278,10 @@ public final class JerseyTypeUtils {
                 String listType = JerseySchemaUtils.getListTypeForObjectWithSingleArrayOfRef(schema, ctx.spec);
                 if (listType != null) {
                     return listType;
+                }
+                String inlineComponentName = OpenApiSchemaUtils.findComponentSchemaNameByTitle(schema, ctx.spec);
+                if (inlineComponentName != null) {
+                    return JerseyNamingUtils.toJavaClassName(inlineComponentName);
                 }
                 return "Object";
             }
