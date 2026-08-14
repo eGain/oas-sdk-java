@@ -170,6 +170,65 @@ class JerseyTypeUtilsTest {
                 typeUtils.getFieldTypeForModelProperty("EditFolderPermissionsEntry", "identity", fieldSchema, false, Map.of()));
     }
 
+    @Test
+    @DisplayName("getJavaType returns List<L10NString> for array items inline object with title matching component")
+    void getJavaType_arrayInlineObjectTitleMatchesComponent() {
+        Map<String, Object> l10nComponent = new LinkedHashMap<>();
+        l10nComponent.put("type", "object");
+        l10nComponent.put("properties", Map.of(
+                "value", Map.of("type", "string"),
+                "displayValue", Map.of("type", "string", "readOnly", true)));
+
+        Map<String, Object> items = new LinkedHashMap<>();
+        items.put("type", "object");
+        items.put("title", "L10NString");
+        items.put("required", List.of("value"));
+        items.put("properties", Map.of(
+                "value", Map.of("type", "string", "minLength", 0, "maxLength", 255),
+                "displayValue", Map.of("type", "string", "readOnly", true)));
+
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("L10NString", l10nComponent);
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", schemas));
+
+        Map<String, Object> arraySchema = Map.of("type", "array", "items", items);
+        assertEquals("List<L10NString>", createTypeUtils(spec).getJavaType(arraySchema));
+    }
+
+    @Test
+    @DisplayName("getFieldTypeForModelProperty returns List<L10NString> for CustomAttributeL10N.attribValues shape")
+    void getFieldTypeForModelProperty_customAttributeAttribValues() {
+        Map<String, Object> l10nComponent = new LinkedHashMap<>();
+        l10nComponent.put("type", "object");
+        l10nComponent.put("properties", Map.of(
+                "value", Map.of("type", "string"),
+                "displayValue", Map.of("type", "string", "readOnly", true)));
+
+        Map<String, Object> items = new LinkedHashMap<>();
+        items.put("type", "object");
+        items.put("title", "L10NString");
+        items.put("required", List.of("value"));
+        items.put("properties", Map.of(
+                "value", Map.of("type", "string"),
+                "displayValue", Map.of("type", "string", "readOnly", true)));
+
+        Map<String, Object> attribValues = Map.of(
+                "type", "array",
+                "minItems", 1,
+                "items", items);
+
+        Map<String, Object> schemas = new LinkedHashMap<>();
+        schemas.put("L10NString", l10nComponent);
+        schemas.put("CustomAttributeL10N", Map.of(
+                "type", "object",
+                "properties", Map.of("attribValues", attribValues)));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", schemas));
+
+        JerseyTypeUtils typeUtils = createTypeUtils(spec);
+        assertEquals("List<L10NString>",
+                typeUtils.getFieldTypeForModelProperty("CustomAttributeL10N", "attribValues", attribValues, false, spec));
+    }
+
     // -----------------------------------------------------------------------
     //  getJavaType - date types
     // -----------------------------------------------------------------------
