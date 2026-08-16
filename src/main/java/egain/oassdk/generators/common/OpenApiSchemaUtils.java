@@ -674,6 +674,35 @@ public final class OpenApiSchemaUtils {
     }
 
     /**
+     * When an anonymous inline object uses {@code title} equal to a {@code components.schemas} key
+     * (e.g. PAI #981 {@code CustomAttributeL10N.attribValues.items} with {@code title: L10NString}),
+     * return that component name so Java codegen can emit a typed model instead of {@code Object}.
+     */
+    public static String findComponentSchemaNameByTitle(Map<String, Object> schema, Map<String, Object> spec) {
+        if (schema == null || spec == null) {
+            return null;
+        }
+        Object titleObj = schema.get("title");
+        if (!(titleObj instanceof String title) || title.isBlank()) {
+            return null;
+        }
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        Map<String, Object> schemas = components != null ? Util.asStringObjectMap(components.get("schemas")) : null;
+        if (schemas == null || schemas.isEmpty()) {
+            return null;
+        }
+        if (schemas.containsKey(title)) {
+            return title;
+        }
+        for (String key : schemas.keySet()) {
+            if (key != null && key.equalsIgnoreCase(title)) {
+                return key;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Split {@code allOf} branches into ref bases and overlays, preserving listed order within each group.
      */
     public static void partitionAllOfBranches(List<Map<String, Object>> allOfSchemas,
