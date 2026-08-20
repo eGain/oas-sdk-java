@@ -835,6 +835,38 @@ public class JerseyGeneratorValidationTest {
     }
 
     @Test
+    @DisplayName("BasicUser required readOnly userName must not emit @NotNull (contentmgr write reference pattern)")
+    public void testBasicUserRequiredReadOnlyUserNameSkipsNotNull() throws OASSDKException, IOException {
+        Path outputDir = tempOutputDir.resolve("basicuser-readonly-required-test");
+        String yamlFile = "src/test/resources/openapi-basicuser-readonly-required.yaml";
+        String packageName = "com.test.api";
+
+        OASSDK sdk = new OASSDK();
+        sdk.loadSpec(yamlFile);
+        sdk.generateApplication("java", "jersey", packageName, outputDir.toString());
+
+        Path modelFile = outputDir.resolve("src/main/java/com/test/api/model/BasicUser.java");
+        assertTrue(Files.exists(modelFile), "BasicUser model should be generated");
+
+        String content = Files.readString(modelFile);
+        int userNameFieldIdx = content.indexOf("private String userName;");
+        assertTrue(userNameFieldIdx > 0, "BasicUser should declare userName field");
+        String userNameBlock = content.substring(Math.max(0, userNameFieldIdx - 250), userNameFieldIdx + 20);
+        assertTrue(userNameBlock.contains("JsonProperty.Access.READ_ONLY"),
+                "userName should remain READ_ONLY");
+        assertFalse(userNameBlock.contains("@NotNull"),
+                "readOnly required userName must not emit @NotNull");
+        assertFalse(userNameBlock.contains("required = true"),
+                "readOnly required userName must not emit XmlElement required = true");
+
+        int idFieldIdx = content.indexOf("private String id;");
+        assertTrue(idFieldIdx > 0, "BasicUser should declare id field");
+        String idFieldBlock = content.substring(Math.max(0, idFieldIdx - 250), idFieldIdx + 20);
+        assertFalse(idFieldBlock.contains("@NotNull"),
+                "readOnly required id must not emit @NotNull");
+    }
+
+    @Test
     @DisplayName("readOnly on allOf overlay is preserved when base schema redefines same property names")
     public void testAllOfReadOnlyPropertyOverlayOnCreateModel() throws OASSDKException, IOException {
         Path outputDir = tempOutputDir.resolve("allof-readonly-overlay-test");

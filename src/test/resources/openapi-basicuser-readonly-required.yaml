@@ -1,0 +1,24 @@
+openapi: 3.0.0
+info:
+  title: BasicUser readOnly + required bean validation test
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    BasicUser:
+      type: object
+      required:
+        - id
+        - userName
+      properties:
+        id:
+          type: string
+          readOnly: true
+          pattern: ^[1-9]\d*$
+          minLength: 1
+          maxLength: 9
+        userName:
+          type: string
+          readOnly: true
+          minLength: 1
+          maxLength: 255

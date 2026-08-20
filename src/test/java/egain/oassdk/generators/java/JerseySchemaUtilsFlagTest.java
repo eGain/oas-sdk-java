@@ -44,4 +44,25 @@ class JerseySchemaUtilsFlagTest {
     void isSchemaFlagTrue_nullSchema() {
         assertFalse(JerseySchemaUtils.isSchemaFlagTrue(null, "readOnly"));
     }
+
+    @Test
+    @DisplayName("isRequiredForBeanValidation returns false when property is readOnly even if listed in required")
+    void isRequiredForBeanValidation_readOnlySkipsRequired() {
+        Map<String, Object> fieldSchema = Map.of("type", "string", "readOnly", true);
+        assertFalse(JerseySchemaUtils.isRequiredForBeanValidation(fieldSchema, Map.of(), true));
+    }
+
+    @Test
+    @DisplayName("isRequiredForBeanValidation returns true for writable required property")
+    void isRequiredForBeanValidation_writableRequired() {
+        Map<String, Object> fieldSchema = Map.of("type", "string");
+        assertTrue(JerseySchemaUtils.isRequiredForBeanValidation(fieldSchema, Map.of(), true));
+    }
+
+    @Test
+    @DisplayName("isRequiredForBeanValidation returns false when not listed in required")
+    void isRequiredForBeanValidation_notListed() {
+        Map<String, Object> fieldSchema = Map.of("type", "string", "readOnly", true);
+        assertFalse(JerseySchemaUtils.isRequiredForBeanValidation(fieldSchema, Map.of(), false));
+    }
 }

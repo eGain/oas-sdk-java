@@ -413,8 +413,8 @@ class JerseyModelGenerator {
                 }
             } else {
                 content.append("@XmlElement(name = \"").append(fieldName).append("\"");
-                boolean effectiveRequired = allRequired.contains(fieldName)
-                        && !xorExclusiveJsonNames.contains(fieldName);
+                boolean effectiveRequired = JerseySchemaUtils.isRequiredForBeanValidation(fieldSchema, spec,
+                        allRequired.contains(fieldName) && !xorExclusiveJsonNames.contains(fieldName));
                 if (effectiveRequired) {
                     content.append(", required = true");
                 }
@@ -426,8 +426,8 @@ class JerseyModelGenerator {
                     xorExclusiveJsonNames.contains(fieldName));
 
             // Add validation annotations based on schema constraints
-            boolean effectiveFieldRequired = allRequired.contains(fieldName)
-                    && !xorExclusiveJsonNames.contains(fieldName);
+            boolean effectiveFieldRequired = JerseySchemaUtils.isRequiredForBeanValidation(fieldSchema, spec,
+                    allRequired.contains(fieldName) && !xorExclusiveJsonNames.contains(fieldName));
             String validationAnnotations = typeUtils.generateValidationAnnotations(fieldSchema, effectiveFieldRequired);
             if (!validationAnnotations.isEmpty()) {
                 content.append(validationAnnotations);
@@ -972,10 +972,14 @@ class JerseyModelGenerator {
             String javaFieldName = JerseyNamingUtils.toModelFieldName(fieldName);
             content.append(indentBody);
             content.append("@XmlElement(name = \"").append(fieldName).append("\"");
-            if (allRequired.contains(fieldName)) content.append(", required = true");
+            boolean innerFieldRequired = JerseySchemaUtils.isRequiredForBeanValidation(fieldSchema, spec,
+                    allRequired.contains(fieldName));
+            if (innerFieldRequired) {
+                content.append(", required = true");
+            }
             content.append(")\n").append(indentBody);
             appendJsonPropertyAccessAnnotation(content, indentBody, fieldName, javaFieldName, fieldSchema, false);
-            String validationAnnotations = typeUtils.generateValidationAnnotations(fieldSchema, allRequired.contains(fieldName));
+            String validationAnnotations = typeUtils.generateValidationAnnotations(fieldSchema, innerFieldRequired);
             if (!validationAnnotations.isEmpty()) {
                 content.append(validationAnnotations.replace("\n    ", "\n" + indentBody));
             }
