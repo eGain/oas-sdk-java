@@ -535,6 +535,19 @@ class JerseyTypeUtilsTest {
     }
 
     @Test
+    @DisplayName("generateValidationAnnotations skips @NotNull when required field is readOnly")
+    void generateValidationAnnotations_requiredReadOnly_skipsNotNull() {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "string");
+        schema.put("readOnly", true);
+        schema.put("minLength", 1);
+        schema.put("maxLength", 255);
+        String annotations = createTypeUtils().generateValidationAnnotations(schema, true);
+        assertFalse(annotations.contains("@NotNull"));
+        assertTrue(annotations.contains("@Size(min = 1, max = 255)"));
+    }
+
+    @Test
     @DisplayName("generateValidationAnnotations adds @Size for minLength/maxLength")
     void generateValidationAnnotations_size() {
         Map<String, Object> schema = new LinkedHashMap<>();

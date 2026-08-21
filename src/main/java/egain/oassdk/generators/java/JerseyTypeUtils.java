@@ -605,15 +605,17 @@ public final class JerseyTypeUtils {
             }
         }
 
+        boolean requiresNotNull = JerseySchemaUtils.isRequiredForBeanValidation(schema, ctx.spec, isRequired);
+
         // Handle $ref - resolve the reference to get actual schema
         if (schema.containsKey("$ref")) {
-            return isRequired ? "@NotNull\n    " : "";
+            return requiresNotNull ? "@NotNull\n    " : "";
         }
 
         StringBuilder annotations = new StringBuilder();
 
         // Add @NotNull for required fields
-        if (isRequired) {
+        if (requiresNotNull) {
             annotations.append("@NotNull\n    ");
         }
 

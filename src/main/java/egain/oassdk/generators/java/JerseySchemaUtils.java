@@ -128,6 +128,31 @@ public final class JerseySchemaUtils {
         return OpenApiSchemaUtils.isSchemaFlagTrue(schema, key);
     }
 
+    /**
+     * OpenAPI {@code required} means the property must appear in payloads for that schema direction,
+     * but {@code readOnly} fields are not accepted on write. Bean validation {@code @NotNull} must not
+     * be emitted for read-only properties even when listed in {@code required}.
+     */
+    public static boolean isRequiredForBeanValidation(Map<String, Object> fieldSchema, Map<String, Object> spec,
+            boolean listedAsRequired) {
+        if (!listedAsRequired) {
+            return false;
+        }
+        if (fieldSchema == null) {
+            return true;
+        }
+        if (isSchemaFlagTrue(fieldSchema, "readOnly")) {
+            return false;
+        }
+        if (fieldSchema.containsKey("allOf") || fieldSchema.containsKey("oneOf") || fieldSchema.containsKey("anyOf")) {
+            Map<String, Object> effective = resolveCompositionToEffectiveSchema(fieldSchema, spec);
+            if (effective != null && isSchemaFlagTrue(effective, "readOnly")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public static String getSchemaNameFromRef(Map<String, Object> schema) {
         return OpenApiSchemaUtils.getSchemaNameFromRef(schema);
     }
