@@ -549,5 +549,65 @@ public class OASParserTest {
         assertTrue(ghProps.containsKey("image"), "schemas-Answer must keep GH image");
         assertFalse(ghProps.containsKey("value"), "schemas-Answer must not be the common schema");
     }
+
+    @Test
+    public void testGhAnswerReferencedFirstStillKeepsCommonAnswerKey(@TempDir Path tempDir) throws IOException, OASSDKException {
+        Path commonDir = tempDir.resolve("common");
+        Path schemasDir = tempDir.resolve("schemas");
+        Files.createDirectories(commonDir);
+        Files.createDirectories(schemasDir);
+
+        Files.writeString(commonDir.resolve("Answer.yaml"), """
+                type: object
+                title: Answer
+                properties:
+                  id:
+                    type: string
+                  value:
+                    type: string
+                """);
+        Files.writeString(schemasDir.resolve("Answer.yaml"), """
+                type: object
+                title: Answer
+                properties:
+                  id:
+                    type: string
+                  text:
+                    type: string
+                  image:
+                    type: object
+                """);
+
+        Files.writeString(tempDir.resolve("api.yaml"), """
+                openapi: 3.0.0
+                info:
+                  title: Answer collision GH first
+                  version: 1.0.0
+                paths: {}
+                components:
+                  schemas:
+                    Wrapper:
+                      type: object
+                      properties:
+                        gh:
+                          $ref: schemas/Answer.yaml
+                        common:
+                          $ref: common/Answer.yaml
+                """);
+
+        OASParser parserWithSearch = new OASParser(List.of(tempDir.toString()));
+        Map<String, Object> spec = parserWithSearch.parse(tempDir.resolve("api.yaml").toString());
+        Map<String, Object> resolved = parserWithSearch.resolveReferences(spec, tempDir.resolve("api.yaml").toString());
+
+        Map<String, Object> schemas = Util.asStringObjectMap(
+                Util.asStringObjectMap(resolved.get("components")).get("schemas"));
+        assertNotNull(schemas);
+        Map<String, Object> commonAnswer = Util.asStringObjectMap(schemas.get("Answer"));
+        Map<String, Object> commonProps = Util.asStringObjectMap(commonAnswer.get("properties"));
+        assertTrue(commonProps.containsKey("value"), "Answer must keep common id+value when GH is seen first");
+        assertFalse(commonProps.containsKey("text"), "Answer must not be the GH schema when GH is seen first");
+        assertTrue(schemas.containsKey("schemas-Answer"),
+                "guided-help Answer.yaml should be registered as schemas-Answer when seen first");
+    }
 }
 

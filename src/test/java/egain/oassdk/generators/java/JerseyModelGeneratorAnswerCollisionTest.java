@@ -120,5 +120,98 @@ class JerseyModelGeneratorAnswerCollisionTest {
                 "GH Answer must have text");
         assertTrue(gh.contains("image"), "GH Answer must have image");
         assertFalse(gh.contains("private String value;"), "GH Answer must not have common value");
+        assertCommonAnswerJaxbMethods(answer);
+    }
+
+    @Test
+    @DisplayName("Jakarta modelsOnly: GH $ref first still keeps JAXB Answer methods (getValue)")
+    void jakartaModelsOnlyGhFirstKeepsCommonAnswerMethods() throws OASSDKException, IOException {
+        Path bundle = tempDir.resolve("bundle-gh-first");
+        Path commonDir = bundle.resolve("common");
+        Path schemasDir = bundle.resolve("schemas");
+        Files.createDirectories(commonDir);
+        Files.createDirectories(schemasDir);
+
+        Files.writeString(commonDir.resolve("Answer.yaml"), """
+                type: object
+                title: Answer
+                properties:
+                  id:
+                    type: string
+                  value:
+                    type: string
+                """);
+        Files.writeString(schemasDir.resolve("Answer.yaml"), """
+                type: object
+                title: Answer
+                properties:
+                  id:
+                    type: string
+                  text:
+                    type: string
+                  image:
+                    type: object
+                """);
+        Path specFile = bundle.resolve("api.yaml");
+        Files.writeString(specFile, """
+                openapi: 3.0.0
+                info:
+                  title: Answer collision GH first
+                  version: 1.0.0
+                paths: {}
+                components:
+                  schemas:
+                    Wrapper:
+                      type: object
+                      properties:
+                        gh:
+                          $ref: schemas/Answer.yaml
+                        common:
+                          $ref: common/Answer.yaml
+                """);
+
+        Path outputDir = tempDir.resolve("out-gh-first");
+        GeneratorConfig config = GeneratorConfig.builder()
+                .modelsOnly(true)
+                .useJakartaNamespace(true)
+                .packageName("com.egain.bindings.ws.model.xsds.common.v4")
+                .outputDir(outputDir.toString())
+                .searchPaths(List.of(bundle.toString()))
+                .build();
+
+        try (OASSDK sdk = new OASSDK(config, null, null)) {
+            sdk.loadSpec(specFile.toString());
+            sdk.generateApplication("java", "jersey", config.getPackageName(), outputDir.toString());
+        }
+
+        Path answerJava;
+        try (Stream<Path> walk = Files.walk(outputDir)) {
+            List<Path> javaFiles = walk.filter(p -> p.getFileName().toString().endsWith(".java")).toList();
+            answerJava = javaFiles.stream()
+                    .filter(p -> p.getFileName().toString().equals("Answer.java"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Answer.java not found under " + outputDir + ": " + javaFiles));
+        }
+
+        String answer = Files.readString(answerJava, StandardCharsets.UTF_8);
+        assertTrue(answer.contains("jakarta.xml.bind") || answer.contains("jakarta.validation"),
+                "Jakarta generation should use jakarta imports");
+        assertFalse(answer.contains("private String text;"), "common Answer must not have GH text");
+        assertFalse(answer.contains("conceptName"), "common Answer must not have GH conceptName");
+        assertCommonAnswerJaxbMethods(answer);
+    }
+
+    /** JAXB Answer (javax gold) exposes id + value accessors; jakarta output must match. */
+    private static void assertCommonAnswerJaxbMethods(String answer) {
+        assertTrue(answer.contains("getId("), "must have getId");
+        assertTrue(answer.contains("setId("), "must have setId");
+        assertTrue(answer.contains("isSetId("), "must have isSetId");
+        assertTrue(answer.contains("getValue("), "must have getValue like JAXB Answer");
+        assertTrue(answer.contains("setValue("), "must have setValue like JAXB Answer");
+        assertTrue(answer.contains("isSetValue("), "must have isSetValue like JAXB Answer");
+        assertTrue(answer.contains("getAttribute("), "must have getAttribute");
+        assertTrue(answer.contains("setAttribute("), "must have setAttribute");
+        assertTrue(answer.contains("isSetAttribute("), "must have isSetAttribute");
+        assertTrue(answer.contains("getAttributeNames("), "must have getAttributeNames");
     }
 }
