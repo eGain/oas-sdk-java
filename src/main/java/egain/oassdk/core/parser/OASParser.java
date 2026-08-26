@@ -676,9 +676,12 @@ public class OASParser {
      * Register {@code incoming} under {@code schemaName}, or a parent-path-qualified name when that
      * key already holds a different schema (e.g. two {@code Answer.yaml} files → {@code Answer} and
      * {@code schemas-Answer}). A richer incoming schema still overwrites a placeholder at the same key.
+     * Guided-help Answer (text/image, no value) is registered as {@code schemas-Answer} even when
+     * it is seen first, so the JAXB {@code Answer} key stays id+value.
      */
     private String registerSchemaAvoidingCollision(Map<String, Object> mainSchemas, String schemaName,
                                                    Map<String, Object> incoming, String refOrFileKey) {
+        schemaName = qualifyGuidedHelpAnswerSchemaName(schemaName, incoming, refOrFileKey);
         Object existing = mainSchemas.get(schemaName);
         if (existing == null) {
             mainSchemas.put(schemaName, incoming);
@@ -698,6 +701,26 @@ public class OASParser {
         }
         mainSchemas.put(unique, incoming);
         return unique;
+    }
+
+    /**
+     * JAXB {@code Answer} is id+value. The GH schema from {@code schemas/Answer.yaml} must not
+     * occupy that key when it is registered first.
+     */
+    private static String qualifyGuidedHelpAnswerSchemaName(String schemaName, Map<String, Object> incoming,
+                                                           String refOrFileKey) {
+        if (!"Answer".equals(schemaName)) {
+            return schemaName;
+        }
+        List<String> parents = parentPathSegments(refOrFileKey);
+        boolean fromSchemasDir = !parents.isEmpty()
+                && "schemas".equalsIgnoreCase(parents.get(parents.size() - 1));
+        Map<String, Object> props = incoming == null ? null : Util.asStringObjectMap(incoming.get("properties"));
+        boolean ghShape = props != null && props.containsKey("text") && !props.containsKey("value");
+        if (fromSchemasDir || ghShape) {
+            return "schemas-Answer";
+        }
+        return schemaName;
     }
 
     private static boolean incomingReplacesPlaceholder(Object existing, Map<String, Object> incoming) {

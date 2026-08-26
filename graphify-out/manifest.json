@@ -120,9 +120,9 @@
     "semantic_hash": "dee13eb503d9a75341ee084063271427"
   },
   "src/main/java/egain/oassdk/core/parser/OASParser.java": {
-    "mtime": 1781759953.1437511,
-    "ast_hash": "0d8a60ce885635b04c846a3d2c3199df",
-    "semantic_hash": "0d8a60ce885635b04c846a3d2c3199df"
+    "mtime": 1787726983.9379582,
+    "ast_hash": "a5b4733f490da5d53fa2fa2adba02224",
+    "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/core/parser/PathResolver.java": {
     "mtime": 1776318034.7496958,
@@ -170,9 +170,9 @@
     "semantic_hash": "c73d17629b05c0f47984b9957f0bc409"
   },
   "src/main/java/egain/oassdk/dev/beans/BeanFactory.java": {
-    "mtime": 1768296644.7163,
-    "ast_hash": "bf63fdfdb33462d2da4c539b08cda0ef",
-    "semantic_hash": "bf63fdfdb33462d2da4c539b08cda0ef"
+    "mtime": 1786627172.486797,
+    "ast_hash": "122bec4e7538ad643e4576a85e0a81bf",
+    "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/dev/docs/RedoclyGenerator.java": {
     "mtime": 1768296644.7163,
@@ -280,8 +280,8 @@
     "semantic_hash": "c7a67dfc8f45d3530509d386c9081596"
   },
   "src/main/java/egain/oassdk/generators/java/JerseyModelGenerator.java": {
-    "mtime": 1783662622.828943,
-    "ast_hash": "cfe10208fae2fb0674e212c6c974eea1",
+    "mtime": 1787726666.2541218,
+    "ast_hash": "3b04f0eb972967d8972a9808c7bd1711",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/java/JerseyNamingUtils.java": {
@@ -295,14 +295,14 @@
     "semantic_hash": "eb19aede32307738488cbf68e268dc48"
   },
   "src/main/java/egain/oassdk/generators/java/JerseyQueryParamValidatorGenerator.java": {
-    "mtime": 1785938985.9883,
+    "mtime": 1786625459.28112,
     "ast_hash": "3a79902ec625aab45181810faad1a2e1",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/java/JerseyResourceGenerator.java": {
-    "mtime": 1780395531.4602716,
-    "ast_hash": "a58ca9932bdd34b3aff8f75d4db8096c",
-    "semantic_hash": "a58ca9932bdd34b3aff8f75d4db8096c"
+    "mtime": 1786627172.4919086,
+    "ast_hash": "7e017171fea08b19622f6e6f47f7c401",
+    "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/java/JerseySchemaCollector.java": {
     "mtime": 1775882869.5190248,
@@ -315,13 +315,13 @@
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/java/JerseySchemaUtils.java": {
-    "mtime": 1783579074.4779463,
-    "ast_hash": "fb13a6846d15ea8768a5e158450ec1d5",
+    "mtime": 1787726666.261122,
+    "ast_hash": "b7d0f6ca120acabf8b323a3d9640300b",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/java/JerseyTypeUtils.java": {
-    "mtime": 1783662622.8355439,
-    "ast_hash": "7baddef7d908871e495bcaf9fa824bf6",
+    "mtime": 1787726666.269117,
+    "ast_hash": "974f89a41135d4b46c07d522fbaf5301",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/java/JerseyValidationFrameworkGenerator.java": {
@@ -510,9 +510,9 @@
     "semantic_hash": "432e9a160158aa8babc4c3abfda15145"
   },
   "src/main/resources/runtime/jersey/GenericExceptionMapper.java": {
-    "mtime": 1780638805.2758667,
-    "ast_hash": "4c396ec62aa1eba741c44fd074102a89",
-    "semantic_hash": "4c396ec62aa1eba741c44fd074102a89"
+    "mtime": 1786627172.497049,
+    "ast_hash": "46bad4d527f9bf1213417d410e0ecd0b",
+    "semantic_hash": ""
   },
   "src/main/resources/runtime/jersey/egain/framework/validation/ValidationBuilder.java": {
     "mtime": 1780638805.359544,
@@ -670,9 +670,9 @@
     "semantic_hash": "ee0460ce2bdfa528e1190b8916adfdd0"
   },
   "src/test/java/egain/oassdk/core/parser/OASParserTest.java": {
-    "mtime": 1774952110.6627295,
-    "ast_hash": "50c98bd30037c67b46f3979aaeaa27fe",
-    "semantic_hash": "50c98bd30037c67b46f3979aaeaa27fe"
+    "mtime": 1787727005.9349012,
+    "ast_hash": "320ff641a874cd865f2084fcfa7e53ef",
+    "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/core/parser/PathResolverTest.java": {
     "mtime": 1776318034.757766,
@@ -800,9 +800,9 @@
     "semantic_hash": "be0af8484bf388195ba46433bb9ab724"
   },
   "src/test/java/egain/oassdk/generators/java/JerseyFoldersResourceGenerationTest.java": {
-    "mtime": 1775802275.1377957,
-    "ast_hash": "4a9da2bc5c3407577011dfbfa08b3ff7",
-    "semantic_hash": "4a9da2bc5c3407577011dfbfa08b3ff7"
+    "mtime": 1786627172.5032368,
+    "ast_hash": "a5d484c5c8de45bc719b5d4e98e2808d",
+    "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/java/JerseyGenerationContextTest.java": {
     "mtime": 1774952110.6653187,
@@ -815,7 +815,7 @@
     "semantic_hash": "b02a806004f412b24bbf9553c2f32aa4"
   },
   "src/test/java/egain/oassdk/generators/java/JerseyGeneratorConfigTest.java": {
-    "mtime": 1785938985.992298,
+    "mtime": 1786625459.28112,
     "ast_hash": "e6144c5d311ca653e993188ab11cc569",
     "semantic_hash": ""
   },
@@ -830,8 +830,8 @@
     "semantic_hash": "7a57a1c022688a0ea92a9dc68df8c6ef"
   },
   "src/test/java/egain/oassdk/generators/java/JerseyGeneratorValidationTest.java": {
-    "mtime": 1784884587.4608328,
-    "ast_hash": "7482f2647fd0c51ff0fde337fd6461bf",
+    "mtime": 1787726666.277119,
+    "ast_hash": "64d5b41855ad5825da3fd8f7e56042df",
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/java/JerseyModelGeneratorFolderYamlParityTest.java": {
@@ -855,8 +855,8 @@
     "semantic_hash": "4a888d0ffc003c2153e6ed8f8bdf159a"
   },
   "src/test/java/egain/oassdk/generators/java/JerseyTypeUtilsTest.java": {
-    "mtime": 1783662622.8485546,
-    "ast_hash": "97b5463272d8eced22364c6f80d0ac59",
+    "mtime": 1787726666.2971213,
+    "ast_hash": "f2f881787eb3194cfa634ff784779657",
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/nodejs/ExpressGeneratorTest.java": {
@@ -1015,8 +1015,8 @@
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/common/OpenApiSchemaUtils.java": {
-    "mtime": 1783579074.4543,
-    "ast_hash": "ee7fe7d2633fbe0e9aca99f50744c5f1",
+    "mtime": 1787726666.2451217,
+    "ast_hash": "b4a8b9be2594dd214862ac994477384f",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/common/PathOperation.java": {
@@ -1105,8 +1105,8 @@
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/java/JerseySchemaUtilsFlagTest.java": {
-    "mtime": 1781861154.5568101,
-    "ast_hash": "d830c34391f4801afd9796b8be955973",
+    "mtime": 1787726666.2891588,
+    "ast_hash": "b6af3a681224ae51d3461ad25b8403fb",
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/java/JerseySchemaUtilsMergeTest.java": {
@@ -1189,36 +1189,6 @@
     "ast_hash": "0d59bcd3f1c449368915a43f0a5bb290",
     "semantic_hash": ""
   },
-  "debug-504-probe.ps1": {
-    "mtime": 1785937666.8758292,
-    "ast_hash": "46d0a8e9daa188a4063ace3ef0e2b8bc",
-    "semantic_hash": ""
-  },
-  "debug-504-probe2.ps1": {
-    "mtime": 1785937666.9256704,
-    "ast_hash": "a2785598aa652fab9e469186431dffc8",
-    "semantic_hash": ""
-  },
-  "debug-504-probe3.ps1": {
-    "mtime": 1785937666.8850884,
-    "ast_hash": "6f75b90f8376bca6ff5549de6792e9b3",
-    "semantic_hash": ""
-  },
-  "debug-504-probe4.ps1": {
-    "mtime": 1785937666.8850884,
-    "ast_hash": "abaaa60b7174fe4949ee9d499b793612",
-    "semantic_hash": ""
-  },
-  "debug-504-probe5.ps1": {
-    "mtime": 1785937666.927675,
-    "ast_hash": "73a85bed6a17cc2016211da2f545e84b",
-    "semantic_hash": ""
-  },
-  "debug-504-probe6.ps1": {
-    "mtime": 1785937666.8880973,
-    "ast_hash": "e22ad414686b935cbb3dea47669a3e48",
-    "semantic_hash": ""
-  },
   "src/main/java/egain/oassdk/testgenerators/playwright/PlaywrightTestGenerator.java": {
     "mtime": 1785401262.7028666,
     "ast_hash": "52ff82d28bd62fd0b7e9eedcb066733c",
@@ -1234,199 +1204,14 @@
     "ast_hash": "cb28f27b41f98bdd1d3c970b17b2f981",
     "semantic_hash": ""
   },
-  "examples/egain/oassdk/examples/GenerateContentMgrV4PlaywrightTests.java": {
-    "mtime": 1785937666.9073026,
-    "ast_hash": "5689af70de2de8c2663ee80115b4cfdb",
+  "src/test/java/egain/oassdk/generators/java/JerseyModelGeneratorAnswerCollisionTest.java": {
+    "mtime": 1787727006.0716388,
+    "ast_hash": "05e27718ac558db11cdd6eac28b211e4",
     "semantic_hash": ""
   },
-  "generated-playwright/contentmgr-v4/playwright/apis/articles.api.ts": {
-    "mtime": 1785400990.6802604,
-    "ast_hash": "b625dc57c0b29f486bce5180bc55cbda",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/apis/base.api.ts": {
-    "mtime": 1785400989.7599475,
-    "ast_hash": "2bd3c5b662fc9020bd9f6530a8b95efb",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/apis/content-import.api.ts": {
-    "mtime": 1785400990.4056075,
-    "ast_hash": "805802527264c40aada171e0b144f3a2",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/apis/folders.api.ts": {
-    "mtime": 1785400990.1965091,
-    "ast_hash": "d18073e9d930b524fd0722b0ce129e91",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/apis/health-check.api.ts": {
-    "mtime": 1785400990.5987003,
-    "ast_hash": "65e1eef58a4df53608c854928e7d6d00",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/apis/prompt.api.ts": {
-    "mtime": 1785400989.8990264,
-    "ast_hash": "c28ef57dd407a1dd105da77559430248",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/data/generated/knowledge-content-manager-apis-articles/tc01-P-articles-positive.json": {
-    "mtime": 1785400990.8428023,
-    "ast_hash": "8b9aece50fbd1a31b2d87d06f5b4f624",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/data/generated/knowledge-content-manager-apis-articles/tc02-N-articles-negative.json": {
-    "mtime": 1785400990.9033508,
-    "ast_hash": "c7ee47390aacb1c9c2672a65546fd1cb",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/data/generated/knowledge-content-manager-apis-content-import/tc01-P-content-import-positive.json": {
-    "mtime": 1785400990.48117,
-    "ast_hash": "7cddbbff4acadb6a13a9d733604310c8",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/data/generated/knowledge-content-manager-apis-content-import/tc02-N-content-import-negative.json": {
-    "mtime": 1785400990.5211682,
-    "ast_hash": "fc254bb3e47e57d5a8c0498db9caa788",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/data/generated/knowledge-content-manager-apis-folders/tc01-P-folders-positive.json": {
-    "mtime": 1785400990.3110547,
-    "ast_hash": "dd2dec51c925ed8515456ee14998f482",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/data/generated/knowledge-content-manager-apis-folders/tc02-N-folders-negative.json": {
-    "mtime": 1785400990.3470583,
-    "ast_hash": "96f558e8046aaa70b72bbb7d604d9c1a",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/data/generated/knowledge-content-manager-apis-health-check/tc01-P-health-check-positive.json": {
-    "mtime": 1785400990.6207025,
-    "ast_hash": "372d8ad770041dc7f249ae8515f2473d",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/data/generated/knowledge-content-manager-apis-health-check/tc02-N-health-check-negative.json": {
-    "mtime": 1785400990.6357033,
-    "ast_hash": "93836a31f4638575539b305b01ba4c3a",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/data/generated/knowledge-content-manager-apis-prompt/tc01-P-prompt-positive.json": {
-    "mtime": 1785400990.0114198,
-    "ast_hash": "0ad1c3bb605fcd94166be22c714b5038",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/data/generated/knowledge-content-manager-apis-prompt/tc02-N-prompt-negative.json": {
-    "mtime": 1785400990.0689664,
-    "ast_hash": "c564eee7bda29cf6ccd86c92f9c6435b",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/package.json": {
-    "mtime": 1785400989.7199347,
-    "ast_hash": "b2b19e5369a2d77e6be6d918a0e173d3",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/playwright.config.ts": {
-    "mtime": 1785400989.7459347,
-    "ast_hash": "39eb94bbb735ef8a3d8aeea1d5c53970",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/tests/generated/knowledge-content-manager-apis-articles/tc01-P-articles-positive.spec.ts": {
-    "mtime": 1785400990.9163504,
-    "ast_hash": "42b72318bc11f19d53f9d00d68f1cae6",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/tests/generated/knowledge-content-manager-apis-articles/tc02-N-articles-negative.spec.ts": {
-    "mtime": 1785400990.93635,
-    "ast_hash": "91e1407cd363063827cf5bbf1eba7906",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/tests/generated/knowledge-content-manager-apis-content-import/tc01-P-content-import-positive.spec.ts": {
-    "mtime": 1785400990.531165,
-    "ast_hash": "1d9f9ae28afac3e85943c3c62c30ff31",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/tests/generated/knowledge-content-manager-apis-content-import/tc02-N-content-import-negative.spec.ts": {
-    "mtime": 1785400990.5461657,
-    "ast_hash": "4abbdf1574f7afa3ca083242e2f128c7",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/tests/generated/knowledge-content-manager-apis-folders/tc01-P-folders-positive.spec.ts": {
-    "mtime": 1785400990.3666098,
-    "ast_hash": "a0fd194f4fce5cb64e5c9f0e585ad11d",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/tests/generated/knowledge-content-manager-apis-folders/tc02-N-folders-negative.spec.ts": {
-    "mtime": 1785400990.3796072,
-    "ast_hash": "c2edfa1ed5f653e22f8c713735228a24",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/tests/generated/knowledge-content-manager-apis-health-check/tc01-P-health-check-positive.spec.ts": {
-    "mtime": 1785400990.6477187,
-    "ast_hash": "08d87fac54bef13fa24a7aa4c38823d3",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/tests/generated/knowledge-content-manager-apis-health-check/tc02-N-health-check-negative.spec.ts": {
-    "mtime": 1785400990.6557186,
-    "ast_hash": "faa83fba334486725af2d6cf162363dc",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/tests/generated/knowledge-content-manager-apis-prompt/tc01-P-prompt-positive.spec.ts": {
-    "mtime": 1785400990.0999668,
-    "ast_hash": "1c49d77bda9395a2fd23dc391b7a375b",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/tests/generated/knowledge-content-manager-apis-prompt/tc02-N-prompt-negative.spec.ts": {
-    "mtime": 1785400990.149984,
-    "ast_hash": "9d8750ec7921700dba1bfe0d0ecd6837",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/tsconfig.json": {
-    "mtime": 1785400989.7339344,
-    "ast_hash": "11bd1fe7655e32c18f1db128b759a30b",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/playwright/utilities/helpers.ts": {
-    "mtime": 1785400989.8374732,
-    "ast_hash": "fed7ff98ac2742bbc73d092ee731c426",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/run-all.sh": {
-    "mtime": 1785400988.8161387,
-    "ast_hash": "c39380fb629db6ae5f0e8f45b9e5be25",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/run-smoke.sh": {
-    "mtime": 1785400988.6400402,
-    "ast_hash": "257b6ba48b759affd18d42787806bee1",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/test-support/src/test/java/com/example/api/support/RequestBodyEnv.java": {
-    "mtime": 1785400988.4824965,
-    "ast_hash": "960094c83929213116558fce7739154c",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/test-support/src/test/java/com/example/api/support/TestAuth.java": {
-    "mtime": 1785400988.3198688,
-    "ast_hash": "3982fee2c0c004792e61ec2295112497",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/test-support/src/test/java/com/example/api/support/TestClient.java": {
-    "mtime": 1785400988.453968,
-    "ast_hash": "ca2fddc7d776ba92bf4263ceb9e1c374",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/test-support/src/test/java/com/example/api/support/TestContext.java": {
-    "mtime": 1785400988.4674973,
-    "ast_hash": "9f2cb08dc50c3e5824d29f15f72c3ca6",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/test-support/src/test/java/com/example/api/support/TestEnv.java": {
-    "mtime": 1785400988.266866,
-    "ast_hash": "2bbeb84e1ea9afa389aeead58a89cb44",
-    "semantic_hash": ""
-  },
-  "generated-playwright/contentmgr-v4/test-support/src/test/java/com/example/api/support/TestHttp.java": {
-    "mtime": 1785400988.3904195,
-    "ast_hash": "35e8537c8b3c7b9bef5a3f1c4517adde",
+  "src/test/java/egain/oassdk/generators/java/JerseyModelGeneratorCustomAttributeL10NParityTest.java": {
+    "mtime": 1787726666.2821238,
+    "ast_hash": "efa56d2e24cbf2e3a5e6e44422889ab9",
     "semantic_hash": ""
   }
 }
