@@ -201,6 +201,78 @@ class JerseyModelGeneratorAnswerCollisionTest {
         assertCommonAnswerJaxbMethods(answer);
     }
 
+    @Test
+    @DisplayName("Jakarta Answer.java stays id+value across repeated GH-first generation")
+    void jakartaAnswerStableAcrossRepeatedGhFirstGeneration() throws OASSDKException, IOException {
+        for (int i = 0; i < 12; i++) {
+            Path bundle = tempDir.resolve("repeat-" + i);
+            Path commonDir = bundle.resolve("common");
+            Path schemasDir = bundle.resolve("schemas");
+            Files.createDirectories(commonDir);
+            Files.createDirectories(schemasDir);
+            Files.writeString(commonDir.resolve("Answer.yaml"), """
+                    type: object
+                    title: Answer
+                    properties:
+                      id:
+                        type: string
+                      value:
+                        type: string
+                    """);
+            Files.writeString(schemasDir.resolve("Answer.yaml"), """
+                    type: object
+                    title: Answer
+                    properties:
+                      id:
+                        type: string
+                      text:
+                        type: string
+                      conceptName:
+                        type: string
+                    """);
+            Path specFile = bundle.resolve("api.yaml");
+            Files.writeString(specFile, """
+                    openapi: 3.0.0
+                    info:
+                      title: Repeat GH first
+                      version: 1.0.0
+                    paths: {}
+                    components:
+                      schemas:
+                        Wrapper:
+                          type: object
+                          properties:
+                            gh:
+                              $ref: schemas/Answer.yaml
+                            common:
+                              $ref: common/Answer.yaml
+                    """);
+            Path outputDir = tempDir.resolve("out-repeat-" + i);
+            final int iteration = i;
+            GeneratorConfig config = GeneratorConfig.builder()
+                    .modelsOnly(true)
+                    .useJakartaNamespace(true)
+                    .packageName("com.egain.bindings.ws.model.xsds.common.v4")
+                    .outputDir(outputDir.toString())
+                    .searchPaths(List.of(bundle.toString()))
+                    .build();
+            try (OASSDK sdk = new OASSDK(config, null, null)) {
+                sdk.loadSpec(specFile.toString());
+                sdk.generateApplication("java", "jersey", config.getPackageName(), outputDir.toString());
+            }
+            Path answerJava;
+            try (Stream<Path> walk = Files.walk(outputDir)) {
+                answerJava = walk.filter(p -> p.getFileName().toString().equals("Answer.java"))
+                        .findFirst()
+                        .orElseThrow(() -> new AssertionError("Answer.java missing on iteration " + iteration));
+            }
+            String answer = Files.readString(answerJava, StandardCharsets.UTF_8);
+            assertTrue(answer.contains("getValue("), "iteration " + iteration + " missing getValue");
+            assertFalse(answer.contains("conceptName"), "iteration " + iteration + " leaked GH into Answer");
+            assertFalse(answer.contains("private String text;"), "iteration " + iteration + " leaked GH text");
+        }
+    }
+
     /** JAXB Answer (javax gold) exposes id + value accessors; jakarta output must match. */
     private static void assertCommonAnswerJaxbMethods(String answer) {
         assertTrue(answer.contains("getId("), "must have getId");

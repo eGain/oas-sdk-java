@@ -164,6 +164,11 @@ class JerseyModelGenerator {
             }
 
             String javaClassName = JerseyNamingUtils.toJavaClassName(schemaName);
+            Map<String, Object> answerProps = Util.asStringObjectMap(schema.get("properties"));
+            if ("Answer".equals(javaClassName) && answerProps != null
+                    && answerProps.containsKey("text") && !answerProps.containsKey("value")) {
+                javaClassName = "SchemasAnswer";
+            }
 
             generatedTopLevelClassNames.add(javaClassName);
             generateModel(javaClassName, schema, outputDir, packagePath, spec);

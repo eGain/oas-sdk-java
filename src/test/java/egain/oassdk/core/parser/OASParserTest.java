@@ -609,5 +609,108 @@ public class OASParserTest {
         assertTrue(schemas.containsKey("schemas-Answer"),
                 "guided-help Answer.yaml should be registered as schemas-Answer when seen first");
     }
+
+    @Test
+    public void testFullOpenApiNamedAnswerYamlDoesNotOverwriteCommonAnswer(@TempDir Path tempDir) throws IOException, OASSDKException {
+        Path schemasDir = tempDir.resolve("schemas");
+        Files.createDirectories(schemasDir);
+        Files.writeString(schemasDir.resolve("Answer.yaml"), """
+                openapi: 3.0.0
+                info:
+                  title: GH full spec
+                  version: 1.0.0
+                paths: {}
+                components:
+                  schemas:
+                    Answer:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        text:
+                          type: string
+                        image:
+                          type: object
+                """);
+        Files.writeString(tempDir.resolve("api.yaml"), """
+                openapi: 3.0.0
+                info:
+                  title: Common Answer in main spec
+                  version: 1.0.0
+                paths: {}
+                components:
+                  schemas:
+                    Answer:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        value:
+                          type: string
+                    Wrapper:
+                      type: object
+                      properties:
+                        gh:
+                          $ref: schemas/Answer.yaml
+                """);
+
+        OASParser parserWithSearch = new OASParser(List.of(tempDir.toString()));
+        Map<String, Object> spec = parserWithSearch.parse(tempDir.resolve("api.yaml").toString());
+        Map<String, Object> resolved = parserWithSearch.resolveReferences(spec, tempDir.resolve("api.yaml").toString());
+        Map<String, Object> schemas = Util.asStringObjectMap(
+                Util.asStringObjectMap(resolved.get("components")).get("schemas"));
+        Map<String, Object> answerProps = Util.asStringObjectMap(
+                Util.asStringObjectMap(schemas.get("Answer")).get("properties"));
+        assertTrue(answerProps.containsKey("value"), "filename Answer.yaml must not smash JAXB Answer");
+        assertFalse(answerProps.containsKey("text"), "GH full spec must not occupy Answer");
+        assertTrue(schemas.containsKey("schemas-Answer"));
+    }
+
+    @Test
+    public void testMainSpecGhAnswerYieldsToCommonFile(@TempDir Path tempDir) throws IOException, OASSDKException {
+        Path commonDir = tempDir.resolve("common");
+        Files.createDirectories(commonDir);
+        Files.writeString(commonDir.resolve("Answer.yaml"), """
+                type: object
+                title: Answer
+                properties:
+                  id:
+                    type: string
+                  value:
+                    type: string
+                """);
+        Files.writeString(tempDir.resolve("api.yaml"), """
+                openapi: 3.0.0
+                info:
+                  title: GH already at Answer
+                  version: 1.0.0
+                paths: {}
+                components:
+                  schemas:
+                    Answer:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        text:
+                          type: string
+                    Wrapper:
+                      type: object
+                      properties:
+                        common:
+                          $ref: common/Answer.yaml
+                """);
+
+        OASParser parserWithSearch = new OASParser(List.of(tempDir.toString()));
+        Map<String, Object> spec = parserWithSearch.parse(tempDir.resolve("api.yaml").toString());
+        Map<String, Object> resolved = parserWithSearch.resolveReferences(spec, tempDir.resolve("api.yaml").toString());
+        Map<String, Object> schemas = Util.asStringObjectMap(
+                Util.asStringObjectMap(resolved.get("components")).get("schemas"));
+        Map<String, Object> answerProps = Util.asStringObjectMap(
+                Util.asStringObjectMap(schemas.get("Answer")).get("properties"));
+        assertTrue(answerProps.containsKey("value"), "common file must take Answer when main spec had GH");
+        assertFalse(answerProps.containsKey("text"));
+        assertTrue(schemas.containsKey("schemas-Answer"));
+    }
 }
 
