@@ -265,7 +265,7 @@ public class OASParser {
         // This ensures that when we modify maps during resolution, we're modifying the actual spec
         // If we use a copy, the modifications won't be reflected in the original
         Map<String, Object> resolvedSpec = spec;
-        Map<String, Map<String, Object>> loadedFiles = new HashMap<>();
+        Map<String, Map<String, Object>> loadedFiles = new LinkedHashMap<>();
 
         // Load the base file into the cache (use normalized key for cross-platform consistency)
         String sanitizedBase = sanitizeFilePath(baseFilePath);
@@ -290,7 +290,7 @@ public class OASParser {
         Set<Object> visitedObjects = Collections.newSetFromMap(new IdentityHashMap<>());
         // Track which fragment(s) of each external file were referenced (e.g. /components/parameters/accept).
         // Key = file key (same as loadedFiles), value = set of JSON paths. Sentinel "/" = whole file referenced.
-        Map<String, Set<String>> referencedFragmentsByFile = new HashMap<>();
+        Map<String, Set<String>> referencedFragmentsByFile = new LinkedHashMap<>();
 
         // Resolve all references recursively
         resolveReferencesRecursive(resolvedSpec, baseDir, baseFileKey, baseFileKey, loadedFiles, resolvingRefs, visitedObjects, referencedFragmentsByFile);
@@ -683,6 +683,14 @@ public class OASParser {
                                                    Map<String, Object> incoming, String refOrFileKey) {
         schemaName = qualifyGuidedHelpAnswerSchemaName(schemaName, incoming, refOrFileKey);
         Object existing = mainSchemas.get(schemaName);
+        if (existing != null && "Answer".equals(schemaName)
+                && isGuidedHelpAnswerShape(existing) && isCommonAnswerShape(incoming)) {
+            if (!mainSchemas.containsKey("schemas-Answer")) {
+                mainSchemas.put("schemas-Answer", existing);
+            }
+            mainSchemas.put("Answer", incoming);
+            return "Answer";
+        }
         if (existing == null) {
             mainSchemas.put(schemaName, incoming);
             return schemaName;
@@ -715,15 +723,33 @@ public class OASParser {
         List<String> parents = parentPathSegments(refOrFileKey);
         boolean fromSchemasDir = !parents.isEmpty()
                 && "schemas".equalsIgnoreCase(parents.get(parents.size() - 1));
-        Map<String, Object> props = incoming == null ? null : Util.asStringObjectMap(incoming.get("properties"));
-        boolean ghShape = props != null && props.containsKey("text") && !props.containsKey("value");
-        if (fromSchemasDir || ghShape) {
+        if (fromSchemasDir || isGuidedHelpAnswerShape(incoming)) {
             return "schemas-Answer";
         }
         return schemaName;
     }
 
+    private static Map<String, Object> schemaProperties(Object schema) {
+        if (!(schema instanceof Map<?, ?> map)) {
+            return null;
+        }
+        return Util.asStringObjectMap(map.get("properties"));
+    }
+
+    private static boolean isGuidedHelpAnswerShape(Object schema) {
+        Map<String, Object> props = schemaProperties(schema);
+        return props != null && props.containsKey("text") && !props.containsKey("value");
+    }
+
+    private static boolean isCommonAnswerShape(Object schema) {
+        Map<String, Object> props = schemaProperties(schema);
+        return props != null && props.containsKey("value") && !props.containsKey("text");
+    }
+
     private static boolean incomingReplacesPlaceholder(Object existing, Map<String, Object> incoming) {
+        if (isCommonAnswerShape(existing) && isGuidedHelpAnswerShape(incoming)) {
+            return false;
+        }
         if (!(existing instanceof Map<?, ?> existingMap)) {
             return true;
         }
@@ -1258,24 +1284,26 @@ public class OASParser {
                 continue;
             }
             Object schemaValue = schemaEntry.getValue();
+            Map<String, Object> schemaMap = null;
             if (schemaValue instanceof Map) {
-                Map<String, Object> schemaMap = Util.asStringObjectMap(schemaValue);
+                schemaMap = Util.asStringObjectMap(schemaValue);
                 if (schemaMap != null && isPrimitiveSchema(schemaMap)) {
                     continue;
                 }
             }
-            boolean overwrite = fileDerivedSchemaName != null && fileDerivedSchemaName.equals(schemaName);
-            if (overwrite || !mainSchemas.containsKey(schemaName)) {
-                // Create a copy to avoid modifying the original
-                if (schemaValue instanceof Map) {
-                    Map<String, Object> schemaMap = Util.asStringObjectMap(schemaValue);
-                    if (schemaMap != null) {
-                        mainSchemas.put(schemaName, new HashMap<>(schemaMap));
-                    } else {
-                        mainSchemas.put(schemaName, schemaValue);
-                    }
+            String key = schemaName;
+            if (schemaMap != null) {
+                key = qualifyGuidedHelpAnswerSchemaName(schemaName, schemaMap, fileKey);
+            }
+            // Filename User.yaml may overwrite schema User; GH Answer.yaml must not smash JAXB Answer.
+            boolean overwriteBasename = fileDerivedSchemaName != null
+                    && fileDerivedSchemaName.equals(schemaName)
+                    && key.equals(schemaName);
+            if (overwriteBasename || !mainSchemas.containsKey(key)) {
+                if (schemaMap != null) {
+                    mainSchemas.put(key, new HashMap<>(schemaMap));
                 } else {
-                    mainSchemas.put(schemaName, schemaValue);
+                    mainSchemas.put(key, schemaValue);
                 }
             }
         }
