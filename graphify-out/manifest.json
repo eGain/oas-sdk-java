@@ -120,8 +120,8 @@
     "semantic_hash": "dee13eb503d9a75341ee084063271427"
   },
   "src/main/java/egain/oassdk/core/parser/OASParser.java": {
-    "mtime": 1787726983.9379582,
-    "ast_hash": "a5b4733f490da5d53fa2fa2adba02224",
+    "mtime": 1787813264.5514772,
+    "ast_hash": "0ee99e801a32004fb79ecb0f959f1072",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/core/parser/PathResolver.java": {
@@ -280,8 +280,8 @@
     "semantic_hash": "c7a67dfc8f45d3530509d386c9081596"
   },
   "src/main/java/egain/oassdk/generators/java/JerseyModelGenerator.java": {
-    "mtime": 1787726666.2541218,
-    "ast_hash": "3b04f0eb972967d8972a9808c7bd1711",
+    "mtime": 1787813264.5494647,
+    "ast_hash": "0f53c171784d7c2521c8cf8fb7127702",
     "semantic_hash": ""
   },
   "src/main/java/egain/oassdk/generators/java/JerseyNamingUtils.java": {
@@ -670,8 +670,8 @@
     "semantic_hash": "ee0460ce2bdfa528e1190b8916adfdd0"
   },
   "src/test/java/egain/oassdk/core/parser/OASParserTest.java": {
-    "mtime": 1787727005.9349012,
-    "ast_hash": "320ff641a874cd865f2084fcfa7e53ef",
+    "mtime": 1787812494.1179092,
+    "ast_hash": "d16f7f53b115f029bfa197d1462e2382",
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/core/parser/PathResolverTest.java": {
@@ -1205,8 +1205,8 @@
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/java/JerseyModelGeneratorAnswerCollisionTest.java": {
-    "mtime": 1787727006.0716388,
-    "ast_hash": "05e27718ac558db11cdd6eac28b211e4",
+    "mtime": 1787812511.1216671,
+    "ast_hash": "070632f1e45fbdd0fca3c1ae146a2ea2",
     "semantic_hash": ""
   },
   "src/test/java/egain/oassdk/generators/java/JerseyModelGeneratorCustomAttributeL10NParityTest.java": {

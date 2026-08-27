@@ -4,6 +4,7 @@ import egain.oassdk.OASSDK;
 import egain.oassdk.config.GeneratorConfig;
 import egain.oassdk.core.exceptions.OASSDKException;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -270,6 +271,166 @@ class JerseyModelGeneratorAnswerCollisionTest {
             assertTrue(answer.contains("getValue("), "iteration " + iteration + " missing getValue");
             assertFalse(answer.contains("conceptName"), "iteration " + iteration + " leaked GH into Answer");
             assertFalse(answer.contains("private String text;"), "iteration " + iteration + " leaked GH text");
+        }
+    }
+
+    @RepeatedTest(5)
+    @DisplayName("allOf GH outside schemas/ folder never writes GH into Answer.java")
+    void jakartaAnswerStableWhenGhIsAllOfOutsideSchemasFolder() throws OASSDKException, IOException {
+        Path bundle = tempDir.resolve("allof-" + System.nanoTime());
+        Path commonDir = bundle.resolve("common");
+        Path ghDir = bundle.resolve("guidedhelp");
+        Files.createDirectories(commonDir);
+        Files.createDirectories(ghDir);
+        Files.writeString(commonDir.resolve("Answer.yaml"), """
+                type: object
+                title: Answer
+                properties:
+                  id:
+                    type: string
+                  value:
+                    type: string
+                """);
+        Files.writeString(ghDir.resolve("Answer.yaml"), """
+                type: object
+                title: Answer
+                allOf:
+                  - type: object
+                    properties:
+                      text:
+                        type: string
+                      conceptName:
+                        type: string
+                """);
+        Path specFile = bundle.resolve("api.yaml");
+        Files.writeString(specFile, """
+                openapi: 3.0.0
+                info:
+                  title: allOf GH first
+                  version: 1.0.0
+                paths: {}
+                components:
+                  schemas:
+                    Wrapper:
+                      type: object
+                      properties:
+                        gh:
+                          $ref: guidedhelp/Answer.yaml
+                        common:
+                          $ref: common/Answer.yaml
+                """);
+        Path outputDir = tempDir.resolve("out-allof-" + System.nanoTime());
+        generateJakartaModels(specFile, bundle, outputDir);
+        String answer = readGeneratedAnswerJava(outputDir);
+        assertTrue(answer.contains("getValue("), "allOf GH must not steal Answer.java");
+        assertFalse(answer.contains("conceptName"));
+        assertFalse(answer.contains("private String text;"));
+        assertCommonAnswerJaxbMethods(answer);
+    }
+
+    @RepeatedTest(5)
+    @DisplayName("inlined GH with x-resolved-ref Answer cannot overwrite Answer.java")
+    void jakartaAnswerNotOverwrittenByInlinedGhResolvedAsAnswer() throws OASSDKException, IOException {
+        Path bundle = tempDir.resolve("inline-" + System.nanoTime());
+        Files.createDirectories(bundle);
+        Path specFile = bundle.resolve("api.yaml");
+        Files.writeString(specFile, """
+                openapi: 3.0.0
+                info:
+                  title: inlined GH named Answer
+                  version: 1.0.0
+                paths: {}
+                components:
+                  schemas:
+                    Answer:
+                      type: object
+                      title: Answer
+                      properties:
+                        id:
+                          type: string
+                        value:
+                          type: string
+                    Wrapper:
+                      type: object
+                      properties:
+                        ghInline:
+                          type: object
+                          x-resolved-ref: '#/components/schemas/Answer'
+                          properties:
+                            text:
+                              type: string
+                            conceptName:
+                              type: string
+                """);
+        Path outputDir = tempDir.resolve("out-inline-" + System.nanoTime());
+        generateJakartaModels(specFile, bundle, outputDir);
+        String answer = readGeneratedAnswerJava(outputDir);
+        assertTrue(answer.contains("getValue("), "inlined GH must not overwrite Answer.java");
+        assertFalse(answer.contains("conceptName"));
+        assertFalse(answer.contains("private String text;"));
+        assertCommonAnswerJaxbMethods(answer);
+    }
+
+    @RepeatedTest(5)
+    @DisplayName("pre-bundled GH at Answer + common-Answer still emits JAXB Answer.java")
+    void jakartaAnswerStableWhenBundleAlreadyHasGhAtAnswerKey() throws OASSDKException, IOException {
+        Path bundle = tempDir.resolve("prebundled-" + System.nanoTime());
+        Files.createDirectories(bundle);
+        Path specFile = bundle.resolve("api.yaml");
+        Files.writeString(specFile, """
+                openapi: 3.0.0
+                info:
+                  title: leftover collision keys
+                  version: 1.0.0
+                paths: {}
+                components:
+                  schemas:
+                    Answer:
+                      type: object
+                      title: Answer
+                      properties:
+                        text:
+                          type: string
+                        conceptName:
+                          type: string
+                    common-Answer:
+                      type: object
+                      title: Answer
+                      properties:
+                        id:
+                          type: string
+                        value:
+                          type: string
+                """);
+        Path outputDir = tempDir.resolve("out-prebundled-" + System.nanoTime());
+        generateJakartaModels(specFile, bundle, outputDir);
+        String answer = readGeneratedAnswerJava(outputDir);
+        assertTrue(answer.contains("getValue("), "promote must make Answer.java the JAXB class");
+        assertFalse(answer.contains("conceptName"));
+        assertFalse(answer.contains("private String text;"));
+        assertCommonAnswerJaxbMethods(answer);
+    }
+
+    private void generateJakartaModels(Path specFile, Path bundle, Path outputDir) throws OASSDKException {
+        GeneratorConfig config = GeneratorConfig.builder()
+                .modelsOnly(true)
+                .useJakartaNamespace(true)
+                .packageName("com.egain.bindings.ws.model.xsds.common.v4")
+                .outputDir(outputDir.toString())
+                .searchPaths(List.of(bundle.toString()))
+                .build();
+        try (OASSDK sdk = new OASSDK(config, null, null)) {
+            sdk.loadSpec(specFile.toString());
+            sdk.generateApplication("java", "jersey", config.getPackageName(), outputDir.toString());
+        }
+    }
+
+    private static String readGeneratedAnswerJava(Path outputDir) throws IOException {
+        try (Stream<Path> walk = Files.walk(outputDir)) {
+            Path answerJava = walk.filter(p -> p.getFileName().toString().equals("Answer.java"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Answer.java missing under " + outputDir));
+            return Files.readString(answerJava, StandardCharsets.UTF_8);
         }
     }
 

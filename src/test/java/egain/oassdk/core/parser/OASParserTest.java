@@ -712,5 +712,100 @@ public class OASParserTest {
         assertFalse(answerProps.containsKey("text"));
         assertTrue(schemas.containsKey("schemas-Answer"));
     }
+
+    @Test
+    public void testPromoteMovesGhOffAnswerWhenCommonIsPrefixed(@TempDir Path tempDir) throws IOException, OASSDKException {
+        Files.writeString(tempDir.resolve("api.yaml"), """
+                openapi: 3.0.0
+                info:
+                  title: leftover GH at Answer
+                  version: 1.0.0
+                paths: {}
+                components:
+                  schemas:
+                    Answer:
+                      type: object
+                      properties:
+                        text:
+                          type: string
+                        conceptName:
+                          type: string
+                    common-Answer:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        value:
+                          type: string
+                """);
+
+        Map<String, Object> spec = parser.parse(tempDir.resolve("api.yaml").toString());
+        Map<String, Object> resolved = parser.resolveReferences(spec, tempDir.resolve("api.yaml").toString());
+        Map<String, Object> schemas = Util.asStringObjectMap(
+                Util.asStringObjectMap(resolved.get("components")).get("schemas"));
+        Map<String, Object> answerProps = Util.asStringObjectMap(
+                Util.asStringObjectMap(schemas.get("Answer")).get("properties"));
+        assertTrue(answerProps.containsKey("value"), "post-pass must promote common onto Answer");
+        assertFalse(answerProps.containsKey("text"), "GH must not occupy Answer after promote");
+        assertTrue(schemas.containsKey("schemas-Answer"));
+        Map<String, Object> ghProps = Util.asStringObjectMap(
+                Util.asStringObjectMap(schemas.get("schemas-Answer")).get("properties"));
+        assertTrue(ghProps.containsKey("conceptName"));
+    }
+
+    @Test
+    public void testGhAnswerAllOfOutsideSchemasFolderDoesNotOccupyAnswer(@TempDir Path tempDir) throws IOException, OASSDKException {
+        Path ghDir = tempDir.resolve("guidedhelp");
+        Path commonDir = tempDir.resolve("common");
+        Files.createDirectories(ghDir);
+        Files.createDirectories(commonDir);
+        Files.writeString(ghDir.resolve("Answer.yaml"), """
+                type: object
+                title: Answer
+                allOf:
+                  - type: object
+                    properties:
+                      text:
+                        type: string
+                      conceptName:
+                        type: string
+                """);
+        Files.writeString(commonDir.resolve("Answer.yaml"), """
+                type: object
+                title: Answer
+                properties:
+                  id:
+                    type: string
+                  value:
+                    type: string
+                """);
+        Files.writeString(tempDir.resolve("api.yaml"), """
+                openapi: 3.0.0
+                info:
+                  title: GH allOf first
+                  version: 1.0.0
+                paths: {}
+                components:
+                  schemas:
+                    Wrapper:
+                      type: object
+                      properties:
+                        gh:
+                          $ref: guidedhelp/Answer.yaml
+                        common:
+                          $ref: common/Answer.yaml
+                """);
+
+        OASParser parserWithSearch = new OASParser(List.of(tempDir.toString()));
+        Map<String, Object> spec = parserWithSearch.parse(tempDir.resolve("api.yaml").toString());
+        Map<String, Object> resolved = parserWithSearch.resolveReferences(spec, tempDir.resolve("api.yaml").toString());
+        Map<String, Object> schemas = Util.asStringObjectMap(
+                Util.asStringObjectMap(resolved.get("components")).get("schemas"));
+        Map<String, Object> answerProps = Util.asStringObjectMap(
+                Util.asStringObjectMap(schemas.get("Answer")).get("properties"));
+        assertTrue(answerProps.containsKey("value"), "allOf GH outside schemas/ must not keep Answer");
+        assertFalse(answerProps.containsKey("text"));
+        assertTrue(schemas.containsKey("schemas-Answer"));
+    }
 }
 
