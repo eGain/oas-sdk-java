@@ -164,17 +164,11 @@ class JerseyModelGenerator {
             }
 
             String javaClassName = JerseyNamingUtils.toJavaClassName(schemaName);
-            Map<String, Object> answerProps = Util.asStringObjectMap(schema.get("properties"));
-            if ("Answer".equals(javaClassName) && answerProps != null
-                    && answerProps.containsKey("text") && !answerProps.containsKey("value")) {
-                javaClassName = "SchemasAnswer";
-            }
-
-            generatedTopLevelClassNames.add(javaClassName);
-            generateModel(javaClassName, schema, outputDir, packagePath, spec);
+            String emittedClass = generateModel(javaClassName, schema, outputDir, packagePath, spec);
+            generatedTopLevelClassNames.add(emittedClass);
             if (ctx.modelsOnly) {
-                generateObjectFactory(javaClassName, outputDir, packagePath);
-                generateJaxbIndex(javaClassName, outputDir, packagePath);
+                generateObjectFactory(emittedClass, outputDir, packagePath);
+                generateJaxbIndex(emittedClass, outputDir, packagePath);
             }
         }
 
@@ -185,10 +179,10 @@ class JerseyModelGenerator {
 
             Map<String, Object> schema = Util.asStringObjectMap(schemaObj);
             if (schema != null) {
-                generateModel(modelName, schema, outputDir, packagePath, spec);
+                String emittedClass = generateModel(modelName, schema, outputDir, packagePath, spec);
                 if (ctx.modelsOnly) {
-                    generateObjectFactory(modelName, outputDir, packagePath);
-                    generateJaxbIndex(modelName, outputDir, packagePath);
+                    generateObjectFactory(emittedClass, outputDir, packagePath);
+                    generateJaxbIndex(emittedClass, outputDir, packagePath);
                 }
             }
         }
@@ -207,7 +201,7 @@ class JerseyModelGenerator {
     /**
      * Generate individual model.
      */
-    void generateModel(String schemaName, Map<String, Object> schema, String outputDir, String packagePath, Map<String, Object> spec) throws IOException {
+    String generateModel(String schemaName, Map<String, Object> schema, String outputDir, String packagePath, Map<String, Object> spec) throws IOException {
         StringBuilder content = new StringBuilder();
 
         // Build allProperties and fieldNames first (needed for propOrder and for collecting imports)
@@ -239,6 +233,14 @@ class JerseyModelGenerator {
             } else {
                 JerseySchemaUtils.mergeSchemaProperties(schema, allProperties, allRequired, spec);
             }
+        }
+
+        // GH Answer (text/conceptName, no value) must never write answer/Answer.java — inlined
+        // schemas and allOf both merge into allProperties, so this is the last-writer-proof guard.
+        if ("Answer".equals(schemaName) && !allProperties.containsKey("value")
+                && (allProperties.containsKey("text") || allProperties.containsKey("conceptName")
+                || allProperties.containsKey("image"))) {
+            schemaName = "SchemasAnswer";
         }
 
         // Simple two-branch oneOf: each branch requires exactly one distinct property — merge wrongly unionizes
@@ -721,6 +723,7 @@ class JerseyModelGenerator {
         content.append("}\n");
 
         JerseyGenerationContext.writeFile(outputDir + (ctx.modelsOnly?"/":"/src/main/java/") + packagePath.replace(".", "/") + (ctx.modelsOnly?"/"+JerseyNamingUtils.sanitizePackageName(schemaName)+"/":"/model/") + schemaName + ".java", content.toString());
+        return schemaName;
     }
 
     /**

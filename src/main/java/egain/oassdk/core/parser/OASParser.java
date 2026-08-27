@@ -304,6 +304,7 @@ public class OASParser {
                 mergeExternalSchemasIntoMainSpec(entry.getKey(), entry.getValue(), mainSpec, referencedFragments);
             }
         }
+        promoteJaxbAnswerSchema(mainSpec);
 
         return resolvedSpec;
     }
@@ -721,7 +722,7 @@ public class OASParser {
             return schemaName;
         }
         List<String> parents = parentPathSegments(refOrFileKey);
-        boolean fromSchemasDir = !parents.isEmpty()
+        boolean fromSchemasDir = isYamlOrJsonFilePath(refOrFileKey) && !parents.isEmpty()
                 && "schemas".equalsIgnoreCase(parents.get(parents.size() - 1));
         if (fromSchemasDir || isGuidedHelpAnswerShape(incoming)) {
             return "schemas-Answer";
@@ -729,16 +730,86 @@ public class OASParser {
         return schemaName;
     }
 
+    /**
+     * After every merge, JAXB {@code Answer} (id+value) must occupy the {@code Answer} key.
+     * GH (text/conceptName) always lands on {@code schemas-Answer}, regardless of file order.
+     */
+    private static void promoteJaxbAnswerSchema(Map<String, Object> mainSpec) {
+        if (mainSpec == null) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> components = (Map<String, Object>) mainSpec.get("components");
+        if (components == null) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> schemas = (Map<String, Object>) components.get("schemas");
+        if (schemas == null || schemas.isEmpty()) {
+            return;
+        }
+        Object atAnswer = schemas.get("Answer");
+        Object common = null;
+        for (Object value : schemas.values()) {
+            if (isCommonAnswerShape(value)) {
+                common = value;
+                break;
+            }
+        }
+        if (isGuidedHelpAnswerShape(atAnswer)) {
+            if (!schemas.containsKey("schemas-Answer")) {
+                schemas.put("schemas-Answer", atAnswer);
+            }
+            if (common != null) {
+                schemas.put("Answer", common);
+            } else {
+                schemas.remove("Answer");
+            }
+            return;
+        }
+        if (atAnswer == null && common != null) {
+            schemas.put("Answer", common);
+        }
+    }
+
+    private static boolean isYamlOrJsonFilePath(String refOrFileKey) {
+        if (refOrFileKey == null || refOrFileKey.isEmpty()) {
+            return false;
+        }
+        String path = refOrFileKey.contains("#") ? refOrFileKey.split("#", 2)[0] : refOrFileKey;
+        String lower = path.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".yaml") || lower.endsWith(".yml") || lower.endsWith(".json");
+    }
+
     private static Map<String, Object> schemaProperties(Object schema) {
         if (!(schema instanceof Map<?, ?> map)) {
             return null;
         }
-        return Util.asStringObjectMap(map.get("properties"));
+        Map<String, Object> props = Util.asStringObjectMap(map.get("properties"));
+        if (props != null && !props.isEmpty()) {
+            return props;
+        }
+        List<Map<String, Object>> allOf = Util.asStringObjectMapList(map.get("allOf"));
+        if (allOf == null || allOf.isEmpty()) {
+            return props;
+        }
+        Map<String, Object> merged = new LinkedHashMap<>();
+        for (Map<String, Object> branch : allOf) {
+            if (branch == null) {
+                continue;
+            }
+            Map<String, Object> branchProps = Util.asStringObjectMap(branch.get("properties"));
+            if (branchProps != null) {
+                merged.putAll(branchProps);
+            }
+        }
+        return merged.isEmpty() ? props : merged;
     }
 
     private static boolean isGuidedHelpAnswerShape(Object schema) {
         Map<String, Object> props = schemaProperties(schema);
-        return props != null && props.containsKey("text") && !props.containsKey("value");
+        return props != null && !props.containsKey("value")
+                && (props.containsKey("text") || props.containsKey("conceptName") || props.containsKey("image"));
     }
 
     private static boolean isCommonAnswerShape(Object schema) {
@@ -1173,6 +1244,10 @@ public class OASParser {
             section = new HashMap<>();
             components.put(parts[1], section);
         }
+        if ("schemas".equals(parts[1]) && value != null) {
+            registerSchemaAvoidingCollision(section, parts[2], value, pathWithSlash);
+            return;
+        }
         section.put(parts[2], value);
     }
 
@@ -1291,11 +1366,16 @@ public class OASParser {
                     continue;
                 }
             }
+            // Filename User.yaml may overwrite schema User; GH Answer.yaml must not smash JAXB Answer.
+            if (schemaMap != null && ("Answer".equals(schemaName) || isGuidedHelpAnswerShape(schemaMap)
+                    || isCommonAnswerShape(schemaMap))) {
+                registerSchemaAvoidingCollision(mainSchemas, schemaName, new HashMap<>(schemaMap), fileKey);
+                continue;
+            }
             String key = schemaName;
             if (schemaMap != null) {
                 key = qualifyGuidedHelpAnswerSchemaName(schemaName, schemaMap, fileKey);
             }
-            // Filename User.yaml may overwrite schema User; GH Answer.yaml must not smash JAXB Answer.
             boolean overwriteBasename = fileDerivedSchemaName != null
                     && fileDerivedSchemaName.equals(schemaName)
                     && key.equals(schemaName);
