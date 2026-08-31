@@ -225,13 +225,8 @@ class JerseyModelGenerator {
             if (schema.containsKey("allOf")) {
                 List<Map<String, Object>> allOfSchemas = Util.asStringObjectMapList(schema.get("allOf"));
                 JerseySchemaUtils.mergeAllOfBranchesIntoProperties(allOfSchemas, allProperties, allRequired, spec);
-            } else if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
-                List<Map<String, Object>> schemas = Util.asStringObjectMapList(
-                        schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
-                for (Map<String, Object> subSchema : schemas) {
-                    JerseySchemaUtils.mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
-                }
             } else {
+                // mergeSchemaProperties handles direct properties plus oneOf/anyOf siblings (e.g. AssetPreuploadInput)
                 JerseySchemaUtils.mergeSchemaProperties(schema, allProperties, allRequired, spec);
             }
         }

@@ -1,0 +1,88 @@
+openapi: 3.0.0
+info:
+  title: AssetPreuploadSiblingOneOfTest
+  version: 1.0.0
+paths:
+  /assets/preupload:
+    post:
+      operationId: generateFilePreUploadURL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetPreuploadInput'
+      responses:
+        '200':
+          description: ok
+components:
+  schemas:
+    AssetPreuploadInput:
+      description: Metadata used to start a file upload flow.
+      type: object
+      required:
+        - fileName
+        - contentType
+        - size
+        - application
+      oneOf:
+        - title: Article attachment or inline image
+          required: [isInline]
+          properties:
+            application:
+              enum: [article]
+            emailDirection:
+              readOnly: true
+            departmentId:
+              readOnly: true
+        - title: Email attachment
+          required: [emailDirection, departmentId]
+          properties:
+            application:
+              enum: [email]
+            isInline:
+              readOnly: true
+        - title: Task or calltrack attachment
+          properties:
+            application:
+              enum: [task, calltrack]
+            isInline:
+              readOnly: true
+            emailDirection:
+              readOnly: true
+            departmentId:
+              readOnly: true
+      properties:
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: ^[^/\\]+\.[^./\\]+$
+        contentType:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: ^[a-zA-Z0-9!#$&^_-]+/[a-zA-Z0-9!#$&^_.+-]+$
+        size:
+          type: integer
+          minimum: 1
+          maximum: 157286400
+        application:
+          type: string
+          enum:
+            - article
+            - email
+            - task
+            - calltrack
+        isInline:
+          type: boolean
+        emailDirection:
+          type: string
+          enum:
+            - inbound
+            - outbound
+        departmentId:
+          type: string
+          pattern: ^999$|^[1-9][0-9]{3,8}$
+          minLength: 3
+          maxLength: 9
