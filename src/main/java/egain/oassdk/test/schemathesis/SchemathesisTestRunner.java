@@ -28,6 +28,9 @@ public class SchemathesisTestRunner {
      * @throws GenerationException if generation fails
      */
     public void executeTests(Map<String, Object> spec, String outputDir, String baseUrl) throws GenerationException {
+        if (outputDir == null) {
+            throw new GenerationException("Failed to execute Schemathesis tests: output directory is required");
+        }
         try {
             Files.createDirectories(Paths.get(outputDir));
 
