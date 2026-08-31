@@ -62,4 +62,32 @@ class JerseyModelGeneratorSiblingOneOfTest {
             sdk.close();
         }
     }
+
+    @Test
+    @DisplayName("Inline nested properties + oneOf merge sibling fields into inner class")
+    void inlineNested_mergesSiblingPropertiesWithOneOf() throws OASSDKException, IOException {
+        Path outputDir = tempOutputDir.resolve("preupload-envelope");
+        GeneratorConfig config = GeneratorConfig.builder()
+                .modelsOnly(true)
+                .build();
+        try (OASSDK sdk = new OASSDK(config, null, null)) {
+            sdk.loadSpec("src/test/resources/asset_preupload_sibling_oneof.yaml");
+            sdk.generateApplication("java", "jersey", "com.test.filemgr", outputDir.toString());
+
+            Path modelJava;
+            try (Stream<Path> walk = Files.walk(outputDir)) {
+                modelJava = walk
+                        .filter(p -> p.getFileName().toString().equals("PreuploadEnvelope.java"))
+                        .findFirst()
+                        .orElseThrow(() -> new AssertionError("PreuploadEnvelope.java not found under " + outputDir));
+            }
+            String content = Files.readString(modelJava, StandardCharsets.UTF_8);
+            assertTrue(content.contains("public static class Preupload"),
+                    "preupload must be a static inner class");
+            assertTrue(content.contains("private String fileName"),
+                    "inner class must keep sibling fileName, not only oneOf overlays");
+            assertTrue(content.contains("private String application"),
+                    "application must be a String field");
+        }
+    }
 }

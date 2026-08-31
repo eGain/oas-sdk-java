@@ -242,6 +242,22 @@ class JerseyTypeUtilsTest {
                 typeUtils.getFieldTypeForModelProperty("CustomAttributeL10N", "attribValues", attribValues, false, spec));
     }
 
+    @Test
+    @DisplayName("getJavaType does not map array items by title when property keys differ from component")
+    void getJavaType_arrayInlineObjectTitleStructureMismatch() {
+        Map<String, Object> user = Map.of(
+                "type", "object",
+                "properties", Map.of("id", Map.of("type", "string")));
+        Map<String, Object> items = new LinkedHashMap<>();
+        items.put("type", "object");
+        items.put("title", "User");
+        items.put("properties", Map.of("name", Map.of("type", "string")));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of("User", user)));
+
+        Map<String, Object> arraySchema = Map.of("type", "array", "items", items);
+        assertEquals("List<Object>", createTypeUtils(spec).getJavaType(arraySchema));
+    }
+
     // -----------------------------------------------------------------------
     //  getJavaType - date types
     // -----------------------------------------------------------------------

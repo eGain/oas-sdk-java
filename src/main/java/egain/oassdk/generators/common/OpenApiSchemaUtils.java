@@ -677,6 +677,7 @@ public final class OpenApiSchemaUtils {
      * When an anonymous inline object uses {@code title} equal to a {@code components.schemas} key
      * (e.g. PAI #981 {@code CustomAttributeL10N.attribValues.items} with {@code title: L10NString}),
      * return that component name so Java codegen can emit a typed model instead of {@code Object}.
+     * Title is documentation: require matching {@code type} (when both set) and the same property names.
      */
     public static String findComponentSchemaNameByTitle(Map<String, Object> schema, Map<String, Object> spec) {
         if (schema == null || spec == null) {
@@ -688,18 +689,35 @@ public final class OpenApiSchemaUtils {
         }
         Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
         Map<String, Object> schemas = components != null ? Util.asStringObjectMap(components.get("schemas")) : null;
-        if (schemas == null || schemas.isEmpty()) {
+        if (schemas == null || !schemas.containsKey(title)) {
             return null;
         }
-        if (schemas.containsKey(title)) {
-            return title;
+        Map<String, Object> component = Util.asStringObjectMap(schemas.get(title));
+        if (!isTitleMatchStructurallyCompatible(schema, component)) {
+            return null;
         }
-        for (String key : schemas.keySet()) {
-            if (key != null && key.equalsIgnoreCase(title)) {
-                return key;
-            }
+        return title;
+    }
+
+    /**
+     * Guard for {@link #findComponentSchemaNameByTitle}: do not type an unrelated inline object
+     * as a component just because {@code title} collides with a schema key.
+     */
+    private static boolean isTitleMatchStructurallyCompatible(Map<String, Object> inline, Map<String, Object> component) {
+        if (component == null) {
+            return false;
         }
-        return null;
+        Object inlineType = inline.get("type");
+        Object componentType = component.get("type");
+        if (inlineType != null && componentType != null && !inlineType.equals(componentType)) {
+            return false;
+        }
+        Map<String, Object> inlineProps = Util.asStringObjectMap(inline.get("properties"));
+        Map<String, Object> componentProps = Util.asStringObjectMap(component.get("properties"));
+        if (inlineProps == null || inlineProps.isEmpty() || componentProps == null || componentProps.isEmpty()) {
+            return false;
+        }
+        return inlineProps.keySet().equals(componentProps.keySet());
     }
 
     /**
