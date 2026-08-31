@@ -9,12 +9,13 @@ import egain.oassdk.generators.CodeGenerator;
 import egain.oassdk.generators.ConfigurableGenerator;
 
 import java.io.File;
-import java.util.logging.Logger;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.logging.Logger;
 
 /**
  * Express.js code generator with full feature parity.
@@ -25,7 +26,7 @@ import java.util.*;
  * {@code ExpressBuildGenerator} sub-classes mirroring the Jersey generator layout to reduce
  * bridge-node coupling reported by the codebase graph.
  */
-public class ExpressGenerator implements CodeGenerator, ConfigurableGenerator {
+public final class ExpressGenerator implements CodeGenerator, ConfigurableGenerator {
 
     private static final Logger logger = LoggerConfig.getLogger(ExpressGenerator.class);
 
@@ -592,10 +593,6 @@ public class ExpressGenerator implements CodeGenerator, ConfigurableGenerator {
     /**
      * Generate middleware
      */
-    private void generateMiddleware(String outputDir, String packageName) throws IOException {
-        generateMiddleware(null, outputDir, packageName);
-    }
-
     private void generateMiddleware(Map<String, Object> spec, String outputDir, String packageName) throws IOException {
         String basePath = outputDir + "/" + (packageName != null ? packageName.replace(".", "/") : "api");
 
@@ -919,7 +916,7 @@ public class ExpressGenerator implements CodeGenerator, ConfigurableGenerator {
 
         logger.fine("Directory creation result: " + result);
 
-        try (FileWriter writer = new FileWriter(file)) {
+        try (FileWriter writer = new FileWriter(file, StandardCharsets.UTF_8)) {
             writer.write(content);
         }
     }
@@ -927,7 +924,7 @@ public class ExpressGenerator implements CodeGenerator, ConfigurableGenerator {
     /**
      * Helper class for path operations
      */
-    private static class PathOperation {
+    private static final class PathOperation {
         String path;
         String method;
         Map<String, Object> operation;
@@ -942,7 +939,7 @@ public class ExpressGenerator implements CodeGenerator, ConfigurableGenerator {
     /**
      * Helper class for security information
      */
-    private static class SecurityInfo {
+    private static final class SecurityInfo {
         boolean hasRequirements;
         List<String> scopes = new ArrayList<>();
 

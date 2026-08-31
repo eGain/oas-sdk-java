@@ -979,7 +979,7 @@ public class RedoclyConfigGenerator {
         }
 
         public String[] getCodeLanguages() {
-            return codeLanguages != null ? codeLanguages.clone() : null;
+            return codeLanguages != null ? codeLanguages.clone() : new String[0];
         }
 
         public void setCodeLanguages(String[] codeLanguages) {
@@ -987,7 +987,7 @@ public class RedoclyConfigGenerator {
         }
 
         public String[] getCodeLabels() {
-            return codeLabels != null ? codeLabels.clone() : null;
+            return codeLabels != null ? codeLabels.clone() : new String[0];
         }
 
         public void setCodeLabels(String[] codeLabels) {

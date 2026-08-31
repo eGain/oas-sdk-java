@@ -78,7 +78,7 @@ public class TestSupportGenerator {
 
     private static String resolveTemplateBaseUrl(Map<String, Object> spec, TestConfig config) {
         String resolved = TestSpecUtils.resolveBaseUrl(spec, config);
-        if (resolved == null || resolved.isBlank()) {
+        if (resolved.isBlank()) {
             return "";
         }
         if (resolved.contains("${")) {

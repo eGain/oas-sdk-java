@@ -117,8 +117,7 @@ public class OASMetadata {
                 if (pathItem != null) {
                     endpointCount++;
 
-                    String[] methods = Constants.HTTP_METHODS;
-                    for (String method : methods) {
+                    for (String method : Constants.HTTP_METHODS) {
                         if (pathItem.containsKey(method)) {
                             operationCount++;
                             methodCounts.put(method.toUpperCase(Locale.ROOT), methodCounts.getOrDefault(method.toUpperCase(Locale.ROOT), 0) + 1);
@@ -155,8 +154,7 @@ public class OASMetadata {
 
             List<Map<String, Object>> operations = new ArrayList<>();
 
-            String[] methods = Constants.HTTP_METHODS;
-            for (String method : methods) {
+            for (String method : Constants.HTTP_METHODS) {
                 if (pathItem.containsKey(method)) {
                     Map<String, Object> operation = Util.asStringObjectMap(pathItem.get(method));
                     if (operation != null) {

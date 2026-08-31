@@ -14,6 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Locale;
 
 /**
  * Generates Pydantic model classes from OpenAPI component schemas for Python backends.
@@ -91,7 +92,7 @@ public final class PythonModelGenerator {
 
         StringBuilder modelsInit = new StringBuilder();
         for (String cls : generatedModels) {
-            modelsInit.append("from .").append(cls.toLowerCase()).append(" import ").append(cls).append("\n");
+            modelsInit.append("from .").append(cls.toLowerCase(Locale.ROOT)).append(" import ").append(cls).append("\n");
         }
         if (!generatedModels.isEmpty()) {
             modelsInit.append("import sys as _sys\n\n");
@@ -127,7 +128,7 @@ public final class PythonModelGenerator {
             return;
         }
         if (node instanceof Map<?, ?> m) {
-            Map<String, Object> schema = Util.asStringObjectMap(node);
+            Map<String, Object> schema = Util.asStringObjectMap(m);
             String refName = OpenApiSchemaReferenceWalker.resolvedRefSchemaName(schema);
             if (refName != null && schema.containsKey("properties")
                     && !existing.containsKey(refName) && !toAdd.containsKey(refName)) {
@@ -213,7 +214,7 @@ public final class PythonModelGenerator {
         if (!siblingImports.isEmpty()) {
             content.append("if TYPE_CHECKING:\n");
             for (String cls : siblingImports) {
-                content.append("    from .").append(cls.toLowerCase()).append(" import ").append(cls).append("\n");
+                content.append("    from .").append(cls.toLowerCase(Locale.ROOT)).append(" import ").append(cls).append("\n");
             }
         }
         content.append("\n");
@@ -230,7 +231,7 @@ public final class PythonModelGenerator {
         content.append("        from_attributes = True\n");
 
         PythonNamingUtils.writeFile(
-                outputDir + "/" + packagePath + "/models/" + schemaName.toLowerCase() + ".py", content.toString());
+                outputDir + "/" + packagePath + "/models/" + schemaName.toLowerCase(Locale.ROOT) + ".py", content.toString());
     }
 
     /**

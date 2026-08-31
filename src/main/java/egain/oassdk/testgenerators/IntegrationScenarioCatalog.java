@@ -1,6 +1,8 @@
 package egain.oassdk.testgenerators;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
 import egain.oassdk.Util;
 import egain.oassdk.generators.common.OpenApiOneOfXor;
 
@@ -184,7 +186,7 @@ final class IntegrationScenarioCatalog {
             Map<String, Object> merged = new LinkedHashMap<>(m0);
             merged.putAll(m1);
             return OBJECT_MAPPER.writeValueAsString(merged);
-        } catch (Exception e) {
+        } catch (IOException e) {
             return json0;
         }
     }

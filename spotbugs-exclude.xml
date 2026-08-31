@@ -34,5 +34,27 @@
     <Match>
         <Package name="~org\.omg\.~"/>
     </Match>
+
+    <!-- Generators emit LF in format strings; %n would put platform newlines into generated sources. -->
+    <Match>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+    <!-- Spec maps use object identity (e.g. findComponentSchemaName). Config beans are pipeline state. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+    <!-- Example apps are not production SDK code. -->
+    <Match>
+        <Class name="egain.oassdk.examples.HelloWorldExample"/>
+    </Match>
+    <Match>
+        <Class name="egain.oassdk.examples.GenerateSequenceChainsFromSpec"/>
+    </Match>
+    <Match>
+        <Class name="HelloWorldExample"/>
+    </Match>
+    <Match>
+        <Class name="GenerateSequenceChainsFromSpec"/>
+    </Match>
 </FindBugsFilter>
 

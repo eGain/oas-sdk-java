@@ -121,7 +121,7 @@ public final class JerseyTypeUtils {
             if (effective != null && effective != schema) {
                 schema = effective;
             }
-            if (schema != null && schema.containsKey("x-java-type-ref")) {
+            if (schema.containsKey("x-java-type-ref")) {
                 String refName = (String) schema.get("x-java-type-ref");
                 if (refName != null && !refName.isEmpty()) {
                     return JerseyNamingUtils.toJavaClassName(refName);
@@ -337,7 +337,7 @@ public final class JerseyTypeUtils {
                     Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
                     if (components != null) {
                         Map<String, Object> schemas = Util.asStringObjectMap(components.get("schemas"));
-                        if (schemas != null && fieldSchema != null) {
+                        if (schemas != null) {
                             for (Map.Entry<String, Object> schemaEntry : schemas.entrySet()) {
                                 Map<String, Object> candidateSchema = Util.asStringObjectMap(schemaEntry.getValue());
                                 if (candidateSchema == fieldSchema) {
@@ -729,6 +729,9 @@ public final class JerseyTypeUtils {
                         annotations.append("@Size(max = ").append(maxItems).append(")\n    ");
                     }
                 }
+            }
+            default -> {
+                // boolean, object, and other types have no bean-validation annotations here
             }
         }
 

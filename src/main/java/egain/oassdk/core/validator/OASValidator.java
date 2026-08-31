@@ -164,8 +164,7 @@ public class OASValidator {
         if (pathItem == null) return;
 
         // Validate HTTP methods
-        String[] validMethods = Constants.HTTP_METHODS;
-        for (String method : validMethods) {
+        for (String method : Constants.HTTP_METHODS) {
             if (pathItem.containsKey(method)) {
                 Map<String, Object> operation = Util.asStringObjectMap(pathItem.get(method));
                 validateOperation(path, method, operation, errors);

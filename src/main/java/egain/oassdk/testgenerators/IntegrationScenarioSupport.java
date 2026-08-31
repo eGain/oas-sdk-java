@@ -297,9 +297,6 @@ public final class IntegrationScenarioSupport {
             if (("$order".equals(name) || "order".equals(name)) && !hasSort) {
                 continue;
             }
-            if (Boolean.FALSE.equals(param.get("required"))) {
-                // include common optional params with valid examples
-            }
             result.put(name, getParameterExample(param));
         }
         return result;
@@ -626,7 +623,6 @@ public final class IntegrationScenarioSupport {
                                           Set<String> visitedRefs) {
         StringBuilder json = new StringBuilder("{");
         boolean first = true;
-        List<String> required = requiredFields != null ? requiredFields : List.of();
         for (Map.Entry<String, Object> entry : properties.entrySet()) {
             String fieldName = entry.getKey();
             Map<String, Object> propSchema = Util.asStringObjectMap(entry.getValue());

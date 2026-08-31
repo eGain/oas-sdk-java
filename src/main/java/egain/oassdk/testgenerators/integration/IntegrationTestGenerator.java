@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Integration test generator
@@ -124,7 +125,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             Files.createDirectories(Paths.get(packageDir));
 
             String testClassContent = generateTestClass(basePackage, className, tag, operations, spec, baseUrl);
-            Files.write(Paths.get(packageDir, className + ".java"), testClassContent.getBytes());
+            Files.write(Paths.get(packageDir, className + ".java"), testClassContent.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -328,19 +329,16 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
             return null;
         }
         String candidate = collectionPath.endsWith("/") ? collectionPath + "{id}" : collectionPath + "/{id}";
-        for (String p : paths.keySet()) {
+        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+            String p = pathEntry.getKey();
             if (p.matches(".*\\{[^}]+}.*") && p.startsWith(collectionPath.replaceAll("/$", ""))) {
-                Map<String, Object> pathItem = Util.asStringObjectMap(paths.get(p));
+                Map<String, Object> pathItem = Util.asStringObjectMap(pathEntry.getValue());
                 if (pathItem != null && pathItem.containsKey("get")) {
                     return p;
                 }
             }
         }
         return paths.containsKey(candidate) ? candidate : null;
-    }
-
-    private void appendMultiContextAuthHelpers(StringBuilder sb) {
-        // replaced by TestCodegenSupport.tokenHelpers()
     }
 
     private void appendJavaPathUriBlocks(StringBuilder sb, String pathTemplate,
@@ -1039,14 +1037,14 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 "# integrationMaxInvalidBodyFieldsPerOperation=40\n" +
                 "# integrationMaxInvalidParamCasesPerOperation=25\n";
 
-        Files.write(Paths.get(outputDir, "test-config.properties"), configContent.getBytes());
+        Files.write(Paths.get(outputDir, "test-config.properties"), configContent.getBytes(StandardCharsets.UTF_8));
     }
 
     private void generatePomXml(String outputDir, String basePackage) throws IOException {
         String pomContent = TestMavenSupport.pomHeader("api-integration-tests", basePackage)
                 + TestMavenSupport.junitDependency()
                 + TestMavenSupport.buildSectionWithTestSupport();
-        Files.write(Paths.get(outputDir, "pom.xml"), pomContent.getBytes());
+        Files.write(Paths.get(outputDir, "pom.xml"), pomContent.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -1056,7 +1054,7 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
         String packageDir = TestOutputLayout.testJavaDir(outputDir, basePackage);
         Files.createDirectories(Paths.get(packageDir));
         Files.write(Paths.get(packageDir, "IntegrationTestUtils.java"),
-                generateIntegrationTestUtilsClass(basePackage).getBytes());
+                generateIntegrationTestUtilsClass(basePackage).getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -1540,33 +1538,6 @@ public class IntegrationTestGenerator implements TestGenerator, ConfigurableTest
                 sb.append("    }\n\n");
             }
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private String resolveFirstOAuthTokenUrl(Map<String, Object> securitySchemes) {
-        if (securitySchemes == null) {
-            return "";
-        }
-        for (Object schemeObj : securitySchemes.values()) {
-            Map<String, Object> scheme = Util.asStringObjectMap(schemeObj);
-            if (scheme == null || !"oauth2".equals(scheme.get("type"))) {
-                continue;
-            }
-            Map<String, Object> flows = Util.asStringObjectMap(scheme.get("flows"));
-            if (flows == null) {
-                continue;
-            }
-            for (String flowKey : List.of("clientCredentials", "authorizationCode", "password")) {
-                Map<String, Object> flow = Util.asStringObjectMap(flows.get(flowKey));
-                if (flow != null) {
-                    String tokenUrl = (String) flow.get("tokenUrl");
-                    if (tokenUrl != null && !tokenUrl.isBlank()) {
-                        return tokenUrl;
-                    }
-                }
-            }
-        }
-        return "";
     }
 
     private String getOperationTag(Map<String, Object> operation) {

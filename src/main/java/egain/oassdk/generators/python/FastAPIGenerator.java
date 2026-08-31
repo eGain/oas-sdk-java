@@ -14,6 +14,7 @@ import java.nio.file.Paths;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.Locale;
 
 /**
  * FastAPI code generator — thin orchestrator delegating to specialised sub-generators.
@@ -124,7 +125,7 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             for (String path : pathsForImport.keySet()) {
                 String routerModule = PythonNamingUtils.generateRouterName(
                         OpenApiPathUtils.buildFullPath(serverBasePath, OpenApiPathUtils.extractParentPath(path))
-                ).toLowerCase();
+                ).toLowerCase(Locale.ROOT);
                 if (importedRouters.add(routerModule)) {
                     content.append("from ").append(pkg).append(".routers.").append(routerModule)
                             .append(" import ").append(routerModule).append("_router\n");
@@ -182,7 +183,7 @@ public class FastAPIGenerator implements CodeGenerator, ConfigurableGenerator {
             for (String path : paths.keySet()) {
                 String routerModule = PythonNamingUtils.generateRouterName(
                         OpenApiPathUtils.buildFullPath(serverBasePath, OpenApiPathUtils.extractParentPath(path))
-                ).toLowerCase();
+                ).toLowerCase(Locale.ROOT);
                 if (includedRouters.add(routerModule)) {
                     content.append("app.include_router(").append(routerModule).append("_router)\n");
                 }

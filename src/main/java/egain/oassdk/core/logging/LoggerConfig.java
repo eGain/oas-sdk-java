@@ -14,6 +14,7 @@ import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.Locale;
 
 /**
  * Configurable logging utility using java.util.logging
@@ -99,7 +100,7 @@ public class LoggerConfig {
         String levelStr = getProperty(LOG_LEVEL_PROPERTY, "OAS_SDK_LOG_LEVEL", 
                 props.getProperty("log.level", DEFAULT_LOG_LEVEL));
         try {
-            logLevel = Level.parse(levelStr.toUpperCase());
+            logLevel = Level.parse(levelStr.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             fallbackLogger.warning("Invalid log level: " + levelStr + ", using default: INFO");
             logLevel = Level.INFO;
@@ -134,7 +135,7 @@ public class LoggerConfig {
         // Create file handler with rotation
         try {
             String logFilePath = Paths.get(logDirectory, logFileName).toString();
-            RotatingFileHandler fileHandler = new RotatingFileHandler(
+            RotatingFileHandler fileHandler = RotatingFileHandler.create(
                 logFilePath,
                 maxFileSize,
                 maxBackupFiles
@@ -235,7 +236,7 @@ public class LoggerConfig {
             return DEFAULT_MAX_FILE_SIZE;
         }
         
-        sizeStr = sizeStr.trim().toUpperCase();
+        sizeStr = sizeStr.trim().toUpperCase(Locale.ROOT);
         
         if (sizeStr.endsWith("KB")) {
             int value = Integer.parseInt(sizeStr.substring(0, sizeStr.length() - 2));
@@ -263,14 +264,17 @@ public class LoggerConfig {
         private int currentFileIndex = 0;
         private static final Logger handlerLogger = Logger.getLogger(RotatingFileHandler.class.getName());
         
-        public RotatingFileHandler(String baseFileName, long maxFileSize, int maxBackupFiles) throws IOException {
+        private RotatingFileHandler(String baseFileName, long maxFileSize, int maxBackupFiles) {
             this.baseFileName = baseFileName;
             this.baseFilePath = Paths.get(baseFileName);
             this.maxFileSize = maxFileSize;
             this.maxBackupFiles = maxBackupFiles;
-            
-            // Initialize with first file
-            rotateIfNeeded();
+        }
+
+        private static RotatingFileHandler create(String baseFileName, long maxFileSize, int maxBackupFiles) throws IOException {
+            RotatingFileHandler handler = new RotatingFileHandler(baseFileName, maxFileSize, maxBackupFiles);
+            handler.rotateIfNeeded();
+            return handler;
         }
         
         @Override

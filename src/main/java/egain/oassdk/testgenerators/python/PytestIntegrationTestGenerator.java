@@ -75,8 +75,7 @@ public class PytestIntegrationTestGenerator implements TestGenerator, Configurab
 
             if (pathItem == null) continue;
 
-            String[] methods = Constants.HTTP_METHODS;
-            for (String method : methods) {
+            for (String method : Constants.HTTP_METHODS) {
                 if (pathItem.containsKey(method)) {
                     Map<String, Object> operation = Util.asStringObjectMap(pathItem.get(method));
                     if (operation == null) continue;

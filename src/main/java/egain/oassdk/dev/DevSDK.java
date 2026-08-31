@@ -60,7 +60,9 @@ public class DevSDK {
             validator.validate(this.openApiSpec);
             metadata.extract(this.openApiSpec);
             return this;
-        } catch (Exception e) {
+        } catch (OASSDKException e) {
+            throw e;
+        } catch (RuntimeException e) {
             throw new OASSDKException("Failed to load OpenAPI specification: " + e.getMessage(), e);
         }
     }

@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.logging.Logger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Date;
@@ -269,12 +270,14 @@ public class MarkdownGenerator {
                         String html = renderer.render(document);
 
                         // Add HTML wrapper using StringBuilder to avoid String.format issues with % characters
+                        Path mdFileName = mdFile.getFileName();
+                        String pageTitle = mdFileName != null ? mdFileName.toString().replace(".md", "") : "doc";
                         String fullHtml = "<!DOCTYPE html>\n" +
                                 "<html lang=\"en\">\n" +
                                 "<head>\n" +
                                 "    <meta charset=\"UTF-8\">\n" +
                                 "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n" +
-                                "    <title>" + mdFile.getFileName().toString().replace(".md", "") + "</title>\n" +
+                                "    <title>" + pageTitle + "</title>\n" +
                                 "    <style>\n" +
                                 "        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }\n" +
                                 "        h1, h2, h3, h4, h5, h6 { color: #333; }\n" +

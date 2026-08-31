@@ -340,9 +340,8 @@ public class OASSDKCLI implements Callable<Integer> {
                 TestConfig testConfig = TestConfig.builder()
                         .playwrightTests(playwright)
                         .build();
-                SLAConfig slaConfig = null;
 
-                try (OASSDK sdk = new OASSDK(generatorConfig, testConfig, slaConfig)) {
+                try (OASSDK sdk = new OASSDK(generatorConfig, testConfig, null)) {
                     sdk.loadSpec(specPath);
 
                     sdk.generateAll(output);

@@ -58,8 +58,8 @@ public final class FlaskBlueprintGenerator {
         }
         content.append("\n");
 
-        content.append(blueprintName.toLowerCase()).append("_bp = Blueprint('")
-                .append(blueprintName.toLowerCase()).append("', __name__, url_prefix='")
+        content.append(blueprintName.toLowerCase(Locale.ROOT)).append("_bp = Blueprint('")
+                .append(blueprintName.toLowerCase(Locale.ROOT)).append("', __name__, url_prefix='")
                 .append(parentPath).append("')\n\n");
 
         for (PathOperation pathOp : operations) {
@@ -71,7 +71,7 @@ public final class FlaskBlueprintGenerator {
         }
 
         PythonNamingUtils.writeFile(
-                outputDir + "/" + packagePath + "/blueprints/" + blueprintName.toLowerCase() + ".py", content.toString());
+                outputDir + "/" + packagePath + "/blueprints/" + blueprintName.toLowerCase(Locale.ROOT) + ".py", content.toString());
     }
 
     /**
@@ -119,7 +119,7 @@ public final class FlaskBlueprintGenerator {
 
         SecurityInfo securityInfo = extractSecurityInfo(operation);
 
-        content.append("@").append(blueprintName.toLowerCase()).append("_bp.route('")
+        content.append("@").append(blueprintName.toLowerCase(Locale.ROOT)).append("_bp.route('")
                 .append(flaskPath).append("', methods=['").append(method.toUpperCase(Locale.ROOT)).append("'])\n");
 
         if (securityInfo != null && securityInfo.hasRequirements) {

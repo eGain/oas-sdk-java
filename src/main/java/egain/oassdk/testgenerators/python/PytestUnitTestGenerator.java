@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.Locale;
 
 /**
  * Python pytest unit test generator
@@ -70,8 +71,7 @@ public class PytestUnitTestGenerator implements TestGenerator, ConfigurableTestG
 
             if (pathItem == null) continue;
 
-            String[] methods = Constants.HTTP_METHODS;
-            for (String method : methods) {
+            for (String method : Constants.HTTP_METHODS) {
                 if (pathItem.containsKey(method)) {
                     Map<String, Object> operation = Util.asStringObjectMap(pathItem.get(method));
                     if (operation == null) continue;
@@ -138,7 +138,7 @@ public class PytestUnitTestGenerator implements TestGenerator, ConfigurableTestG
         Map<String, Object> operation = opInfo.operation;
         String operationId = (String) operation.get("operationId");
         String summary = (String) operation.get("summary");
-        String method = opInfo.method.toLowerCase();
+        String method = opInfo.method.toLowerCase(Locale.ROOT);
         String path = opInfo.path;
 
         // Get operation name for test method
@@ -158,7 +158,7 @@ public class PytestUnitTestGenerator implements TestGenerator, ConfigurableTestG
 
         // Test: Valid request
         sb.append("    def test_").append(testMethodName).append("_valid_request(self):\n");
-        sb.append("        \"\"\"Test ").append(summary != null ? summary : method.toUpperCase() + " " + path).append(" - Valid Request\"\"\"\n");
+        sb.append("        \"\"\"Test ").append(summary != null ? summary : method.toUpperCase(Locale.ROOT) + " " + path).append(" - Valid Request\"\"\"\n");
         sb.append("        # Arrange\n");
         sb.append("        # Note: This is a unit test template. Replace with actual implementation:\n");
         sb.append("        # 1. Mock the HTTP client or service layer\n");
@@ -210,7 +210,7 @@ public class PytestUnitTestGenerator implements TestGenerator, ConfigurableTestG
 
             if (required && "query".equals(paramIn)) {
                 sb.append("    def test_").append(testMethodName).append("_missing_").append(toSnakeCase(paramName)).append("(self):\n");
-                sb.append("        \"\"\"Test ").append(summary != null ? summary : method.toUpperCase() + " " + path)
+                sb.append("        \"\"\"Test ").append(summary != null ? summary : method.toUpperCase(Locale.ROOT) + " " + path)
                         .append(" - Missing Required Parameter: ").append(paramName).append("\"\"\"\n");
                 sb.append("        # Arrange - Missing required parameter: ").append(paramName).append("\n");
                 sb.append("        # Act & Assert\n");
@@ -229,7 +229,7 @@ public class PytestUnitTestGenerator implements TestGenerator, ConfigurableTestG
                 if ("string".equals(type) && schema.containsKey("pattern")) {
                     sb.append("    @pytest.mark.parametrize('invalid_value', ['invalid', 'test123', ''])\n");
                     sb.append("    def test_").append(testMethodName).append("_invalid_").append(toSnakeCase(paramName)).append("_format(self, invalid_value):\n");
-                    sb.append("        \"\"\"Test ").append(summary != null ? summary : method.toUpperCase() + " " + path)
+                    sb.append("        \"\"\"Test ").append(summary != null ? summary : method.toUpperCase(Locale.ROOT) + " " + path)
                             .append(" - Invalid ").append(paramName).append(" Format\"\"\"\n");
                     sb.append("        # Arrange\n");
                     sb.append("        # Invalid ").append(paramName).append(" value\n");
@@ -245,7 +245,7 @@ public class PytestUnitTestGenerator implements TestGenerator, ConfigurableTestG
         for (String statusCode : responses.keySet()) {
             if (!"default".equals(statusCode)) {
                 sb.append("    def test_").append(testMethodName).append("_status_").append(statusCode).append("(self):\n");
-                sb.append("        \"\"\"Test ").append(summary != null ? summary : method.toUpperCase() + " " + path)
+                sb.append("        \"\"\"Test ").append(summary != null ? summary : method.toUpperCase(Locale.ROOT) + " " + path)
                         .append(" - Response Status ").append(statusCode).append("\"\"\"\n");
                 sb.append("        # Arrange\n");
                 sb.append("        # Setup request for ").append(statusCode).append(" response\n");

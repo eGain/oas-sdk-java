@@ -218,7 +218,10 @@ public class DocumentationGenerator {
             ProcessBuilder pb = new ProcessBuilder("chmod", "+x", Paths.get(outputDir, "build-docs.sh").toString());
             Process process = pb.start();
             process.waitFor(5, TimeUnit.SECONDS);
-        } catch (Exception e) {
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             // Ignore if chmod fails (e.g., on Windows)
         }
     }

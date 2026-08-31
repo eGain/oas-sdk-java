@@ -1,5 +1,7 @@
 package egain.oassdk.core;
 
+import java.util.List;
+
 /**
  * Shared constants used across the OAS SDK
  */
@@ -12,9 +14,9 @@ public final class Constants {
     /**
      * Standard HTTP methods supported by OpenAPI
      */
-    public static final String[] HTTP_METHODS = {
+    public static final List<String> HTTP_METHODS = List.of(
             "get", "post", "put", "delete", "patch", "head", "options", "trace"
-    };
+    );
 
     /**
      * Maximum recursion depth for schema resolution to prevent stack overflow

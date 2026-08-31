@@ -52,7 +52,7 @@ public class PlaywrightTestGenerator implements TestGenerator, ConfigurableTestG
 
             String apiTitle = TestSpecUtils.getApiTitle(spec);
             String baseUrl = TestSpecUtils.getBaseUrl(spec);
-            String apiSlug = toKebabCase(apiTitle != null ? apiTitle : "api");
+            String apiSlug = toKebabCase(apiTitle);
 
             writeScaffold(root, apiTitle, baseUrl);
             Map<String, List<OperationInfo>> byTag = collectOperationsByTag(spec);
@@ -101,7 +101,7 @@ public class PlaywrightTestGenerator implements TestGenerator, ConfigurableTestG
                         "# " + apiSlug + "\n\nNo paths found in OpenAPI specification.\n",
                         StandardCharsets.UTF_8);
             }
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             throw new GenerationException("Failed to generate Playwright tests: " + e.getMessage(), e);
         }
     }
@@ -749,7 +749,7 @@ public class PlaywrightTestGenerator implements TestGenerator, ConfigurableTestG
         }
         try {
             return MAPPER.readValue(raw, Object.class);
-        } catch (Exception e) {
+        } catch (IOException e) {
             return raw;
         }
     }

@@ -15,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Locale;
 
 /**
  * Generates FastAPI routers, route handlers, and security wiring from OpenAPI path operations.
@@ -66,7 +67,7 @@ public final class FastAPIRouteGenerator {
             List<PathOperation> operations = groupEntry.getValue();
             String fullParentPath = OpenApiPathUtils.buildFullPath(serverBasePath, parentPath);
             generateRouterForParentPath(fullParentPath, operations, outputDir, packagePath, packageName, serverBasePath);
-            routerModules.add(PythonNamingUtils.generateRouterName(fullParentPath).toLowerCase());
+            routerModules.add(PythonNamingUtils.generateRouterName(fullParentPath).toLowerCase(Locale.ROOT));
         }
 
         StringBuilder routersInit = new StringBuilder();
@@ -102,7 +103,7 @@ public final class FastAPIRouteGenerator {
         }
         content.append("\n");
 
-        content.append(routerName.toLowerCase()).append("_router = APIRouter(prefix=\"")
+        content.append(routerName.toLowerCase(Locale.ROOT)).append("_router = APIRouter(prefix=\"")
                 .append(parentPath).append("\")\n\n");
 
         for (PathOperation pathOp : operations) {
@@ -114,7 +115,7 @@ public final class FastAPIRouteGenerator {
         }
 
         PythonNamingUtils.writeFile(
-                outputDir + "/" + packagePath + "/routers/" + routerName.toLowerCase() + ".py", content.toString());
+                outputDir + "/" + packagePath + "/routers/" + routerName.toLowerCase(Locale.ROOT) + ".py", content.toString());
     }
 
     void generateRouteHandler(String method, Map<String, Object> operation, String relativePath,
@@ -176,8 +177,8 @@ public final class FastAPIRouteGenerator {
             parameterList.add("principal: dict = Depends(" + auth.dependsExpr() + ")");
         }
 
-        content.append("@").append(routerName.toLowerCase()).append("_router.")
-                .append(method.toLowerCase()).append("(").append(pathParam).append(")\n");
+        content.append("@").append(routerName.toLowerCase(Locale.ROOT)).append("_router.")
+                .append(method.toLowerCase(Locale.ROOT)).append("(").append(pathParam).append(")\n");
         content.append("async def ").append(functionName).append("(");
         if (!parameterList.isEmpty()) {
             content.append(String.join(", ", parameterList));
@@ -294,7 +295,7 @@ public final class FastAPIRouteGenerator {
     }
 
     private String getParameterAnnotation(String in, String name) {
-        return switch (in.toLowerCase()) {
+        return switch (in.toLowerCase(Locale.ROOT)) {
             case "path" -> "Path(..., alias=\"" + name + "\")";
             case "query" -> "Query(None, alias=\"" + name + "\")";
             case "header" -> "Header(None, alias=\"" + name + "\")";
