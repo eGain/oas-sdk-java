@@ -49,7 +49,8 @@ class JerseyModelGeneratorSiblingOneOfTest {
 
             assertTrue(content.contains("private String fileName"), "fileName must be a String field");
             assertTrue(content.contains("private String contentType"), "contentType must be a String field");
-            assertTrue(content.contains("private int size"), "size must be an int field");
+            assertTrue(content.contains("private Integer size"),
+                    "size must be an Integer field (modelsOnly boxes numerics)");
             assertTrue(content.contains("private String application"), "application must be a String field");
             assertTrue(content.contains("private Boolean isInline"), "isInline must be a Boolean field");
             assertFalse(content.contains("private Object application"),
