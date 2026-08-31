@@ -99,7 +99,7 @@ public class JerseyGenerator implements CodeGenerator, ConfigurableGenerator {
                 new JerseyObservabilityGenerator(ctx).generate();
             }
 
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             logger.log(java.util.logging.Level.SEVERE, "Failed to generate Jersey application: " + e.getMessage(), e);
             throw new GenerationException("Failed to generate Jersey application: " + e.getMessage(), e);
         } finally {

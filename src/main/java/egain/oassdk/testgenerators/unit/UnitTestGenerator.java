@@ -8,7 +8,6 @@ import egain.oassdk.testgenerators.common.TestCodegenSupport;
 import egain.oassdk.testgenerators.common.TestMavenSupport;
 import egain.oassdk.testgenerators.common.TestOutputLayout;
 import egain.oassdk.testgenerators.common.TestProfileSupport;
-import egain.oassdk.testgenerators.common.TestSpecUtils;
 import egain.oassdk.testgenerators.ConfigurableTestGenerator;
 import egain.oassdk.testgenerators.IntegrationScenarioSupport;
 import egain.oassdk.testgenerators.TestGenerator;
@@ -22,6 +21,8 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Unit test generator — emits JUnit 5 + RestAssured API tests from OpenAPI.
@@ -100,12 +101,11 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
             Files.createDirectories(Paths.get(packageDir));
 
             String testClassContent = generateTestClass(basePackage, className, tag, operations, spec);
-            Files.write(Paths.get(packageDir, className + ".java"), testClassContent.getBytes());
+            Files.write(Paths.get(packageDir, className + ".java"), testClassContent.getBytes(StandardCharsets.UTF_8));
         }
     }
 
     private String generateTestClass(String basePackage, String className, String tag, List<OperationInfo> operations, Map<String, Object> spec) {
-        String baseUrl = TestSpecUtils.getBaseUrl(spec);
         int concurrentThreads = resolveConcurrentThreads();
         boolean needsConcurrent = operations.stream().anyMatch(this::hasRequestBodyForConcurrency);
 
@@ -181,7 +181,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
     }
 
     private boolean hasRequestBodyForConcurrency(OperationInfo op) {
-        String m = op.method.toUpperCase();
+        String m = op.method.toUpperCase(Locale.ROOT);
         if (!("POST".equals(m) || "PUT".equals(m) || "PATCH".equals(m))) {
             return false;
         }
@@ -192,7 +192,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         Map<String, Object> operation = opInfo.operation;
         String operationId = (String) operation.get("operationId");
         String summary = (String) operation.get("summary");
-        String method = opInfo.method.toUpperCase();
+        String method = opInfo.method.toUpperCase(Locale.ROOT);
         String path = opInfo.path;
 
         String testMethodName = operationId != null
@@ -282,7 +282,8 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         } // end !smoke param negatives
 
         if (!smoke) {
-        for (String statusCode : responses.keySet()) {
+        for (Map.Entry<String, Object> statusEntry : responses.entrySet()) {
+            String statusCode = statusEntry.getKey();
             if ("default".equals(statusCode)) {
                 continue;
             }
@@ -562,9 +563,6 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
     private void appendWhenVerb(StringBuilder sb, String method, String pathTemplate) {
         String p = escapeJavaString(pathTemplate);
         switch (method) {
-            case "GET":
-                sb.append("            .get(\"").append(p).append("\")\n");
-                break;
             case "POST":
                 sb.append("            .post(\"").append(p).append("\")\n");
                 break;
@@ -644,9 +642,10 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
         if (paths == null) {
             return null;
         }
-        for (String p : paths.keySet()) {
+        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+            String p = pathEntry.getKey();
             if (p.matches(".*\\{[^}]+}.*") && p.startsWith(collectionPath.replaceAll("/$", ""))) {
-                Map<String, Object> pathItem = Util.asStringObjectMap(paths.get(p));
+                Map<String, Object> pathItem = Util.asStringObjectMap(pathEntry.getValue());
                 if (pathItem != null && pathItem.containsKey("get")) {
                     return p;
                 }
@@ -897,8 +896,8 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
     private void generateTestUtilities(String outputDir, String basePackage) throws IOException {
         String packageDir = TestOutputLayout.testJavaDir(outputDir, basePackage);
         Files.createDirectories(Paths.get(packageDir));
-        Files.write(Paths.get(packageDir, "TestUtils.java"), generateTestUtilsClass(basePackage).getBytes());
-        Files.write(Paths.get(packageDir, "UnitTestUtils.java"), generateUnitTestUtilsClass(basePackage).getBytes());
+        Files.write(Paths.get(packageDir, "TestUtils.java"), generateTestUtilsClass(basePackage).getBytes(StandardCharsets.UTF_8));
+        Files.write(Paths.get(packageDir, "UnitTestUtils.java"), generateUnitTestUtilsClass(basePackage).getBytes(StandardCharsets.UTF_8));
     }
 
     private String generateUnitTestUtilsClass(String basePackage) {
@@ -1041,7 +1040,7 @@ public class UnitTestGenerator implements TestGenerator, ConfigurableTestGenerat
                 + TestMavenSupport.junitDependency()
                 + TestMavenSupport.restAssuredDependencies()
                 + TestMavenSupport.buildSectionWithTestSupport();
-        Files.write(Paths.get(outputDir, "pom.xml"), pomContent.getBytes());
+        Files.write(Paths.get(outputDir, "pom.xml"), pomContent.getBytes(StandardCharsets.UTF_8));
     }
 
     private String generateTestUtilsClass(String basePackage) {

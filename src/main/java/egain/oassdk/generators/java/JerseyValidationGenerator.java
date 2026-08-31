@@ -903,7 +903,7 @@ class JerseyValidationGenerator {
                     private boolean isNumericFormat(String format)
                     {
                         if (format == null) return false;
-                        String f = format.toLowerCase();
+                        String f = format.toLowerCase(Locale.ROOT);
                         return "int32".equals(f) || "int64".equals(f) || "float".equals(f) || "double".equals(f);
                     }
 
@@ -912,7 +912,7 @@ class JerseyValidationGenerator {
                         if (input == null || input.isEmpty()) return true;
                         try
                         {
-                            switch (format.toLowerCase())
+                            switch (format.toLowerCase(Locale.ROOT))
                             {
                                 case "int32" ->
                                 {

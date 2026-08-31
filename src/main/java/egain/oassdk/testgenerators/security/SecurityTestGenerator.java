@@ -17,6 +17,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Security test generator
@@ -73,7 +75,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
         // Generate security test class
         String className = "SecurityTest";
         String testClassContent = generateSecurityTestClass(basePackage, className, spec, baseUrl);
-        Files.write(Paths.get(packageDir, className + ".java"), testClassContent.getBytes());
+        Files.write(Paths.get(packageDir, className + ".java"), testClassContent.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -195,8 +197,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                 Map<String, Object> pathItem = Util.asStringObjectMap(pathEntry.getValue());
                 if (pathItem == null) continue;
 
-                String[] methods = Constants.HTTP_METHODS;
-                for (String method : methods) {
+                for (String method : Constants.HTTP_METHODS) {
                     if (pathItem.containsKey(method)) {
                         Map<String, Object> operation = Util.asStringObjectMap(pathItem.get(method));
                         if (operation != null && operation.containsKey("security")) {
@@ -204,7 +205,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                             String summary = (String) operation.get("summary");
 
                             sb.append("    @Test\n");
-                            sb.append("    @DisplayName(\"Authentication: ").append(summary != null ? summary : method.toUpperCase() + " " + path)
+                            sb.append("    @DisplayName(\"Authentication: ").append(summary != null ? summary : method.toUpperCase(Locale.ROOT) + " " + path)
                                     .append(" - Missing Token\")\n");
                             sb.append("    void testAuthentication_MissingToken_").append(sanitizePath(path)).append("_").append(method).append("() throws Exception {\n");
                             if ("delete".equals(method)) {
@@ -215,7 +216,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                             sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
                             sb.append("            .uri(uri)\n");
                             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
-                            sb.append("            .").append(method.toUpperCase()).append("()\n");
+                            sb.append("            .").append(method.toUpperCase(Locale.ROOT)).append("()\n");
                             sb.append("            .header(\"Accept\", \"application/json\")\n");
                             sb.append("            // Intentionally omitting Authorization header\n");
                             sb.append("            .build();\n\n");
@@ -227,7 +228,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                             sb.append("    }\n\n");
 
                             sb.append("    @Test\n");
-                            sb.append("    @DisplayName(\"Authentication: ").append(summary != null ? summary : method.toUpperCase() + " " + path)
+                            sb.append("    @DisplayName(\"Authentication: ").append(summary != null ? summary : method.toUpperCase(Locale.ROOT) + " " + path)
                                     .append(" - Invalid Token\")\n");
                             sb.append("    void testAuthentication_InvalidToken_").append(sanitizePath(path)).append("_").append(method).append("() throws Exception {\n");
                             sb.append("        // Arrange - Request with invalid token\n");
@@ -235,7 +236,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                             sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
                             sb.append("            .uri(uri)\n");
                             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
-                            sb.append("            .").append(method.toUpperCase()).append("()\n");
+                            sb.append("            .").append(method.toUpperCase(Locale.ROOT)).append("()\n");
                             sb.append("            .header(\"Accept\", \"application/json\")\n");
                             sb.append("            .header(\"Authorization\", \"Bearer invalid-token-12345\")\n");
                             sb.append("            .build();\n\n");
@@ -248,7 +249,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
 
                             // CBD-8481: client-app tokens must not be treated as user tokens for secured APIs
                             sb.append("    @Test\n");
-                            sb.append("    @DisplayName(\"Authentication: ").append(summary != null ? summary : method.toUpperCase() + " " + path)
+                            sb.append("    @DisplayName(\"Authentication: ").append(summary != null ? summary : method.toUpperCase(Locale.ROOT) + " " + path)
                                     .append(" - Client App Token\")\n");
                             sb.append("    void testAuthentication_ClientAppToken_").append(sanitizePath(path)).append("_").append(method).append("() throws Exception {\n");
                             sb.append("        // Arrange - Client-application token (not a user token); expect 401/403\n");
@@ -256,7 +257,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                             sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
                             sb.append("            .uri(uri)\n");
                             sb.append("            .timeout(REQUEST_TIMEOUT)\n");
-                            sb.append("            .").append(method.toUpperCase()).append("()\n");
+                            sb.append("            .").append(method.toUpperCase(Locale.ROOT)).append("()\n");
                             sb.append("            .header(\"Accept\", \"application/json\")\n");
                             sb.append("            .header(\"Authorization\", \"Bearer <TOKEN_CLIENT_APP>\")\n");
                             sb.append("            .build();\n\n");
@@ -281,13 +282,6 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
     private void generateAuthorizationTests(StringBuilder sb, Map<String, Object> spec) {
         sb.append("    // ========== Authorization Tests ==========\n\n");
 
-        // Extract security schemes from components
-        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
-        Map<String, Object> securitySchemes = null;
-        if (components != null) {
-            securitySchemes = Util.asStringObjectMap(components.get("securitySchemes"));
-        }
-
         Map<String, Object> paths = Util.asStringObjectMap(spec.get("paths"));
         if (paths == null || paths.isEmpty()) {
             return;
@@ -309,9 +303,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                 if (securityRequirements == null) continue;
 
                 for (Map<String, Object> requirement : securityRequirements) {
-                    for (Map.Entry<String, Object> schemeEntry : requirement.entrySet()) {
-                        String schemeName = schemeEntry.getKey();
-                        Object scopesObj = schemeEntry.getValue();
+                    for (Object scopesObj : requirement.values()) {
                         if (!(scopesObj instanceof List)) continue;
 
                         @SuppressWarnings("unchecked")
@@ -323,7 +315,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
 
                         // Test: correct scope should succeed (200)
                         sb.append("    @Test\n");
-                        sb.append("    @DisplayName(\"Authorization: ").append(method.toUpperCase()).append(" ").append(path)
+                        sb.append("    @DisplayName(\"Authorization: ").append(method.toUpperCase(Locale.ROOT)).append(" ").append(path)
                                 .append(" - Correct Scope (").append(scopeList).append(")\")\n");
                         sb.append("    void testAuthorization_CorrectScope_").append(safePath).append("_").append(method).append("() throws Exception {\n");
                         sb.append("        // Arrange - Request with a token bearing the required scopes: ").append(scopeList).append("\n");
@@ -331,7 +323,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
                         sb.append("            .uri(uri)\n");
                         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
-                        sb.append("            .").append(method.toUpperCase()).append("()\n");
+                        sb.append("            .").append(method.toUpperCase(Locale.ROOT)).append("()\n");
                         sb.append("            .header(\"Accept\", \"application/json\")\n");
                         sb.append("            .header(\"Authorization\", \"Bearer <TOKEN_WITH_SCOPES: ").append(scopeList).append(">\")\n");
                         sb.append("            .build();\n\n");
@@ -344,7 +336,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
 
                         // Test: insufficient scope should be forbidden (403)
                         sb.append("    @Test\n");
-                        sb.append("    @DisplayName(\"Authorization: ").append(method.toUpperCase()).append(" ").append(path)
+                        sb.append("    @DisplayName(\"Authorization: ").append(method.toUpperCase(Locale.ROOT)).append(" ").append(path)
                                 .append(" - Insufficient Scope\")\n");
                         sb.append("    void testAuthorization_InsufficientScope_").append(safePath).append("_").append(method).append("() throws Exception {\n");
                         sb.append("        // Arrange - Request with a token that does NOT have the required scopes\n");
@@ -352,7 +344,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
                         sb.append("            .uri(uri)\n");
                         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
-                        sb.append("            .").append(method.toUpperCase()).append("()\n");
+                        sb.append("            .").append(method.toUpperCase(Locale.ROOT)).append("()\n");
                         sb.append("            .header(\"Accept\", \"application/json\")\n");
                         sb.append("            .header(\"Authorization\", \"Bearer <TOKEN_WITHOUT_REQUIRED_SCOPES>\")\n");
                         sb.append("            .build();\n\n");
@@ -365,7 +357,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
 
                         // Test: different role accessing unauthorized endpoint (403)
                         sb.append("    @Test\n");
-                        sb.append("    @DisplayName(\"Authorization: ").append(method.toUpperCase()).append(" ").append(path)
+                        sb.append("    @DisplayName(\"Authorization: ").append(method.toUpperCase(Locale.ROOT)).append(" ").append(path)
                                 .append(" - Wrong Role\")\n");
                         sb.append("    void testAuthorization_WrongRole_").append(safePath).append("_").append(method).append("() throws Exception {\n");
                         sb.append("        // Arrange - Request with a valid token for a different role that lacks [").append(scopeList).append("]\n");
@@ -373,7 +365,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                         sb.append("        HttpRequest request = HttpRequest.newBuilder()\n");
                         sb.append("            .uri(uri)\n");
                         sb.append("            .timeout(REQUEST_TIMEOUT)\n");
-                        sb.append("            .").append(method.toUpperCase()).append("()\n");
+                        sb.append("            .").append(method.toUpperCase(Locale.ROOT)).append("()\n");
                         sb.append("            .header(\"Accept\", \"application/json\")\n");
                         sb.append("            .header(\"Authorization\", \"Bearer <TOKEN_WRONG_ROLE>\")\n");
                         sb.append("            .build();\n\n");
@@ -381,7 +373,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                         sb.append("        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());\n\n");
                         sb.append("        // Assert - Wrong role should be forbidden\n");
                         sb.append("        assertEquals(403, response.statusCode(),\n");
-                        sb.append("            \"Expected 403 Forbidden for wrong-role token accessing [").append(method.toUpperCase()).append(" ").append(path).append("], got \" + response.statusCode());\n");
+                        sb.append("            \"Expected 403 Forbidden for wrong-role token accessing [").append(method.toUpperCase(Locale.ROOT)).append(" ").append(path).append("], got \" + response.statusCode());\n");
                         sb.append("    }\n\n");
                     }
                 }
@@ -642,7 +634,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
         String pom = TestMavenSupport.pomHeader("api-security-tests", basePackage)
                 + TestMavenSupport.junitDependency()
                 + TestMavenSupport.buildSectionWithTestSupport();
-        Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes());
+        Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes(StandardCharsets.UTF_8));
     }
 
     private void generateSecurityConfiguration(String outputDir, String baseUrl) throws IOException {
@@ -658,7 +650,7 @@ public class SecurityTestGenerator implements TestGenerator, ConfigurableTestGen
                 "test.xss=true\n" +
                 "test.path.traversal=true\n";
 
-        Files.write(Paths.get(outputDir, "security-config.properties"), configContent.getBytes());
+        Files.write(Paths.get(outputDir, "security-config.properties"), configContent.getBytes(StandardCharsets.UTF_8));
     }
 
     private String sanitizePath(String path) {

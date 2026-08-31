@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Performance test generator
@@ -72,7 +73,7 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
         // Generate performance test class
         String className = "PerformanceTest";
         String testClassContent = generatePerformanceTestClass(basePackage, className, spec, baseUrl);
-        Files.write(Paths.get(packageDir, className + ".java"), testClassContent.getBytes());
+        Files.write(Paths.get(packageDir, className + ".java"), testClassContent.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -407,7 +408,7 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
         String pom = TestMavenSupport.pomHeader("api-performance-tests", basePackage)
                 + TestMavenSupport.junitDependency()
                 + TestMavenSupport.buildSectionWithTestSupport();
-        Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes());
+        Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes(StandardCharsets.UTF_8));
     }
 
     private void generatePerformanceConfiguration(String outputDir, String baseUrl) throws IOException {
@@ -421,7 +422,7 @@ public class PerformanceTestGenerator implements TestGenerator, ConfigurableTest
                 "stress.test.users=100\n" +
                 "timeout.seconds=30\n";
 
-        Files.write(Paths.get(outputDir, "performance-config.properties"), configContent.getBytes());
+        Files.write(Paths.get(outputDir, "performance-config.properties"), configContent.getBytes(StandardCharsets.UTF_8));
     }
 
     @Override

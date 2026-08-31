@@ -14,6 +14,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 /**
  * SLA processor for generating API Gateway scripts and SLA enforcement
@@ -132,7 +133,7 @@ public class SLAProcessor {
             if (pathItem != null) {
                 for (String method : Constants.HTTP_METHODS) {
                     if (pathItem.containsKey(method)) {
-                        methods.add(method.toUpperCase());
+                        methods.add(method.toUpperCase(Locale.ROOT));
                     }
                 }
             }
@@ -984,16 +985,6 @@ public class SLAProcessor {
                     }
                 }
                 """;
-    }
-
-    /**
-     * Helper methods
-     */
-    private String getAPITitle(Map<String, Object> spec) {
-        Map<String, Object> info = null;
-        if (spec != null)
-            info = Util.asStringObjectMap(spec.get("info"));
-        return info != null ? (String) info.get("title") : "API";
     }
 
     /**

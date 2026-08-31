@@ -147,7 +147,7 @@ public class OASParser {
                     return Util.asStringObjectMap(yamlMapper.readValue(content, Map.class));
                 }
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw new OASSDKException("Failed to parse specification file: " + filePath, e);
         }
     }
@@ -437,7 +437,7 @@ public class OASParser {
                                 String schemaName = null;
                                 String fragment = ref.substring(ref.indexOf("#/components/schemas/") + "#/components/schemas/".length());
                                 schemaName = fragment.contains("/") ? fragment.substring(fragment.lastIndexOf("/") + 1) : fragment;
-                                if (schemaName == null || schemaName.isEmpty()) {
+                                if (schemaName.isEmpty()) {
                                     schemaName = deriveSchemaNameFromRef(ref);
                                 }
                                 if (schemaName != null && !schemaName.isEmpty()) {
@@ -955,6 +955,9 @@ public class OASParser {
         if (ref == null || ref.isEmpty()) {
             throw new OASSDKException("Empty $ref reference");
         }
+        if (loadedFiles == null) {
+            throw new OASSDKException("loadedFiles cannot be null");
+        }
 
         // Check if it's an external file reference
         if (ref.contains("#")) {
@@ -966,7 +969,7 @@ public class OASParser {
                 // External file reference - resolve path (ZIP: resolve ".." and "./" relative to the file that contains the ref)
                 Path refPath = null;
                 boolean zipRelativeRef = (filePath.contains("../") || filePath.contains("..\\") || filePath.startsWith("./"));
-                if (zipFs != null && zipRelativeRef && loadedFiles != null) {
+                if (zipFs != null && zipRelativeRef) {
                     // Try containing file's directory first, then baseDir, then every loaded file's directory
                     List<String> basesToTry = new ArrayList<>();
                     String fromKey = baseDirFromFileKey(currentFileKey);
@@ -1079,7 +1082,7 @@ public class OASParser {
                 // External file reference without JSON path - return the whole file
                 Path refPath = null;
                 boolean zipRelativeRef = (ref.contains("../") || ref.contains("..\\") || ref.startsWith("./"));
-                if (zipFs != null && zipRelativeRef && loadedFiles != null) {
+                if (zipFs != null && zipRelativeRef) {
                     // Try containing file's directory first, then baseDir, then every loaded file's directory
                     // (refs can appear in content merged from another file, so currentFileKey may be the main spec)
                     List<String> basesToTry = new ArrayList<>();
@@ -1192,11 +1195,16 @@ public class OASParser {
         if (basePath == null && currentFileKey != null) basePath = Paths.get(currentFileKey).getParent();
         if (basePath != null && basePath.getNameCount() >= 3) {
             // Build relative path so PathResolver tries search paths: knowledge/models/portalmgr/v4/KnowledgeCommonObjects.yaml
-            Path domainParent = basePath.getParent().getParent();
-            String relativePath = domainParent.getFileName() + "/models/" + basePath.getParent().getFileName() + "/" + basePath.getFileName() + "/KnowledgeCommonObjects.yaml";
+            Path modelsDir = basePath.getParent();
+            Path domainParent = modelsDir != null ? modelsDir.getParent() : null;
+            if (domainParent != null && modelsDir != null
+                    && domainParent.getFileName() != null
+                    && modelsDir.getFileName() != null
+                    && basePath.getFileName() != null) {
+            String relativePath = domainParent.getFileName() + "/models/" + modelsDir.getFileName() + "/" + basePath.getFileName() + "/KnowledgeCommonObjects.yaml";
             try {
                 Path resolvedPath = pathResolver.resolveReference(relativePath, null);
-                if (resolvedPath != null && Files.exists(resolvedPath) && Files.isRegularFile(resolvedPath)) {
+                if (Files.exists(resolvedPath) && Files.isRegularFile(resolvedPath)) {
                     String fileKey = normalizePathKey(resolvedPath);
                     Map<String, Object> externalSpec = loadedFiles.get(fileKey);
                     if (externalSpec == null) {
@@ -1220,6 +1228,7 @@ public class OASParser {
                 }
             } catch (OASSDKException ignored) {
                 // convention file not found or invalid
+            }
             }
         }
 

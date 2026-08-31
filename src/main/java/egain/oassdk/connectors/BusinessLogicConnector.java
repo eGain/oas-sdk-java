@@ -349,7 +349,7 @@ public class BusinessLogicConnector {
      */
     @FunctionalInterface
     public interface BusinessLogicFunction {
-        Map<String, Object> execute(Map<String, Object> request) throws Exception;
+        Map<String, Object> execute(Map<String, Object> request) throws OASSDKException;
     }
 
     /**

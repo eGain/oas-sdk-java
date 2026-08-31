@@ -53,13 +53,11 @@ class JerseyModelGenerator {
 
     /** Holder for wrapper inner class to generate: outer property name, wrapper class name, inner property name, item type name. */
     static final class WrapperToGenerate {
-        final String fieldName;
         final String wrapperClassName;
         final String innerPropertyName;
         final String itemTypeName;
 
-        WrapperToGenerate(String fieldName, String wrapperClassName, String innerPropertyName, String itemTypeName) {
-            this.fieldName = fieldName;
+        WrapperToGenerate(String wrapperClassName, String innerPropertyName, String itemTypeName) {
             this.wrapperClassName = wrapperClassName;
             this.innerPropertyName = innerPropertyName;
             this.itemTypeName = itemTypeName;
@@ -279,7 +277,7 @@ class JerseyModelGenerator {
             if (JerseySchemaUtils.isObjectWithSingleArrayOfRef(fieldSchema, spec) && JerseySchemaUtils.getSchemaNameFromRef(fieldSchema) == null) {
                 JerseySchemaUtils.ObjectWithSingleArrayInfo info = JerseySchemaUtils.getObjectWithSingleArrayInfo(fieldSchema, spec);
                 if (info != null) {
-                    wrappersToGenerate.add(new WrapperToGenerate(fieldName, JerseySchemaUtils.getWrapperClassName(fieldName), info.innerPropertyName, info.itemTypeName));
+                    wrappersToGenerate.add(new WrapperToGenerate(JerseySchemaUtils.getWrapperClassName(fieldName), info.innerPropertyName, info.itemTypeName));
                     typeUtils.addModelImportTypes("List<" + info.itemTypeName + ">", schemaName, modelImports);
                 }
             } else {

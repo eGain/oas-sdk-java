@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
+import java.util.Locale;
 
 /**
  * Flask code generator — thin orchestrator delegating to specialised sub-generators.
@@ -126,8 +127,8 @@ public class FlaskGenerator implements CodeGenerator, ConfigurableGenerator {
                 String parentPath = OpenApiPathUtils.extractParentPath(path);
                 if (parentPaths.add(parentPath)) {
                     String blueprintName = PythonNamingUtils.generateBlueprintName(parentPath);
-                    content.append("from ").append(pkg).append(".blueprints.").append(blueprintName.toLowerCase())
-                            .append(" import ").append(blueprintName.toLowerCase()).append("_bp\n");
+                    content.append("from ").append(pkg).append(".blueprints.").append(blueprintName.toLowerCase(Locale.ROOT))
+                            .append(" import ").append(blueprintName.toLowerCase(Locale.ROOT)).append("_bp\n");
                 }
             }
         }
@@ -170,7 +171,7 @@ public class FlaskGenerator implements CodeGenerator, ConfigurableGenerator {
                 String parentPath = OpenApiPathUtils.extractParentPath(path);
                 if (parentPaths.add(parentPath)) {
                     String blueprintName = PythonNamingUtils.generateBlueprintName(parentPath);
-                    content.append("    app.register_blueprint(").append(blueprintName.toLowerCase())
+                    content.append("    app.register_blueprint(").append(blueprintName.toLowerCase(Locale.ROOT))
                             .append("_bp, url_prefix='").append(parentPath).append("')\n");
                 }
             }

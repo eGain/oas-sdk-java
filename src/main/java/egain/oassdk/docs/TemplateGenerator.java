@@ -46,7 +46,7 @@ public class TemplateGenerator {
             String content = processTemplate("test-documentation.ftl", dataModel);
             Files.write(Paths.get(outputDir, "TEST_DOCUMENTATION.md"), content.getBytes(StandardCharsets.UTF_8));
 
-        } catch (Exception e) {
+        } catch (IOException | TemplateException e) {
             throw new GenerationException("Failed to generate test documentation: " + e.getMessage(), e);
         }
     }
@@ -65,7 +65,7 @@ public class TemplateGenerator {
             String content = processTemplate("project-documentation.ftl", dataModel);
             Files.write(Paths.get(outputDir, "PROJECT_DOCUMENTATION.md"), content.getBytes(StandardCharsets.UTF_8));
 
-        } catch (Exception e) {
+        } catch (IOException | TemplateException e) {
             throw new GenerationException("Failed to generate project documentation: " + e.getMessage(), e);
         }
     }

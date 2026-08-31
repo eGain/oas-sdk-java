@@ -41,7 +41,7 @@ import java.util.Set;
  * When constructed with {@link GeneratorConfig#getSpecZipPath() specZipPath}, specs are
  * read from the ZIP and {@link #close()} should be called when done to release the ZIP filesystem.
  */
-public class OASSDK implements AutoCloseable {
+public final class OASSDK implements AutoCloseable {
 
     private static final Logger logger = LoggerConfig.getLogger(OASSDK.class);
 
@@ -72,7 +72,19 @@ public class OASSDK implements AutoCloseable {
      * Default constructor
      */
     public OASSDK() {
-        this(null, null, null);
+        LoggerConfig.initialize();
+        ParserComponents components = createParserComponents(null);
+        this.generatorConfig = null;
+        this.testConfig = null;
+        this.slaConfig = null;
+        this.parser = components.parser();
+        this.zipFileSystem = components.zipFileSystem();
+        this.validator = new OASValidator();
+        this.metadata = new OASMetadata();
+        this.generatorFactory = new GeneratorFactory();
+        this.testGeneratorFactory = new TestGeneratorFactory();
+        this.slaProcessor = new SLAProcessor();
+        this.docGenerator = new DocumentationGenerator();
     }
 
     /**
@@ -83,16 +95,27 @@ public class OASSDK implements AutoCloseable {
      * @param slaConfig       Configuration for SLA integration
      */
     public OASSDK(GeneratorConfig generatorConfig, TestConfig testConfig, SLAConfig slaConfig) {
-        // Initialize logging
         LoggerConfig.initialize();
-        
+        ParserComponents components = createParserComponents(generatorConfig);
+
         // Store config references - EI_EXPOSE_REP2 is acceptable here as configs
         // are designed to be passed by reference for efficient configuration sharing
         this.generatorConfig = generatorConfig;
         this.testConfig = testConfig;
         this.slaConfig = slaConfig;
+        this.parser = components.parser();
+        this.zipFileSystem = components.zipFileSystem();
+        this.validator = new OASValidator();
+        this.metadata = new OASMetadata();
+        this.generatorFactory = new GeneratorFactory();
+        this.testGeneratorFactory = new TestGeneratorFactory();
+        this.slaProcessor = new SLAProcessor();
+        this.docGenerator = new DocumentationGenerator();
+    }
 
-        // Initialize components: ZIP-based or filesystem-based
+    private record ParserComponents(OASParser parser, java.nio.file.FileSystem zipFileSystem) {}
+
+    private static ParserComponents createParserComponents(GeneratorConfig generatorConfig) {
         java.nio.file.FileSystem zipFs = null;
         if (generatorConfig != null && generatorConfig.getSpecZipPath() != null) {
             try {
@@ -105,22 +128,17 @@ public class OASSDK implements AutoCloseable {
                 throw new IllegalStateException("Failed to open spec ZIP: " + generatorConfig.getSpecZipPath(), e);
             }
         }
-        this.zipFileSystem = zipFs;
+        OASParser parserInstance;
         if (zipFs != null) {
-            this.parser = new OASParser(null, zipFs, "/");
+            parserInstance = new OASParser(null, zipFs, "/");
         } else {
             List<String> searchPaths = null;
             if (generatorConfig != null && generatorConfig.getSearchPaths() != null) {
                 searchPaths = generatorConfig.getSearchPaths();
             }
-            this.parser = new OASParser(searchPaths);
+            parserInstance = new OASParser(searchPaths);
         }
-        this.validator = new OASValidator();
-        this.metadata = new OASMetadata();
-        this.generatorFactory = new GeneratorFactory();
-        this.testGeneratorFactory = new TestGeneratorFactory();
-        this.slaProcessor = new SLAProcessor();
-        this.docGenerator = new DocumentationGenerator();
+        return new ParserComponents(parserInstance, zipFs);
     }
 
     /**
@@ -236,8 +254,7 @@ public class OASSDK implements AutoCloseable {
                 Map<String, Object> filteredPathItem = new LinkedHashMap<>();
 
                 // Copy allowed operations
-                String[] methods = Constants.HTTP_METHODS;
-                for (String method : methods) {
+                for (String method : Constants.HTTP_METHODS) {
                     String upperMethod = method.toUpperCase(Locale.ROOT);
                     if (allowedMethods.contains(upperMethod) && pathItem.containsKey(method)) {
                         filteredPathItem.put(method, pathItem.get(method));

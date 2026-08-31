@@ -827,7 +827,7 @@ public final class JerseySchemaCollector {
             }
 
             // Check items (for arrays)
-            if (schema.containsKey("items") && depth < 10) {
+            if (schema.containsKey("items")) {
                 collectSchemasFromSchemaObject(schema.get("items"), referencedSchemas, spec, visited, depth + 1);
             }
         }

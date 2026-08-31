@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.Locale;
 
 /**
  * Postman collection generator.
@@ -99,9 +100,9 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         String apiDescription = getAPIDescription(spec);
 
         // Ensure all values are non-null for Map.of()
-        String safeTitle = apiTitle != null ? apiTitle : "API";
-        String safeVersion = apiVersion != null ? apiVersion : "1.0.0";
-        String safeDescription = apiDescription != null ? apiDescription : "Generated API";
+        String safeTitle = apiTitle;
+        String safeVersion = apiVersion;
+        String safeDescription = apiDescription;
 
         Map<String, Object> collection = new HashMap<>();
         Map<String, Object> info = new HashMap<>();
@@ -186,8 +187,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
                                                                         Map<String, Object> spec) {
         Map<String, List<Map<String, Object>>> taggedOperations = new HashMap<>();
 
-        String[] methods = Constants.HTTP_METHODS;
-        for (String method : methods) {
+        for (String method : Constants.HTTP_METHODS) {
             if (pathItem.containsKey(method)) {
                 Map<String, Object> operation = Util.asStringObjectMap(pathItem.get(method));
                 if (operation == null) {
@@ -236,7 +236,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
                                                      Map<String, Object> spec) {
         String operationId = (String) operation.get("operationId");
         String summary = (String) operation.get("summary");
-        String opName = summary != null ? summary : operationId != null ? operationId : method.toUpperCase() + " " + path;
+        String opName = summary != null ? summary : operationId != null ? operationId : method.toUpperCase(Locale.ROOT) + " " + path;
 
         Map<String, Object> folder = new HashMap<>();
         folder.put("name", opName);
@@ -275,7 +275,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         item.put("name", "Happy path");
 
         Map<String, Object> requestMap = new HashMap<>();
-        requestMap.put("method", method.toUpperCase());
+        requestMap.put("method", method.toUpperCase(Locale.ROOT));
         requestMap.put("header", generateHeaders(operation));
         requestMap.put("url", buildHappyPathUrl(path, operation));
         requestMap.put("body", generateBody(operation, spec));
@@ -304,7 +304,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         }
 
         Map<String, Object> requestMap = new HashMap<>();
-        requestMap.put("method", method.toUpperCase());
+        requestMap.put("method", method.toUpperCase(Locale.ROOT));
         requestMap.put("header", applyHeaderOverrides(generateHeaders(operation), nc.headerOverrides));
         requestMap.put("url", PostmanParameterSupport.buildUrlObject(path, resolvedPath, nc.queryEntries));
         requestMap.put("body", generateBody(operation, spec));
@@ -609,17 +609,6 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
         List<Map<String, Object>> variables = new ArrayList<>();
         Map<String, String> paramDefaults = collectParameterVariableDefaults(spec);
 
-        String baseUrl = "http://localhost:8080";
-        if (spec.containsKey("servers")) {
-            List<Map<String, Object>> servers = Util.asStringObjectMapList(spec.get("servers"));
-            if (servers != null && !servers.isEmpty()) {
-                Map<String, Object> firstServer = servers.get(0);
-                if (firstServer != null && firstServer.get("url") != null) {
-                    baseUrl = String.valueOf(firstServer.get("url"));
-                }
-            }
-        }
-
         variables.add(variableEntry("base_url", ""));
         variables.add(variableEntry("auth_token", ""));
         variables.add(variableEntry("departmentId", ""));
@@ -691,7 +680,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
      */
     private void generateEnvironmentFile(Map<String, Object> spec, String outputDir) throws IOException {
         String apiTitle = TestSpecUtils.getApiTitle(spec);
-        String safeTitle = apiTitle != null ? apiTitle : "API";
+        String safeTitle = apiTitle;
 
         Map<String, Object> environment = new HashMap<>();
         environment.put("id", UUID.randomUUID().toString());
@@ -708,7 +697,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
      */
     private void generateTestScripts(Map<String, Object> spec, String outputDir) throws IOException {
         String apiTitle = TestSpecUtils.getApiTitle(spec);
-        String safeTitle = apiTitle != null ? apiTitle : "API";
+        String safeTitle = apiTitle;
 
         // Generate Newman test script
         String newmanScript = generateNewmanScript(safeTitle);
@@ -723,7 +712,7 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
      * Generate Newman test script
      */
     private String generateNewmanScript(String apiTitle) {
-        String safeTitle = apiTitle != null ? apiTitle : "API";
+        String safeTitle = apiTitle;
         String collectionFile = safeTitle.replaceAll("[^a-zA-Z0-9]", "-") + "-API.postman_collection.json";
         String environmentFile = safeTitle.replaceAll("[^a-zA-Z0-9]", "-") + "-Environment.postman_environment.json";
 
@@ -817,8 +806,8 @@ public class PostmanTestGenerator implements TestGenerator, ConfigurableTestGene
                         Map<String, Object> operation = Util.asStringObjectMap(pathItem.get(method));
                         String summary = (String) operation.get("summary");
 
-                        script.append("# ").append(summary != null ? summary : method.toUpperCase()).append(" ").append(path).append("\n");
-                        script.append("curl -X ").append(method.toUpperCase()).append(" \"$BASE_URL").append(path).append("\" \\\n");
+                        script.append("# ").append(summary != null ? summary : method.toUpperCase(Locale.ROOT)).append(" ").append(path).append("\n");
+                        script.append("curl -X ").append(method.toUpperCase(Locale.ROOT)).append(" \"$BASE_URL").append(path).append("\" \\\n");
                         script.append("  -H \"Content-Type: application/json\" \\\n");
                         script.append("  -H \"Accept: application/json\"\n\n");
                     }

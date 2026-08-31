@@ -49,7 +49,7 @@ public class SchemathesisTestRunner {
             generateDockerConfig(bundleDir.toString(), effectiveBase);
             generateCICDIntegration(bundleDir.toString(), effectiveBase);
 
-        } catch (Exception e) {
+        } catch (IOException | GenerationException e) {
             throw new GenerationException("Failed to execute Schemathesis tests: " + e.getMessage(), e);
         }
     }

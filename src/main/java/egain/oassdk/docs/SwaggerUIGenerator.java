@@ -249,7 +249,10 @@ public class SwaggerUIGenerator {
             ProcessBuilder pb = new ProcessBuilder("chmod", "+x", Paths.get(outputDir, "build-swagger-ui.sh").toString());
             Process process = pb.start();
             process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
-        } catch (Exception e) {
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             // Ignore if chmod fails (e.g., on Windows)
         }
 
@@ -403,7 +406,7 @@ public class SwaggerUIGenerator {
         }
 
         public String[] getSupportedSubmitMethodsArray() {
-            return supportedSubmitMethods != null ? supportedSubmitMethods.clone() : null;
+            return supportedSubmitMethods != null ? supportedSubmitMethods.clone() : new String[0];
         }
 
         public void setSupportedSubmitMethods(String[] supportedSubmitMethods) {

@@ -60,7 +60,7 @@ public final class PythonNamingUtils {
         for (int i = s.length() - 1; i >= 0 && s.charAt(i) == '\\'; i--) {
             count++;
         }
-        return (count % 2) == 1;
+        return (count & 1) != 0;
     }
 
     public static boolean isValidPyIdentifier(String s) {

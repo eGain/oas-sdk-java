@@ -259,8 +259,10 @@ public class PathResolver {
         // If path contains ../ and wasn't found, try extracting just the filename
         // This handles cases like ../../../models/v4/User.yaml where we want to find User.yaml in search paths
         if (sanitizedPath.contains("../") || sanitizedPath.contains("..\\")) {
-            String fileName = Paths.get(sanitizedPath).getFileName().toString();
-            if (fileName != null && !fileName.isEmpty()) {
+            Path namePath = Paths.get(sanitizedPath).getFileName();
+            if (namePath != null) {
+                String fileName = namePath.toString();
+                if (!fileName.isEmpty()) {
                 for (Path searchPath : searchPaths) {
                     Path candidatePath = searchPath.resolve(fileName).normalize();
                     if (Files.exists(candidatePath) && Files.isRegularFile(candidatePath)) {
@@ -274,6 +276,7 @@ public class PathResolver {
                         }
                     }
                 }
+                }
             }
         }
 
@@ -286,9 +289,12 @@ public class PathResolver {
                     Path foundPath = findFileRecursively(sanitizedPath, searchPath);
                     // If not found, try with just the filename (e.g. ./UserView.yaml -> UserView.yaml)
                     if (foundPath == null) {
-                        String fileName = Paths.get(sanitizedPath).getFileName().toString();
-                        if (fileName != null && !fileName.isEmpty() && !fileName.equals(sanitizedPath)) {
-                            foundPath = findFileRecursively(fileName, searchPath);
+                        Path namePath = Paths.get(sanitizedPath).getFileName();
+                        if (namePath != null) {
+                            String fileName = namePath.toString();
+                            if (!fileName.isEmpty() && !fileName.equals(sanitizedPath)) {
+                                foundPath = findFileRecursively(fileName, searchPath);
+                            }
                         }
                     }
                     if (foundPath != null) {

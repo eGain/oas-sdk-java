@@ -20,6 +20,8 @@ import java.util.*;
 import java.util.Base64;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
+import java.util.Locale;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Mock data generator
@@ -101,7 +103,7 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
                 }
 
                 String fileName = schemaName + "_" + i + ".json";
-                Files.write(Paths.get(outputDir, fileName), jsonContent.getBytes());
+                Files.write(Paths.get(outputDir, fileName), jsonContent.getBytes(StandardCharsets.UTF_8));
             }
         }
 
@@ -345,7 +347,7 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
                 case "password":
                     return faker.internet().password(8, 20, true, true, true);
                 case "byte":
-                    return Base64.getEncoder().encodeToString(faker.lorem().word().getBytes());
+                    return Base64.getEncoder().encodeToString(faker.lorem().word().getBytes(StandardCharsets.UTF_8));
                 case "binary":
                     return faker.lorem().characters(16, 32);
                 case "hostname":
@@ -358,7 +360,7 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
         }
 
         // Generate based on field name using Faker
-        String name = fieldName.toLowerCase();
+        String name = fieldName.toLowerCase(Locale.ROOT);
         if (name.contains("id") || name.contains("identifier")) {
             return String.valueOf(faker.number().numberBetween(1000, 99999));
         } else if (name.contains("name") || name.contains("title")) {
@@ -575,14 +577,6 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
         }
     }
 
-    private String generateRequestBodyJsonForWrite(Map<String, Object> operation, Map<String, Object> spec) {
-        String json = generateRequestBodyJson(operation, spec);
-        if (json == null || json.isBlank()) {
-            return "{}";
-        }
-        return bindMockRequestPlaceholders(json);
-    }
-
     private static String bindMockRequestPlaceholders(String json) {
         if (json == null || json.isBlank()) {
             return "{}";
@@ -613,7 +607,7 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
         }
 
         String jsonContent = convertToJson(sampleData, 0);
-        Files.write(Paths.get(outputDir, "sample-data.json"), jsonContent.getBytes());
+        Files.write(Paths.get(outputDir, "sample-data.json"), jsonContent.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -676,7 +670,7 @@ public class MockDataGenerator implements TestGenerator, ConfigurableTestGenerat
 
         String packageDir = outputDir + "/com/example/api";
         Files.createDirectories(Paths.get(packageDir));
-        Files.write(Paths.get(packageDir, "MockDataGenerator.java"), classContent.getBytes());
+        Files.write(Paths.get(packageDir, "MockDataGenerator.java"), classContent.getBytes(StandardCharsets.UTF_8));
     }
 
     /**

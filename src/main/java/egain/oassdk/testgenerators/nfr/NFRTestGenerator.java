@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Non-Functional Requirements (NFR) test generator.
@@ -73,7 +74,7 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
         // Generate comprehensive NFR test class
         String className = "NFRTest";
         String testClassContent = generateNFRTestClass(basePackage, className, spec, baseUrl);
-        Files.write(Paths.get(packageDir, className + ".java"), testClassContent.getBytes());
+        Files.write(Paths.get(packageDir, className + ".java"), testClassContent.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -307,7 +308,7 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
                 + TestMavenSupport.junitDependency()
                 + TestMavenSupport.restAssuredDependencies()
                 + TestMavenSupport.buildSectionWithTestSupport();
-        Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes());
+        Files.write(Paths.get(outputDir, "pom.xml"), pom.getBytes(StandardCharsets.UTF_8));
     }
 
     private void generateNFRConfiguration(String outputDir, String baseUrl) throws IOException {
@@ -320,7 +321,7 @@ public class NFRTestGenerator implements TestGenerator, ConfigurableTestGenerato
                 "max.error.rate=0.01\n" +
                 "timeout.seconds=30\n";
 
-        Files.write(Paths.get(outputDir, "nfr-config.properties"), configContent.getBytes());
+        Files.write(Paths.get(outputDir, "nfr-config.properties"), configContent.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String escapeJavaString(String s) {
