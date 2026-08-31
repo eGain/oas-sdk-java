@@ -928,15 +928,8 @@ class JerseyModelGenerator {
             if (envelopeProps != null && !envelopeProps.isEmpty()) {
                 JerseySchemaUtils.mergePropertiesIntoAll(allProperties, envelopeProps, spec);
             }
-        } else if (innerSchema.containsKey("oneOf") || innerSchema.containsKey("anyOf")) {
-            List<Map<String, Object>> schemasList = Util.asStringObjectMapList(
-                    innerSchema.containsKey("oneOf") ? innerSchema.get("oneOf") : innerSchema.get("anyOf"));
-            if (schemasList != null) {
-                for (Map<String, Object> subSchema : schemasList) {
-                    if (subSchema != null) JerseySchemaUtils.mergeSchemaProperties(subSchema, allProperties, allRequired, spec);
-                }
-            }
         } else {
+            // mergeSchemaProperties handles direct properties plus oneOf/anyOf siblings (e.g. AssetPreuploadInput)
             JerseySchemaUtils.mergeSchemaProperties(innerSchema, allProperties, allRequired, spec);
         }
         List<String> fieldNames = new ArrayList<>(allProperties.keySet());
