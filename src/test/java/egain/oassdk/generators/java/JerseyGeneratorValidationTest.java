@@ -272,6 +272,10 @@ public class JerseyGeneratorValidationTest {
             "Should have getPatternForFormat method");
         assertTrue(content.contains("import java.util.regex.Pattern;"),
             "Should import Pattern");
+        assertTrue(content.contains("import java.util.Locale;"),
+            "Should import Locale for ROOT-safe format comparisons");
+        assertTrue(content.contains("toLowerCase(Locale.ROOT)"),
+            "Should use Locale.ROOT for format string comparisons");
     }
 
     @Test
