@@ -808,6 +808,7 @@ class JerseyValidationGenerator {
 
                 import java.util.ArrayList;
                 import java.util.List;
+                import java.util.Locale;
                 import java.util.regex.Pattern;
 
                 import egain.framework.validation.ValidationError;
