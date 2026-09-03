@@ -3,6 +3,7 @@ package egain.oassdk.generators.java;
 import egain.oassdk.Util;
 import egain.oassdk.core.exceptions.OASSDKException;
 import egain.oassdk.core.parser.OASParser;
+import egain.oassdk.generators.common.OpenApiSchemaUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
@@ -92,6 +93,23 @@ class JerseySchemaUtilsMergeTest {
 
         assertEquals(List.of("article", "email", "task", "calltrack"), merged.get("enum"));
         assertEquals("string", merged.get("type"));
+    }
+
+    @Test
+    @DisplayName("mergePropertyDefinitionsForComposition keeps sibling property writable when oneOf overlays readOnly")
+    void mergePropertyDefinitions_siblingPropertyWinsOverOneOfReadOnly() {
+        Map<String, Object> base = new LinkedHashMap<>();
+        base.put("type", "boolean");
+
+        Map<String, Object> emailBranch = Map.of("readOnly", true);
+        Map<String, Object> taskBranch = Map.of("readOnly", true);
+
+        Map<String, Object> merged = OpenApiSchemaUtils.mergePropertyDefinitionsForComposition(
+                base, emailBranch, null, true);
+        merged = OpenApiSchemaUtils.mergePropertyDefinitionsForComposition(merged, taskBranch, null, true);
+
+        assertEquals("boolean", merged.get("type"));
+        assertFalse(JerseySchemaUtils.isSchemaFlagTrue(merged, "readOnly"));
     }
 
     @Test

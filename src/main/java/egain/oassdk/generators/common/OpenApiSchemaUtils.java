@@ -204,6 +204,13 @@ public final class OpenApiSchemaUtils {
     public static Map<String, Object> mergePropertyDefinitionsForComposition(Map<String, Object> earlier,
                                                                         Map<String, Object> later,
                                                                         Map<String, Object> spec) {
+        return mergePropertyDefinitionsForComposition(earlier, later, spec, false);
+    }
+
+    public static Map<String, Object> mergePropertyDefinitionsForComposition(Map<String, Object> earlier,
+                                                                        Map<String, Object> later,
+                                                                        Map<String, Object> spec,
+                                                                        boolean oneOfBranchOverlay) {
         if (later == null || later.isEmpty()) {
             return earlier != null ? new LinkedHashMap<>(earlier) : new LinkedHashMap<>();
         }
@@ -213,10 +220,10 @@ public final class OpenApiSchemaUtils {
         Map<String, Object> out;
         if (!definesOwnPropertyType(later) && definesOwnPropertyType(earlier)) {
             out = new LinkedHashMap<>(earlier);
-            applyPropertyOverlayOnBase(out, earlier, later, spec);
+            applyPropertyOverlayOnBase(out, earlier, later, spec, oneOfBranchOverlay);
         } else {
             out = new LinkedHashMap<>(later);
-            mergeEarlierIntoLaterPropertyBase(out, earlier, later, spec);
+            mergeEarlierIntoLaterPropertyBase(out, earlier, later, spec, oneOfBranchOverlay);
         }
         return out;
     }
@@ -282,7 +289,8 @@ public final class OpenApiSchemaUtils {
     private static void applyPropertyOverlayOnBase(Map<String, Object> out,
                                                    Map<String, Object> earlier,
                                                    Map<String, Object> later,
-                                                   Map<String, Object> spec) {
+                                                   Map<String, Object> spec,
+                                                   boolean oneOfBranchOverlay) {
         List<Map<String, Object>> earlierAllOf = Util.asStringObjectMapList(earlier.get("allOf"));
         List<Map<String, Object>> laterAllOf = Util.asStringObjectMapList(later.get("allOf"));
         if (earlierAllOf != null && !earlierAllOf.isEmpty()
@@ -306,12 +314,20 @@ public final class OpenApiSchemaUtils {
             }
         }
         if (later.containsKey("readOnly")) {
-            out.put("readOnly", later.get("readOnly"));
+            boolean skipVariantReadOnly = oneOfBranchOverlay && isVariantConstraintOnlyOverlay(later)
+                    && !Boolean.FALSE.equals(later.get("readOnly"));
+            if (!skipVariantReadOnly) {
+                out.put("readOnly", later.get("readOnly"));
+            }
         } else if (isSchemaFlagTrue(earlier, "readOnly")) {
             out.put("readOnly", true);
         }
         if (later.containsKey("writeOnly")) {
-            out.put("writeOnly", later.get("writeOnly"));
+            boolean skipVariantWriteOnly = oneOfBranchOverlay && isVariantConstraintOnlyOverlay(later)
+                    && !Boolean.FALSE.equals(later.get("writeOnly"));
+            if (!skipVariantWriteOnly) {
+                out.put("writeOnly", later.get("writeOnly"));
+            }
         } else if (isSchemaFlagTrue(earlier, "writeOnly")) {
             out.put("writeOnly", true);
         }
@@ -329,7 +345,7 @@ public final class OpenApiSchemaUtils {
             Map<String, Object> overlaySub = Util.asStringObjectMap(pe.getValue());
             Map<String, Object> baseSub = Util.asStringObjectMap(baseProps.get(pk));
             if (baseSub != null && overlaySub != null) {
-                baseProps.put(pk, mergePropertyDefinitionsForComposition(baseSub, overlaySub, spec));
+                baseProps.put(pk, mergePropertyDefinitionsForComposition(baseSub, overlaySub, spec, oneOfBranchOverlay));
             } else {
                 baseProps.put(pk, pe.getValue());
             }
@@ -340,7 +356,8 @@ public final class OpenApiSchemaUtils {
     private static void mergeEarlierIntoLaterPropertyBase(Map<String, Object> out,
                                                           Map<String, Object> earlier,
                                                           Map<String, Object> later,
-                                                          Map<String, Object> spec) {
+                                                          Map<String, Object> spec,
+                                                          boolean oneOfBranchOverlay) {
         List<Map<String, Object>> earlierAllOf = Util.asStringObjectMapList(earlier.get("allOf"));
         List<Map<String, Object>> laterAllOf = Util.asStringObjectMapList(later.get("allOf"));
         if (earlierAllOf != null && !earlierAllOf.isEmpty()
@@ -377,7 +394,7 @@ public final class OpenApiSchemaUtils {
                     Map<String, Object> eSub = Util.asStringObjectMap(pe.getValue());
                     Map<String, Object> lSub = Util.asStringObjectMap(mergedProps.get(pk));
                     if (eSub != null && lSub != null) {
-                        mergedProps.put(pk, mergePropertyDefinitionsForComposition(eSub, lSub, spec));
+                        mergedProps.put(pk, mergePropertyDefinitionsForComposition(eSub, lSub, spec, oneOfBranchOverlay));
                     }
                 }
             }
@@ -385,6 +402,33 @@ public final class OpenApiSchemaUtils {
         } else if (earlierProps != null && !earlierProps.isEmpty()) {
             out.put("properties", new LinkedHashMap<>(earlierProps));
         }
+    }
+
+    /**
+     * True when a {@code oneOf}/{@code anyOf} branch property overlay only marks variant constraints
+     * ({@code readOnly}, {@code writeOnly}, {@code enum}) on a field already defined in sibling
+     * {@code properties}. Those markers must not reshape the generated bean (e.g. filemgr
+     * {@code AssetPreuploadInput.isInline} stays writable for article).
+     */
+    static boolean isVariantConstraintOnlyOverlay(Map<String, Object> overlay) {
+        if (overlay == null || overlay.isEmpty()) {
+            return false;
+        }
+        if (definesOwnPropertyType(overlay) || isSemanticPropertyOverlay(overlay)) {
+            return false;
+        }
+        Map<String, Object> props = Util.asStringObjectMap(overlay.get("properties"));
+        if (props != null && !props.isEmpty()) {
+            return false;
+        }
+        for (String key : overlay.keySet()) {
+            if (!"readOnly".equals(key) && !"writeOnly".equals(key) && !"enum".equals(key)
+                    && !"description".equals(key)) {
+                return false;
+            }
+        }
+        return overlay.containsKey("readOnly") || overlay.containsKey("writeOnly")
+                || overlay.containsKey("enum");
     }
 
     /**
@@ -417,6 +461,13 @@ public final class OpenApiSchemaUtils {
     public static void mergePropertiesIntoAll(Map<String, Object> allProperties,
                                                Map<String, Object> properties,
                                                Map<String, Object> spec) {
+        mergePropertiesIntoAll(allProperties, properties, spec, false);
+    }
+
+    public static void mergePropertiesIntoAll(Map<String, Object> allProperties,
+                                               Map<String, Object> properties,
+                                               Map<String, Object> spec,
+                                               boolean oneOfBranchOverlay) {
         if (properties == null) {
             return;
         }
@@ -433,7 +484,8 @@ public final class OpenApiSchemaUtils {
             if (existing == null || incoming == null) {
                 allProperties.put(name, incomingObj);
             } else {
-                allProperties.put(name, mergePropertyDefinitionsForComposition(existing, incoming, spec));
+                allProperties.put(name,
+                        mergePropertyDefinitionsForComposition(existing, incoming, spec, oneOfBranchOverlay));
             }
         }
     }
@@ -461,6 +513,19 @@ public final class OpenApiSchemaUtils {
     public static void mergeSchemaProperties(Map<String, Object> schema, Map<String, Object> allProperties,
                                        List<String> allRequired, Map<String, Object> spec,
                                        Map<Object, Boolean> visited, int depth) {
+        mergeSchemaProperties(schema, allProperties, allRequired, spec, visited, depth, false);
+    }
+
+    /**
+     * Merge schema properties with cycle detection and depth limit to prevent StackOverflow.
+     *
+     * @param oneOfBranchOverlay when true, merges are from a {@code oneOf}/{@code anyOf} branch over
+     *                           sibling {@code properties} (variant constraint overlays must not reshape beans)
+     */
+    public static void mergeSchemaProperties(Map<String, Object> schema, Map<String, Object> allProperties,
+                                       List<String> allRequired, Map<String, Object> spec,
+                                       Map<Object, Boolean> visited, int depth,
+                                       boolean oneOfBranchOverlay) {
         if (schema == null) return;
         if (depth > MAX_MERGE_SCHEMA_DEPTH) {
             java.util.logging.Logger.getLogger(OpenApiSchemaUtils.class.getName())
@@ -482,7 +547,7 @@ public final class OpenApiSchemaUtils {
         if (schema.containsKey("properties")) {
             // Schema has properties - use them directly (even if $ref also exists)
             Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
-            mergePropertiesIntoAll(allProperties, properties, spec);
+            mergePropertiesIntoAll(allProperties, properties, spec, oneOfBranchOverlay);
             // Merge required fields
             if (schema.containsKey("required")) {
                 List<String> required = Util.asStringList(schema.get("required"));
@@ -542,7 +607,7 @@ public final class OpenApiSchemaUtils {
         // Merge direct properties (this handles schemas that were resolved and have properties)
         if (schema.containsKey("properties")) {
             Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
-            mergePropertiesIntoAll(allProperties, properties, spec);
+            mergePropertiesIntoAll(allProperties, properties, spec, oneOfBranchOverlay);
             // Merge required fields
             if (schema.containsKey("required")) {
                 List<String> required = Util.asStringList(schema.get("required"));
@@ -572,10 +637,12 @@ public final class OpenApiSchemaUtils {
         if (schema.containsKey("oneOf") || schema.containsKey("anyOf")) {
             List<Map<String, Object>> schemas = Util.asStringObjectMapList(
                     schema.containsKey("oneOf") ? schema.get("oneOf") : schema.get("anyOf"));
+            boolean siblingPropertiesOneOf = schema.containsKey("properties");
             if (schemas != null) {
                 for (Map<String, Object> subSchema : schemas) {
                     if (subSchema != null) {
-                        mergeSchemaProperties(subSchema, allProperties, allRequired, spec, visited, depth + 1);
+                        mergeSchemaProperties(subSchema, allProperties, allRequired, spec, visited, depth + 1,
+                                siblingPropertiesOneOf);
                     }
                 }
             }
@@ -585,7 +652,7 @@ public final class OpenApiSchemaUtils {
         // Merge direct properties
         if (schema.containsKey("properties")) {
             Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
-            mergePropertiesIntoAll(allProperties, properties, spec);
+            mergePropertiesIntoAll(allProperties, properties, spec, oneOfBranchOverlay);
         }
 
         // Merge required fields
