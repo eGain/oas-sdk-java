@@ -52,6 +52,8 @@ class JerseyModelGeneratorSiblingOneOfTest {
             assertTrue(content.contains("private Integer size"),
                     "size must be an Integer field (modelsOnly boxes numerics)");
             assertTrue(content.contains("private String application"), "application must be a String field");
+            assertTrue(content.contains("@Pattern(regexp = \"(article)|(email)|(task)|(calltrack)\")"),
+                    "application enum must union base properties with all oneOf branch discriminators");
             assertTrue(content.contains("private Boolean isInline"), "isInline must be a Boolean field");
             assertFalse(content.contains("private Object application"),
                     "application must not fall back to Object when oneOf branches redefine enum");

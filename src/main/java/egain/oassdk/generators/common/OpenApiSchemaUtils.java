@@ -293,7 +293,15 @@ public final class OpenApiSchemaUtils {
             }
         }
         for (String key : COMPOSITION_CONSTRAINT_KEYS) {
-            if (later.containsKey(key)) {
+            if (!later.containsKey(key)) {
+                continue;
+            }
+            if ("enum".equals(key)) {
+                List<String> union = unionEnumValues(out.get("enum"), later.get("enum"));
+                if (union != null && !union.isEmpty()) {
+                    out.put(key, union);
+                }
+            } else {
                 out.put(key, later.get(key));
             }
         }
@@ -377,6 +385,24 @@ public final class OpenApiSchemaUtils {
         } else if (earlierProps != null && !earlierProps.isEmpty()) {
             out.put("properties", new LinkedHashMap<>(earlierProps));
         }
+    }
+
+    /**
+     * Union enum values from sequential composition branches (e.g. sibling {@code oneOf} overlays on a
+     * base property). Preserves first-seen order and deduplicates.
+     */
+    static List<String> unionEnumValues(Object first, Object second) {
+        List<String> firstValues = Util.asStringList(first);
+        List<String> secondValues = Util.asStringList(second);
+        if (firstValues == null || firstValues.isEmpty()) {
+            return secondValues == null ? null : new ArrayList<>(secondValues);
+        }
+        if (secondValues == null || secondValues.isEmpty()) {
+            return new ArrayList<>(firstValues);
+        }
+        LinkedHashSet<String> union = new LinkedHashSet<>(firstValues);
+        union.addAll(secondValues);
+        return new ArrayList<>(union);
     }
 
     /**
