@@ -76,6 +76,25 @@ class JerseySchemaUtilsMergeTest {
     }
 
     @Test
+    @DisplayName("mergePropertyDefinitionsForComposition unions enum overlays onto typed base")
+    void mergePropertyDefinitions_unionsEnumOverlays() {
+        Map<String, Object> base = new LinkedHashMap<>();
+        base.put("type", "string");
+        base.put("enum", List.of("article", "email", "task", "calltrack"));
+
+        Map<String, Object> articleBranch = Map.of("enum", List.of("article"));
+        Map<String, Object> emailBranch = Map.of("enum", List.of("email"));
+        Map<String, Object> taskBranch = Map.of("enum", List.of("task", "calltrack"));
+
+        Map<String, Object> merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(base, articleBranch);
+        merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(merged, emailBranch);
+        merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(merged, taskBranch);
+
+        assertEquals(List.of("article", "email", "task", "calltrack"), merged.get("enum"));
+        assertEquals("string", merged.get("type"));
+    }
+
+    @Test
     @DisplayName("mergePropertyDefinitionsForComposition keeps readOnly from earlier branch when later omits it")
     void mergePropertyDefinitions_mergeReadOnlyOverlay() {
         Map<String, Object> earlier = Map.of("readOnly", true);
