@@ -548,17 +548,7 @@ public final class OpenApiSchemaUtils {
             // Schema has properties - use them directly (even if $ref also exists)
             Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
             mergePropertiesIntoAll(allProperties, properties, spec, oneOfBranchOverlay);
-            // Merge required fields
-            if (schema.containsKey("required")) {
-                List<String> required = Util.asStringList(schema.get("required"));
-                if (required != null) {
-                    for (String field : required) {
-                        if (!allRequired.contains(field)) {
-                            allRequired.add(field);
-                        }
-                    }
-                }
-            }
+            mergeRequiredFields(schema, allRequired, oneOfBranchOverlay);
             // Properties found - return (unless there's allOf/oneOf/anyOf to handle)
             if (!schema.containsKey("allOf") && !schema.containsKey("oneOf") && !schema.containsKey("anyOf")) {
                 return;
@@ -608,17 +598,7 @@ public final class OpenApiSchemaUtils {
         if (schema.containsKey("properties")) {
             Map<String, Object> properties = Util.asStringObjectMap(schema.get("properties"));
             mergePropertiesIntoAll(allProperties, properties, spec, oneOfBranchOverlay);
-            // Merge required fields
-            if (schema.containsKey("required")) {
-                List<String> required = Util.asStringList(schema.get("required"));
-                if (required != null) {
-                    for (String field : required) {
-                        if (!allRequired.contains(field)) {
-                            allRequired.add(field);
-                        }
-                    }
-                }
-            }
+            mergeRequiredFields(schema, allRequired, oneOfBranchOverlay);
             // If schema has properties, we've merged them, so we can return
             // (unless it also has allOf/oneOf/anyOf which should be handled)
             if (!schema.containsKey("allOf") && !schema.containsKey("oneOf") && !schema.containsKey("anyOf")) {
@@ -655,15 +635,25 @@ public final class OpenApiSchemaUtils {
             mergePropertiesIntoAll(allProperties, properties, spec, oneOfBranchOverlay);
         }
 
-        // Merge required fields
-        if (schema.containsKey("required")) {
-            List<String> required = Util.asStringList(schema.get("required"));
-            if (required != null) {
-                for (String field : required) {
-                    if (!allRequired.contains(field)) {
-                        allRequired.add(field);
-                    }
-                }
+        mergeRequiredFields(schema, allRequired, oneOfBranchOverlay);
+    }
+
+    /**
+     * Merge {@code required} from a schema unless the merge is a {@code oneOf}/{@code anyOf} branch overlay on
+     * sibling {@code properties} (variant-required fields stay optional on the unified bean).
+     */
+    private static void mergeRequiredFields(Map<String, Object> schema, List<String> allRequired,
+                                            boolean oneOfBranchOverlay) {
+        if (oneOfBranchOverlay || schema == null || !schema.containsKey("required")) {
+            return;
+        }
+        List<String> required = Util.asStringList(schema.get("required"));
+        if (required == null) {
+            return;
+        }
+        for (String field : required) {
+            if (!allRequired.contains(field)) {
+                allRequired.add(field);
             }
         }
     }
