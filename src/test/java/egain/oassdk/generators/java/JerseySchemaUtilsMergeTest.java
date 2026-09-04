@@ -3,6 +3,7 @@ package egain.oassdk.generators.java;
 import egain.oassdk.Util;
 import egain.oassdk.core.exceptions.OASSDKException;
 import egain.oassdk.core.parser.OASParser;
+import egain.oassdk.generators.common.OpenApiSchemaUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
@@ -92,6 +93,60 @@ class JerseySchemaUtilsMergeTest {
 
         assertEquals(List.of("article", "email", "task", "calltrack"), merged.get("enum"));
         assertEquals("string", merged.get("type"));
+    }
+
+    @Test
+    @DisplayName("mergeSchemaProperties sibling oneOf keeps required from properties only")
+    void mergeSchemaProperties_siblingOneOf_keepsPropertiesRequiredOnly() {
+        Map<String, Object> articleBranch = new LinkedHashMap<>();
+        articleBranch.put("required", List.of("isInline"));
+        articleBranch.put("properties", Map.of(
+                "application", Map.of("enum", List.of("article")),
+                "emailDirection", Map.of("readOnly", true),
+                "departmentId", Map.of("readOnly", true)));
+
+        Map<String, Object> emailBranch = new LinkedHashMap<>();
+        emailBranch.put("required", List.of("emailDirection", "departmentId"));
+        emailBranch.put("properties", Map.of(
+                "application", Map.of("enum", List.of("email")),
+                "isInline", Map.of("readOnly", true)));
+
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("required", List.of("fileName", "application"));
+        schema.put("oneOf", List.of(articleBranch, emailBranch));
+        schema.put("properties", Map.of(
+                "fileName", Map.of("type", "string"),
+                "application", Map.of("type", "string"),
+                "isInline", Map.of("type", "boolean"),
+                "emailDirection", Map.of("type", "string"),
+                "departmentId", Map.of("type", "string")));
+
+        Map<String, Object> allProps = new LinkedHashMap<>();
+        List<String> allRequired = new ArrayList<>();
+        JerseySchemaUtils.mergeSchemaProperties(schema, allProps, allRequired, Map.of());
+
+        assertEquals(List.of("fileName", "application"), allRequired);
+        assertFalse(allRequired.contains("isInline"));
+        assertFalse(allRequired.contains("emailDirection"));
+        assertFalse(allRequired.contains("departmentId"));
+    }
+
+    @Test
+    @DisplayName("mergePropertyDefinitionsForComposition keeps sibling property writable when oneOf overlays readOnly")
+    void mergePropertyDefinitions_siblingPropertyWinsOverOneOfReadOnly() {
+        Map<String, Object> base = new LinkedHashMap<>();
+        base.put("type", "boolean");
+
+        Map<String, Object> emailBranch = Map.of("readOnly", true);
+        Map<String, Object> taskBranch = Map.of("readOnly", true);
+
+        Map<String, Object> merged = OpenApiSchemaUtils.mergePropertyDefinitionsForComposition(
+                base, emailBranch, null, true);
+        merged = OpenApiSchemaUtils.mergePropertyDefinitionsForComposition(merged, taskBranch, null, true);
+
+        assertEquals("boolean", merged.get("type"));
+        assertFalse(JerseySchemaUtils.isSchemaFlagTrue(merged, "readOnly"));
     }
 
     @Test

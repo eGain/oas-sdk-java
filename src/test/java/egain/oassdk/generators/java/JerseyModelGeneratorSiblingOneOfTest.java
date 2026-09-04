@@ -55,6 +55,14 @@ class JerseyModelGeneratorSiblingOneOfTest {
             assertTrue(content.contains("@Pattern(regexp = \"(article)|(email)|(task)|(calltrack)\")"),
                     "application enum must union base properties with all oneOf branch discriminators");
             assertTrue(content.contains("private Boolean isInline"), "isInline must be a Boolean field");
+            assertFalse(content.contains("JsonProperty(access = JsonProperty.Access.READ_ONLY)"),
+                    "oneOf readOnly overlays must not mark sibling-defined fields readOnly on the bean");
+            assertFalse(content.contains("name = \"isInline\", required = true"),
+                    "oneOf branch required must not make isInline @NotNull on the unified bean");
+            assertFalse(content.contains("name = \"emailDirection\", required = true"),
+                    "oneOf branch required must not make emailDirection @NotNull on the unified bean");
+            assertFalse(content.contains("name = \"departmentId\", required = true"),
+                    "oneOf branch required must not make departmentId @NotNull on the unified bean");
             assertFalse(content.contains("private Object application"),
                     "application must not fall back to Object when oneOf branches redefine enum");
             assertFalse(content.contains("private Object isInline"),
