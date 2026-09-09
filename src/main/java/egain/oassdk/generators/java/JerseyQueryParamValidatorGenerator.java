@@ -308,9 +308,10 @@ class JerseyQueryParamValidatorGenerator {
 				if (format != null && !format.isEmpty())
 				{
 					String errorCode = "L10N_INVALID_VALUE_FOR_" + errorPrefix + "_INVALID_FORMAT";
+					String formatMessageArg = getFormatMessageArgument(type, format);
 					sb.append("    List<String> arguments").append(getNextArgCounter()).append(" = List.of(\"").append(
 											paramName)
-							.append("\", \"").append(format).append("\");\n");
+							.append("\", \"").append(formatMessageArg).append("\");\n");
 					sb.append("    v.add(new FormatValidator(\"").append(paramName).append("\", \"").append(format)
 							.append("\", \"").append(errorCode).append("\", arguments").append(
 											getCurrentArgCounter())
@@ -543,6 +544,20 @@ class JerseyQueryParamValidatorGenerator {
 
         // Write to proper package directory under src/main/java
         JerseyGenerationContext.writeFile(outputDir + (ctx.modelsOnly ? "/" : "/src/main/java/") + validatorPackagePath + "/ValidationMapHelper."+(ctx.modelsOnly?"txt":"java"), content.toString());
+    }
+
+    /**
+     * Error-message placeholder for formatted integer query params. Validation still uses the
+     * schema format (e.g. int64) in {@link FormatValidator}; clients expect the digit regex in
+     * L10N_INVALID_VALUE_FOR_*_INVALID_FORMAT messages (EGS-99382).
+     */
+    private static String getFormatMessageArgument(String type, String format)
+    {
+        if ("integer".equals(type) && ("int32".equals(format) || "int64".equals(format)))
+        {
+            return "^\\\\d+$";
+        }
+        return format;
     }
 
     /**

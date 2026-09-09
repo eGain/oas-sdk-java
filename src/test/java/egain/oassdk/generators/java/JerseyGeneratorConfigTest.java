@@ -195,6 +195,8 @@ public class JerseyGeneratorConfigTest {
 
         assertTrue(content.contains("new FormatValidator(\"pagenum\", \"int64\""),
                 "Formatted integer query params should use FormatValidator with their schema format");
+        assertTrue(content.contains("List.of(\"pagenum\", \"^\\\\d+$\""),
+                "Integer format error message should show digit regex, not int64");
         assertTrue(content.contains("new PatternValidator(\"pagesize\", \"^-?\\\\d+$\""),
                 "Integer query params without a format should use PatternValidator");
         assertFalse(content.contains("new FormatValidator(\"pagesize\""),
