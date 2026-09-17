@@ -47,6 +47,16 @@ class JerseyModelGenerator {
         }
     }
 
+    /**
+     * Match XJC beans: every {@code XMLGregorianCalendar} field gets
+     * {@code @XmlJavaTypeAdapter(XsDateTimeAdapter.class)} so marshalling uses {@code yyyy-MM-dd'T'HH:mm:ss.SSS'Z'}.
+     */
+    private static void appendXsDateTimeAdapterAnnotation(StringBuilder content, String indent, String fieldType) {
+        if (JerseyTypeUtils.isXmlGregorianCalendarJavaType(fieldType)) {
+            content.append("@XmlJavaTypeAdapter(XsDateTimeAdapter.class)\n").append(indent);
+        }
+    }
+
     private boolean legacyXorNestedIdAsserts() {
         return ctx.config != null && ctx.config.isLegacyXorNestedIdAsserts();
     }
@@ -261,6 +271,7 @@ class JerseyModelGenerator {
         // Collect referenced model types for imports (use wrapper class name for parent field; add item type for inner class)
         Set<String> modelImports = new LinkedHashSet<>();
         Set<String> innerClasses = new HashSet<>();
+        boolean needsXsDateTimeAdapter = false;
         for (Map.Entry<String, Object> property : allProperties.entrySet()) {
             String fieldName = property.getKey();
             Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
@@ -274,10 +285,17 @@ class JerseyModelGenerator {
                 }
             }
             String fieldType = typeUtils.getFieldTypeForModelProperty(schemaName, fieldName, fieldSchema, isArrayType, spec);
+            if (JerseyTypeUtils.isXmlGregorianCalendarJavaType(fieldType)) {
+                needsXsDateTimeAdapter = true;
+            }
             if (JerseySchemaUtils.isObjectWithSingleArrayOfRef(fieldSchema, spec) && JerseySchemaUtils.getSchemaNameFromRef(fieldSchema) == null) {
                 JerseySchemaUtils.ObjectWithSingleArrayInfo info = JerseySchemaUtils.getObjectWithSingleArrayInfo(fieldSchema, spec);
                 if (info != null) {
                     wrappersToGenerate.add(new WrapperToGenerate(JerseySchemaUtils.getWrapperClassName(fieldName), info.innerPropertyName, info.itemTypeName));
+                    if (JerseyTypeUtils.isXmlGregorianCalendarJavaType(info.itemTypeName)
+                            || JerseyTypeUtils.isXmlGregorianCalendarJavaType("List<" + info.itemTypeName + ">")) {
+                        needsXsDateTimeAdapter = true;
+                    }
                     typeUtils.addModelImportTypes("List<" + info.itemTypeName + ">", schemaName, modelImports);
                 }
             } else {
@@ -292,6 +310,9 @@ class JerseyModelGenerator {
                 if (innerProps != null) {
                     for (Map.Entry<String, Object> innerProp : innerProps.entrySet()) {
                         String innerFieldType = typeUtils.getFieldTypeForModelProperty(innerClassName2, innerProp.getKey(), Util.asStringObjectMap(innerProp.getValue()), false, spec);
+                        if (JerseyTypeUtils.isXmlGregorianCalendarJavaType(innerFieldType)) {
+                            needsXsDateTimeAdapter = true;
+                        }
                         if(innerFieldType!=null && !innerFieldType.contains(".") && !innerFieldType.equals(innerClassName2) && !innerFieldType.equals(schemaName))
                         {
                             typeUtils.addModelImportTypes(innerFieldType, schemaName, modelImports);
@@ -310,6 +331,10 @@ class JerseyModelGenerator {
         content.append("import ").append(ctx.validationNs).append(".constraints.*;\n");
         content.append("import ").append(ctx.validationNs).append(".Valid;\n");
         content.append("import ").append(ctx.getXmlBindNs()).append(".annotation.*;\n");
+        if (needsXsDateTimeAdapter) {
+            content.append("import ").append(ctx.getXmlBindNs()).append(".annotation.adapters.XmlJavaTypeAdapter;\n");
+            content.append("import egain.ws.framework.XsDateTimeAdapter;\n");
+        }
         content.append("import ").append(ctx.getXmlBindNs()).append(".JAXBElement;\n");
         content.append("import javax.xml.namespace.QName;\n");
         content.append("import java.io.Serializable;\n");
@@ -424,6 +449,7 @@ class JerseyModelGenerator {
             // Add @JsonProperty for name mapping and/or readOnly/writeOnly access
             appendJsonPropertyAccessAnnotation(content, "    ", fieldName, javaFieldName, fieldSchema,
                     xorExclusiveJsonNames.contains(fieldName));
+            appendXsDateTimeAdapterAnnotation(content, "    ", fieldType);
 
             // Add validation annotations based on schema constraints
             boolean effectiveFieldRequired = JerseySchemaUtils.isRequiredForBeanValidation(fieldSchema, spec,
@@ -973,6 +999,7 @@ class JerseyModelGenerator {
             }
             content.append(")\n").append(indentBody);
             appendJsonPropertyAccessAnnotation(content, indentBody, fieldName, javaFieldName, fieldSchema, false);
+            appendXsDateTimeAdapterAnnotation(content, indentBody, fieldType);
             String validationAnnotations = typeUtils.generateValidationAnnotations(fieldSchema, innerFieldRequired);
             if (!validationAnnotations.isEmpty()) {
                 content.append(validationAnnotations.replace("\n    ", "\n" + indentBody));
@@ -1139,6 +1166,7 @@ class JerseyModelGenerator {
         }
         content.append("        private static final long serialVersionUID = 1L;\n\n");
         content.append("        @XmlElement(name = \"").append(w.innerPropertyName).append("\")\n");
+        appendXsDateTimeAdapterAnnotation(content, "        ", "List<" + w.itemTypeName + ">");
         if (typeUtils.isEligibleForCascadingValidation(w.innerPropertyName)) {
             content.append("        @Valid\n");
         }

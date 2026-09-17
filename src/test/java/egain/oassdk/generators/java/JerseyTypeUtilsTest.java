@@ -700,6 +700,16 @@ class JerseyTypeUtilsTest {
     }
 
     @Test
+    @DisplayName("isXmlGregorianCalendarJavaType is true for XMLGregorianCalendar and List thereof")
+    void isXmlGregorianCalendarJavaType_positiveAndNegative() {
+        assertTrue(JerseyTypeUtils.isXmlGregorianCalendarJavaType("XMLGregorianCalendar"));
+        assertTrue(JerseyTypeUtils.isXmlGregorianCalendarJavaType("List<XMLGregorianCalendar>"));
+        assertFalse(JerseyTypeUtils.isXmlGregorianCalendarJavaType("String"));
+        assertFalse(JerseyTypeUtils.isXmlGregorianCalendarJavaType("DateAndUser"));
+        assertFalse(JerseyTypeUtils.isXmlGregorianCalendarJavaType(null));
+    }
+
+    @Test
     @DisplayName("isEligibleForCascadingValidation returns false for XMLGregorianCalendar")
     void isEligibleForCascadingValidation_xmlGregorianCalendar() {
         assertFalse(createTypeUtils().isEligibleForCascadingValidation("XMLGregorianCalendar"));

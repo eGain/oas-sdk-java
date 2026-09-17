@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Generated JAXB model fields of type `XMLGregorianCalendar` (OpenAPI `date` / `date-time`) now emit `@XmlJavaTypeAdapter(XsDateTimeAdapter.class)`, matching XJC beans such as `DateAndUser#date`.
 - Sequence-chain generator now builds one chain family per POST in the spec — top-level creators and sub-resource creators alike. A POST on `/orders/{orderId}/items` is preceded by `POST /orders` as a prefix producer so its `orderId` path parameter is bound before the sub-resource call fires. Alternative top-level creators on the same resource group (e.g. `POST /users` and `POST /users/bulk`) each seed their own chain family.
 - `ChainConfig.unresolvedParamPolicy` (`SKIP` default, or `EMIT_WITH_MARKER`) controls how a sub-resource POST is handled when one of its path parameters has no producer POST in the spec. `EMIT_WITH_MARKER` emits the chain with a `pytest.skip(...)` at the top so the gap is visible in the test report instead of being silently dropped.
 - `EnumeratedChain(seedPost, steps, unresolved)` record; `ApiCallExtractor.findProducerForParam` (longest-prefix match with a name-stem fallback); `ApiCallExtractor.idVariableName`; `ApiCallInfo.isSubResourceCreator`.

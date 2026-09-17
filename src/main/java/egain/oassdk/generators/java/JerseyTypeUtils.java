@@ -822,6 +822,14 @@ public final class JerseyTypeUtils {
         };
     }
 
+    static boolean isXmlGregorianCalendarJavaType(String fieldType) {
+        if (fieldType == null) {
+            return false;
+        }
+        return "XMLGregorianCalendar".equals(fieldType)
+                || "List<XMLGregorianCalendar>".equals(fieldType);
+    }
+
     boolean isEligibleForCascadingValidation(String fieldType) {
         if (fieldType == null) return false;
         if ("XMLGregorianCalendar".equals(fieldType)) {
