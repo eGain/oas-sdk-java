@@ -5,9 +5,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Unit tests for JerseyTypeUtils.
@@ -709,5 +712,22 @@ class JerseyTypeUtilsTest {
     @DisplayName("isEligibleForCascadingValidation returns false for List of XMLGregorianCalendar")
     void isEligibleForCascadingValidation_listOfXmlGregorianCalendar() {
         assertFalse(createTypeUtils().isEligibleForCascadingValidation("List<XMLGregorianCalendar>"));
+    }
+
+    @Test
+    @DisplayName("addModelImportTypes peels nested List to the element class")
+    void addModelImportTypes_nestedListPeelsToElementType() {
+        Set<String> imports = new LinkedHashSet<>();
+        createTypeUtils().addModelImportTypes("List<List<TagCategory>>", "PublishView", imports);
+        assertEquals(Set.of("TagCategory"), imports);
+        assertFalse(imports.contains("List<TagCategory>"));
+    }
+
+    @Test
+    @DisplayName("addModelImportTypes peels a single List to the element class")
+    void addModelImportTypes_singleListPeelsToElementType() {
+        Set<String> imports = new HashSet<>();
+        createTypeUtils().addModelImportTypes("List<TagCategory>", "PublishView", imports);
+        assertEquals(Set.of("TagCategory"), imports);
     }
 }

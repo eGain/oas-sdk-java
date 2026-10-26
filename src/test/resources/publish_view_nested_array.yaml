@@ -1,0 +1,50 @@
+openapi: 3.0.0
+info:
+  title: PublishViewNestedArrayParity
+  version: 1.0.0
+paths:
+  /publish-views:
+    get:
+      operationId: listPublishViews
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishView'
+components:
+  schemas:
+    TagCategory:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: ^[a-zA-Z0-9]{2,4}-\d{4,15}$
+          minLength: 7
+          maxLength: 20
+        name:
+          type: string
+          pattern: ^[a-zA-Z0-9 ]+$
+          minLength: 1
+          maxLength: 255
+    PublishView:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: ^[a-zA-Z0-9 ]+$
+        id:
+          type: string
+          minLength: 7
+          maxLength: 20
+          pattern: ^[a-zA-Z0-9]{2,4}-\d{4,15}$
+        tagCategories:
+          type: array
+          items:
+            type: array
+            maxItems: 20
+            items:
+              $ref: '#/components/schemas/TagCategory'

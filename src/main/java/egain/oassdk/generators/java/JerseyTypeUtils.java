@@ -449,6 +449,7 @@ public final class JerseyTypeUtils {
     /**
      * Add referenced model type names from a field type string to the given set.
      * Skips excluded types, the current schema name, and inner classes (currentSchemaName.*).
+     * Nested {@code List<List<T>>} peels to {@code T} so modelsOnly imports stay valid Java.
      */
     void addModelImportTypes(String fieldType, String currentSchemaName, Set<String> modelImports) {
         if (fieldType == null || fieldType.isEmpty()) return;
@@ -456,20 +457,25 @@ public final class JerseyTypeUtils {
         if (currentSchemaName != null && fieldType.startsWith(currentSchemaName + ".")) {
             return;
         }
-        if (fieldType.startsWith("List<")) {
-            int start = fieldType.indexOf('<') + 1;
-            int end = fieldType.lastIndexOf('>');
-            if (start > 0 && end > start) {
-                String inner = fieldType.substring(start, end).trim();
-                if (!MODEL_IMPORT_EXCLUDES.contains(inner) && !inner.equals(currentSchemaName)) {
-                    modelImports.add(inner);
-                }
-            }
-        } else {
-            if (!MODEL_IMPORT_EXCLUDES.contains(fieldType) && !fieldType.equals(currentSchemaName)) {
-                modelImports.add(fieldType);
-            }
+        String typeName = unwrapListElementType(fieldType);
+        if (typeName == null || typeName.isEmpty() || typeName.indexOf('<') >= 0) {
+            return;
         }
+        if (!MODEL_IMPORT_EXCLUDES.contains(typeName) && !typeName.equals(currentSchemaName)) {
+            modelImports.add(typeName);
+        }
+    }
+
+    /** Peel {@code List<...>} wrappers until the element type remains. */
+    static String unwrapListElementType(String fieldType) {
+        if (fieldType == null) {
+            return null;
+        }
+        String current = fieldType.trim();
+        while (current.startsWith("List<") && current.endsWith(">")) {
+            current = current.substring("List<".length(), current.length() - 1).trim();
+        }
+        return current;
     }
 
     // ---------------------------------------------------------------------------
