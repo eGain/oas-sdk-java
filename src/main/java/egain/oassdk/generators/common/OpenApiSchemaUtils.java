@@ -313,6 +313,7 @@ public final class OpenApiSchemaUtils {
                 out.put(key, later.get(key));
             }
         }
+        mergeRequiredOverlay(out, later);
         if (later.containsKey("readOnly")) {
             boolean skipVariantReadOnly = oneOfBranchOverlay && isVariantConstraintOnlyOverlay(later)
                     && !Boolean.FALSE.equals(later.get("readOnly"));
@@ -372,6 +373,7 @@ public final class OpenApiSchemaUtils {
                 out.put(key, earlier.get(key));
             }
         }
+        mergeRequiredOverlay(out, earlier);
         if (!later.containsKey("readOnly") && isSchemaFlagTrue(earlier, "readOnly")) {
             out.put("readOnly", true);
         }
@@ -429,6 +431,105 @@ public final class OpenApiSchemaUtils {
         }
         return overlay.containsKey("readOnly") || overlay.containsKey("writeOnly")
                 || overlay.containsKey("enum");
+    }
+
+    /**
+     * Union {@code required} from {@code source} onto {@code out}. Nested required on a $ref overlay
+     * (CreateArticle.macro requiring {@code name}) must survive composition; it is not a type key.
+     */
+    static void mergeRequiredOverlay(Map<String, Object> out, Map<String, Object> source) {
+        if (out == null || source == null) {
+            return;
+        }
+        List<String> extra = Util.asStringList(source.get("required"));
+        if (extra == null || extra.isEmpty()) {
+            return;
+        }
+        List<String> current = Util.asStringList(out.get("required"));
+        if (current == null || current.isEmpty()) {
+            out.put("required", new ArrayList<>(extra));
+            return;
+        }
+        List<String> merged = new ArrayList<>(current);
+        for (String name : extra) {
+            if (name != null && !merged.contains(name)) {
+                merged.add(name);
+            }
+        }
+        out.put("required", merged);
+    }
+
+    /**
+     * True when a usage-site overlay adds {@code required} names that already exist as properties on
+     * the referenced parent type but are not required on that parent (CreateArticle.macro requiring
+     * {@code name}). Named types that already declare the same {@code required} (Identity requiring
+     * {@code id}) stay as that model. Overlay property keys must also exist on the parent.
+     */
+    public static boolean isRefWithNestedRequiredOverlay(Map<String, Object> schema, Map<String, Object> spec) {
+        if (schema == null || spec == null) {
+            return false;
+        }
+        String refName = getSchemaNameFromRef(schema);
+        if (refName == null && !schema.containsKey("$ref")) {
+            return false;
+        }
+        List<String> overlayRequired = Util.asStringList(schema.get("required"));
+        if (overlayRequired == null || overlayRequired.isEmpty()) {
+            return false;
+        }
+        Map<String, Object> parent = lookupComponentSchema(refName, schema, spec);
+        if (parent == null || parent == schema) {
+            return false;
+        }
+        Map<String, Object> parentProps = resolveEffectivePropertyProperties(parent, spec);
+        if (parentProps == null || parentProps.isEmpty()) {
+            return false;
+        }
+        List<String> parentRequired = Util.asStringList(parent.get("required"));
+        if (parentRequired == null) {
+            parentRequired = List.of();
+        }
+        boolean tightened = false;
+        for (String name : overlayRequired) {
+            if (name == null || !parentProps.containsKey(name)) {
+                return false;
+            }
+            if (!parentRequired.contains(name)) {
+                tightened = true;
+            }
+        }
+        if (!tightened) {
+            return false;
+        }
+        Map<String, Object> overlayProps = Util.asStringObjectMap(schema.get("properties"));
+        if (overlayProps != null) {
+            for (String key : overlayProps.keySet()) {
+                if (!parentProps.containsKey(key)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static Map<String, Object> lookupComponentSchema(String refName, Map<String, Object> schema,
+                                                             Map<String, Object> spec) {
+        if (spec == null) {
+            return null;
+        }
+        Map<String, Object> components = Util.asStringObjectMap(spec.get("components"));
+        Map<String, Object> schemas = components != null ? Util.asStringObjectMap(components.get("schemas")) : null;
+        if (schemas == null) {
+            return null;
+        }
+        String name = refName;
+        if (name == null) {
+            name = getSchemaNameFromRef(schema);
+        }
+        if (name == null) {
+            return null;
+        }
+        return Util.asStringObjectMap(schemas.get(name));
     }
 
     /**

@@ -748,6 +748,10 @@ public final class JerseyTypeUtils {
      */
     boolean isInlineObjectProperty(Map<String, Object> fieldSchema, Map<String, Object> spec) {
         if (fieldSchema == null || spec == null) return false;
+        // $ref + nested required overlay (CreateArticle.macro requiring name): inner class, not Macro alias
+        if (JerseySchemaUtils.isRefWithNestedRequiredOverlay(fieldSchema, spec)) {
+            return true;
+        }
         // Do not create inner class for $ref: use separate model class (x-resolved-ref set when parser resolves $ref)
         if (JerseySchemaUtils.getSchemaNameFromRef(fieldSchema) != null) return false;
         if (fieldSchema.containsKey("$ref")) return false;

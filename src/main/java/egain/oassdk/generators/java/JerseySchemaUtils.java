@@ -63,6 +63,10 @@ public final class JerseySchemaUtils {
         return OpenApiSchemaUtils.definesOwnPropertyType(schema);
     }
 
+    public static boolean isRefWithNestedRequiredOverlay(Map<String, Object> schema, Map<String, Object> spec) {
+        return OpenApiSchemaUtils.isRefWithNestedRequiredOverlay(schema, spec);
+    }
+
     public static void mergePropertiesIntoAll(Map<String, Object> allProperties, Map<String, Object> properties) {
         OpenApiSchemaUtils.mergePropertiesIntoAll(allProperties, properties);
     }
