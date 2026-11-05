@@ -641,6 +641,23 @@ class JerseySchemaUtilsMergeTest {
     }
 
     @Test
+    @DisplayName("mergePropertyDefinitionsForComposition keeps nested required when overlay is applied on $ref")
+    void mergePropertyDefinitions_preservesRequiredWhenOverlayOnRef() {
+        Map<String, Object> earlier = Map.of("$ref", "#/components/schemas/Macro");
+        Map<String, Object> later = Map.of(
+                "required", List.of("name"),
+                "properties", Map.of("name", Map.of()));
+
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "Macro", Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string"))))));
+        Map<String, Object> merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(earlier, later);
+
+        assertEquals("#/components/schemas/Macro", merged.get("$ref"));
+        assertEquals(List.of("name"), merged.get("required"));
+        assertTrue(JerseySchemaUtils.isRefWithNestedRequiredOverlay(merged, spec));
+    }
+
+    @Test
     @DisplayName("mergePropertyDefinitionsForComposition type:object overlay over $ref uses later-wins path (known edge case)")
     void mergePropertyDefinitions_typeObjectOverlayOverRef_laterWinsAndDropsRef() {
         Map<String, Object> earlier = Map.of("$ref", "#/components/schemas/DateAndUser");

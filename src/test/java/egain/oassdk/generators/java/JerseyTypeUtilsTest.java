@@ -342,6 +342,86 @@ class JerseyTypeUtilsTest {
     }
 
     @Test
+    @DisplayName("isInlineObjectProperty is true for $ref plus nested required overlay")
+    void isInlineObjectProperty_refWithRequiredOverlay_returnsTrue() {
+        Map<String, Object> macro = new LinkedHashMap<>();
+        macro.put("$ref", "#/components/schemas/Macro");
+        macro.put("required", List.of("name"));
+        macro.put("properties", Map.of("name", Map.of()));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "Macro", Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string"))))));
+
+        assertTrue(createTypeUtils(spec).isInlineObjectProperty(macro, spec));
+    }
+
+    @Test
+    @DisplayName("isInlineObjectProperty is false when overlay required name is not on parent schema")
+    void isInlineObjectProperty_refWithRequiredUnknownToParent_returnsFalse() {
+        Map<String, Object> macro = new LinkedHashMap<>();
+        macro.put("$ref", "#/components/schemas/Macro");
+        macro.put("required", List.of("notOnParent"));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "Macro", Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string"))))));
+
+        assertFalse(createTypeUtils(spec).isInlineObjectProperty(macro, spec));
+    }
+
+    @Test
+    @DisplayName("isInlineObjectProperty is false when overlay property is not on parent schema")
+    void isInlineObjectProperty_refWithOverlayPropertyUnknownToParent_returnsFalse() {
+        Map<String, Object> macro = new LinkedHashMap<>();
+        macro.put("$ref", "#/components/schemas/Macro");
+        macro.put("required", List.of("name"));
+        macro.put("properties", Map.of("extra", Map.of("type", "string")));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "Macro", Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string"))))));
+
+        assertFalse(createTypeUtils(spec).isInlineObjectProperty(macro, spec));
+    }
+
+    @Test
+    @DisplayName("isInlineObjectProperty is false for $ref plus nested readOnly overlay without required")
+    void isInlineObjectProperty_refWithNestedReadOnly_noRequired_returnsFalse() {
+        Map<String, Object> lastModified = new LinkedHashMap<>();
+        lastModified.put("$ref", "#/components/schemas/DateAndUser");
+        lastModified.put("properties", Map.of("user", Map.of("readOnly", true)));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "DateAndUser", Map.of("type", "object"))));
+
+        assertFalse(createTypeUtils(spec).isInlineObjectProperty(lastModified, spec));
+    }
+
+    @Test
+    @DisplayName("isInlineObjectProperty is false when overlay required already required on named parent")
+    void isInlineObjectProperty_refWhenParentAlreadyRequiresSameField_returnsFalse() {
+        Map<String, Object> identity = new LinkedHashMap<>();
+        identity.put("$ref", "#/components/schemas/Identity");
+        identity.put("required", List.of("id"));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "Identity", Map.of(
+                        "type", "object",
+                        "required", List.of("id"),
+                        "properties", Map.of("id", Map.of("type", "string"))))));
+
+        assertFalse(createTypeUtils(spec).isInlineObjectProperty(identity, spec));
+    }
+
+    @Test
+    @DisplayName("getFieldTypeForModelProperty returns CreateArticle.Macro for $ref plus required overlay")
+    void getFieldTypeForModelProperty_refWithRequiredOverlay_returnsInnerClassType() {
+        Map<String, Object> macro = new LinkedHashMap<>();
+        macro.put("$ref", "#/components/schemas/Macro");
+        macro.put("required", List.of("name"));
+        macro.put("properties", Map.of("name", Map.of()));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "Macro", Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string"))))));
+
+        JerseyTypeUtils typeUtils = createTypeUtils(spec);
+        assertEquals("CreateArticle.Macro",
+                typeUtils.getFieldTypeForModelProperty("CreateArticle", "macro", macro, false, spec));
+    }
+
+    @Test
     @DisplayName("getFieldTypeForModelProperty returns IdentityPayload.User for inline allOf overlay property")
     void getFieldTypeForModelProperty_inlineAllOfOverlay_returnsInnerClassType() {
         Map<String, Object> userSchema = new LinkedHashMap<>();
