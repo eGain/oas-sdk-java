@@ -926,6 +926,21 @@ class JerseyModelGenerator {
             if (envelopeProps != null && !envelopeProps.isEmpty()) {
                 JerseySchemaUtils.mergePropertiesIntoAll(allProperties, envelopeProps, spec);
             }
+        } else if (JerseySchemaUtils.isRefWithNestedRequiredOverlay(innerSchema, spec)) {
+            // $ref + required overlay: expand the ref so inner class keeps base fields and marks overlay required.
+            // Only an unresolved $ref needs its own base branch; when the parser already inlined the ref
+            // (x-resolved-ref only), the overlay copy below already carries the base properties.
+            List<Map<String, Object>> allOfSchemas = new ArrayList<>();
+            if (innerSchema.containsKey("$ref")) {
+                Map<String, Object> refBranch = new LinkedHashMap<>();
+                refBranch.put("$ref", innerSchema.get("$ref"));
+                allOfSchemas.add(refBranch);
+            }
+            Map<String, Object> overlay = new LinkedHashMap<>(innerSchema);
+            overlay.remove("$ref");
+            overlay.remove("x-resolved-ref");
+            allOfSchemas.add(overlay);
+            JerseySchemaUtils.mergeAllOfBranchesIntoProperties(allOfSchemas, allProperties, allRequired, spec);
         } else {
             // mergeSchemaProperties handles direct properties plus oneOf/anyOf siblings (e.g. AssetPreuploadInput)
             JerseySchemaUtils.mergeSchemaProperties(innerSchema, allProperties, allRequired, spec);

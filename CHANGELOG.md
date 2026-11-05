@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ChainConfig.crossResource` (field, builder method, and defaults entry). It was never read anywhere in the codebase; the new `unresolvedParamPolicy` replaces it conceptually for the "what do we do at the chain boundary" question.
 
 ### Fixed
+- Java model generator emits a parent inner class for a `$ref` plus nested `required` overlay only when those names exist on the parent and the parent does not already require them, directly or via `allOf` (CreateArticle.macro requiring `name`). Named types that already declare the same `required` (Identity.id) stay as that model. When the inner class name would equal the referenced model (`macro` over `Macro`) it is suffixed (`CreateArticle.MacroOverlay`) so sibling fields typed as the top-level model are not shadowed. `required` from `oneOf`/`anyOf` variant overlays is not unioned onto the shared bean.
 - Fixed encoding issues by using `StandardCharsets.UTF_8` consistently
 - Fixed internal representation exposure with defensive copying
 - Fixed locale-sensitive operations by using `Locale.ROOT`

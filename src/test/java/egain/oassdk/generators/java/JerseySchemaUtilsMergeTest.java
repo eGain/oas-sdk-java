@@ -641,6 +641,76 @@ class JerseySchemaUtilsMergeTest {
     }
 
     @Test
+    @DisplayName("mergePropertyDefinitionsForComposition keeps nested required when overlay is applied on $ref")
+    void mergePropertyDefinitions_preservesRequiredWhenOverlayOnRef() {
+        Map<String, Object> earlier = Map.of("$ref", "#/components/schemas/Macro");
+        Map<String, Object> later = Map.of(
+                "required", List.of("name"),
+                "properties", Map.of("name", Map.of()));
+
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "Macro", Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string"))))));
+        Map<String, Object> merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(earlier, later);
+
+        assertEquals("#/components/schemas/Macro", merged.get("$ref"));
+        assertEquals(List.of("name"), merged.get("required"));
+        assertTrue(JerseySchemaUtils.isRefWithNestedRequiredOverlay(merged, spec));
+    }
+
+    @Test
+    @DisplayName("mergePropertyDefinitionsForComposition drops nested required from a oneOf branch overlay")
+    void mergePropertyDefinitions_oneOfBranchOverlay_doesNotUnionRequired() {
+        Map<String, Object> earlier = Map.of("$ref", "#/components/schemas/Payload");
+        Map<String, Object> later = Map.of("required", List.of("a"));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "Payload", Map.of("type", "object", "properties", Map.of(
+                        "a", Map.of("type", "string"), "b", Map.of("type", "string"))))));
+
+        Map<String, Object> merged = OpenApiSchemaUtils.mergePropertyDefinitionsForComposition(earlier, later, spec, true);
+
+        assertEquals("#/components/schemas/Payload", merged.get("$ref"));
+        assertFalse(merged.containsKey("required"), "variant-required must stay optional on the unified bean");
+        assertFalse(JerseySchemaUtils.isRefWithNestedRequiredOverlay(merged, spec));
+    }
+
+    @Test
+    @DisplayName("mergePropertyDefinitionsForComposition unions required from both sides across overlays")
+    void mergePropertyDefinitions_unionsRequiredAcrossOverlays() {
+        Map<String, Object> earlier = Map.of("$ref", "#/components/schemas/Macro", "required", List.of("name"));
+        Map<String, Object> later = Map.of("required", List.of("description", "name"));
+
+        Map<String, Object> merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(earlier, later);
+
+        assertEquals(List.of("name", "description"), merged.get("required"));
+    }
+
+    @Test
+    @DisplayName("mergePropertyDefinitionsForComposition keeps earlier required when later redefines the type")
+    void mergePropertyDefinitions_keepsEarlierRequiredWhenLaterDefinesType() {
+        Map<String, Object> earlier = Map.of("required", List.of("a"), "properties", Map.of("a", Map.of()));
+        Map<String, Object> later = Map.of("type", "object", "properties", Map.of("a", Map.of("type", "string")));
+
+        Map<String, Object> merged = JerseySchemaUtils.mergePropertyDefinitionsForComposition(earlier, later);
+
+        assertEquals("object", merged.get("type"));
+        assertEquals(List.of("a"), merged.get("required"));
+    }
+
+    @Test
+    @DisplayName("isRefWithNestedRequiredOverlay is false when parent requires the field through an allOf branch")
+    void isRefWithNestedRequiredOverlay_parentRequiresViaAllOf_returnsFalse() {
+        Map<String, Object> identity = new LinkedHashMap<>();
+        identity.put("$ref", "#/components/schemas/Identity");
+        identity.put("required", List.of("id"));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "Identity", Map.of("allOf", List.of(
+                        Map.of("type", "object", "properties", Map.of("id", Map.of("type", "string"))),
+                        Map.of("required", List.of("id")))))));
+
+        assertFalse(JerseySchemaUtils.isRefWithNestedRequiredOverlay(identity, spec));
+    }
+
+    @Test
     @DisplayName("mergePropertyDefinitionsForComposition type:object overlay over $ref uses later-wins path (known edge case)")
     void mergePropertyDefinitions_typeObjectOverlayOverRef_laterWinsAndDropsRef() {
         Map<String, Object> earlier = Map.of("$ref", "#/components/schemas/DateAndUser");

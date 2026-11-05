@@ -1,0 +1,40 @@
+openapi: 3.0.0
+info:
+  title: oneOf variant required overlay on $ref property
+  version: 1.0.0
+paths:
+  /things:
+    post:
+      operationId: createThing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Thing'
+      responses:
+        '201':
+          description: Created
+components:
+  schemas:
+    Payload:
+      type: object
+      properties:
+        a:
+          type: string
+        b:
+          type: string
+    Thing:
+      type: object
+      properties:
+        kind:
+          type: string
+        payload:
+          $ref: '#/components/schemas/Payload'
+      oneOf:
+        - properties:
+            payload:
+              required: [a]
+        - properties:
+            payload:
+              required: [b]

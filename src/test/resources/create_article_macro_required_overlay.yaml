@@ -1,0 +1,54 @@
+openapi: 3.0.0
+info:
+  title: CreateArticle macro required overlay
+  version: 1.0.0
+paths:
+  /articles:
+    post:
+      operationId: createArticle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateArticle'
+      responses:
+        '201':
+          description: Created
+components:
+  schemas:
+    Macro:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        isSystemCreated:
+          type: boolean
+          readOnly: true
+        description:
+          type: string
+    Article:
+      type: object
+      properties:
+        title:
+          type: string
+        macro:
+          $ref: '#/components/schemas/Macro'
+        fallbackMacro:
+          $ref: '#/components/schemas/Macro'
+        macros:
+          type: array
+          items:
+            $ref: '#/components/schemas/Macro'
+    CreateArticle:
+      allOf:
+        - type: object
+          properties:
+            macro:
+              required:
+                - name
+              properties:
+                name: {}
+        - $ref: '#/components/schemas/Article'
