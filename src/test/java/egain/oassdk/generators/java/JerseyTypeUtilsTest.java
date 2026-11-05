@@ -404,7 +404,21 @@ class JerseyTypeUtilsTest {
     }
 
     @Test
-    @DisplayName("getFieldTypeForModelProperty returns CreateArticle.Macro for $ref plus required overlay")
+    @DisplayName("isInlineObjectProperty is false when parent requires the field via an allOf branch")
+    void isInlineObjectProperty_refWhenParentRequiresViaAllOf_returnsFalse() {
+        Map<String, Object> identity = new LinkedHashMap<>();
+        identity.put("$ref", "#/components/schemas/Identity");
+        identity.put("required", List.of("id"));
+        Map<String, Object> spec = Map.of("components", Map.of("schemas", Map.of(
+                "Identity", Map.of("allOf", List.of(
+                        Map.of("type", "object", "properties", Map.of("id", Map.of("type", "string"))),
+                        Map.of("required", List.of("id")))))));
+
+        assertFalse(createTypeUtils(spec).isInlineObjectProperty(identity, spec));
+    }
+
+    @Test
+    @DisplayName("getFieldTypeForModelProperty returns CreateArticle.MacroOverlay when inner name collides with ref model")
     void getFieldTypeForModelProperty_refWithRequiredOverlay_returnsInnerClassType() {
         Map<String, Object> macro = new LinkedHashMap<>();
         macro.put("$ref", "#/components/schemas/Macro");
@@ -414,8 +428,26 @@ class JerseyTypeUtilsTest {
                 "Macro", Map.of("type", "object", "properties", Map.of("name", Map.of("type", "string"))))));
 
         JerseyTypeUtils typeUtils = createTypeUtils(spec);
-        assertEquals("CreateArticle.Macro",
+        assertEquals("CreateArticle.MacroOverlay",
                 typeUtils.getFieldTypeForModelProperty("CreateArticle", "macro", macro, false, spec));
+    }
+
+    @Test
+    @DisplayName("getInnerClassNameForInlineProperty keeps property-derived name when it does not collide with ref model")
+    void getInnerClassNameForInlineProperty_refOverlayWithDistinctPropertyName_noSuffix() {
+        Map<String, Object> defaultMacro = new LinkedHashMap<>();
+        defaultMacro.put("$ref", "#/components/schemas/Macro");
+        defaultMacro.put("required", List.of("name"));
+
+        assertEquals("DefaultMacro", createTypeUtils().getInnerClassNameForInlineProperty("defaultMacro", defaultMacro));
+        assertEquals("MacroOverlay", createTypeUtils().getInnerClassNameForInlineProperty("macro", defaultMacro));
+    }
+
+    @Test
+    @DisplayName("getInnerClassNameForInlineProperty is unchanged for plain inline objects")
+    void getInnerClassNameForInlineProperty_plainInlineObject_unchanged() {
+        Map<String, Object> inline = Map.of("type", "object", "properties", Map.of("x", Map.of("type", "string")));
+        assertEquals("Macro", createTypeUtils().getInnerClassNameForInlineProperty("macro", inline));
     }
 
     @Test

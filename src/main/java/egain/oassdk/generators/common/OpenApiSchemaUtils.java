@@ -313,7 +313,7 @@ public final class OpenApiSchemaUtils {
                 out.put(key, later.get(key));
             }
         }
-        mergeRequiredOverlay(out, later);
+        mergeRequiredOverlay(out, later, oneOfBranchOverlay);
         if (later.containsKey("readOnly")) {
             boolean skipVariantReadOnly = oneOfBranchOverlay && isVariantConstraintOnlyOverlay(later)
                     && !Boolean.FALSE.equals(later.get("readOnly"));
@@ -373,7 +373,7 @@ public final class OpenApiSchemaUtils {
                 out.put(key, earlier.get(key));
             }
         }
-        mergeRequiredOverlay(out, earlier);
+        mergeRequiredOverlay(out, earlier, oneOfBranchOverlay);
         if (!later.containsKey("readOnly") && isSchemaFlagTrue(earlier, "readOnly")) {
             out.put("readOnly", true);
         }
@@ -436,9 +436,16 @@ public final class OpenApiSchemaUtils {
     /**
      * Union {@code required} from {@code source} onto {@code out}. Nested required on a $ref overlay
      * (CreateArticle.macro requiring {@code name}) must survive composition; it is not a type key.
+     * Skipped for {@code oneOf}/{@code anyOf} branch overlays: variant-required fields stay optional on
+     * the unified bean, matching {@link #mergeRequiredFields}.
      */
     static void mergeRequiredOverlay(Map<String, Object> out, Map<String, Object> source) {
-        if (out == null || source == null) {
+        mergeRequiredOverlay(out, source, false);
+    }
+
+    static void mergeRequiredOverlay(Map<String, Object> out, Map<String, Object> source,
+                                     boolean oneOfBranchOverlay) {
+        if (oneOfBranchOverlay || out == null || source == null) {
             return;
         }
         List<String> extra = Util.asStringList(source.get("required"));
@@ -485,7 +492,13 @@ public final class OpenApiSchemaUtils {
         if (parentProps == null || parentProps.isEmpty()) {
             return false;
         }
-        List<String> parentRequired = Util.asStringList(parent.get("required"));
+        // Compare against the parent's effective required (allOf branches unioned), not only its direct list
+        Map<String, Object> effectiveParent = resolveCompositionToEffectiveSchema(parent, spec);
+        List<String> parentRequired = Util.asStringList(
+                effectiveParent != null ? effectiveParent.get("required") : null);
+        if (parentRequired == null) {
+            parentRequired = Util.asStringList(parent.get("required"));
+        }
         if (parentRequired == null) {
             parentRequired = List.of();
         }

@@ -786,13 +786,26 @@ public final class JerseyTypeUtils {
     /**
      * Java class name for a static inner class representing an inline object property.
      * Uses the property name (key in parent schema); optional schema title is not used.
+     * <p>
+     * When the property is a {@code $ref} plus {@code required} overlay (CreateArticle.macro over Macro)
+     * and the derived name equals the referenced model's class name, the inner class is suffixed
+     * ({@code MacroOverlay}). A member class named {@code Macro} would otherwise shadow the top-level
+     * {@code Macro} for every other field in the same file (e.g. {@code List<Macro> macros}).
      */
     String getInnerClassNameForInlineProperty(String propertyName, Map<String, Object> fieldSchema) {
-        if (propertyName != null && !propertyName.isEmpty()) {
-            return JerseyNamingUtils.toJavaClassName(JerseyNamingUtils.capitalize(propertyName));
+        if (propertyName == null || propertyName.isEmpty()) {
+            return "Inline";
         }
-        return "Inline";
+        String name = JerseyNamingUtils.toJavaClassName(JerseyNamingUtils.capitalize(propertyName));
+        String refName = JerseySchemaUtils.getSchemaNameFromRef(fieldSchema);
+        if (refName != null && name.equals(JerseyNamingUtils.toJavaClassName(refName))) {
+            return name + REF_OVERLAY_INNER_CLASS_SUFFIX;
+        }
+        return name;
     }
+
+    /** Suffix for a $ref-overlay inner class whose name would collide with the referenced model. */
+    static final String REF_OVERLAY_INNER_CLASS_SUFFIX = "Overlay";
 
     private String resolveNumericType(String primitive, String wrapper, Map<String, Object> schema, boolean nullable) {
         if (ctx.isUseBoxedPrimitives() || schema.containsKey("default") || nullable) {
