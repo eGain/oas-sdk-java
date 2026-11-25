@@ -301,6 +301,17 @@ class JerseyModelGenerator {
             }
         }
 
+        List<NestedListField> nestedListFields = new ArrayList<>();
+        for (Map.Entry<String, Object> property : allProperties.entrySet()) {
+            String fieldName = property.getKey();
+            Map<String, Object> fieldSchema = Util.asStringObjectMap(property.getValue());
+            String fieldType = typeUtils.getFieldTypeForModelProperty(schemaName, fieldName, fieldSchema, isArrayType, spec);
+            if (isSingleNestedList(fieldType)) {
+                nestedListFields.add(new NestedListField(
+                        JerseyNamingUtils.toModelFieldName(fieldName), fieldName, nestedListElementType(fieldType)));
+            }
+        }
+
         content.append("package ").append(packagePath).append(ctx.modelsOnly?"."+JerseyNamingUtils.sanitizePackageName(schemaName)+";\n\n":".model;\n\n");
         boolean includeJaxbBean = !isStandaloneMode();
         if (includeJaxbBean) {
@@ -310,6 +321,10 @@ class JerseyModelGenerator {
         content.append("import ").append(ctx.validationNs).append(".constraints.*;\n");
         content.append("import ").append(ctx.validationNs).append(".Valid;\n");
         content.append("import ").append(ctx.getXmlBindNs()).append(".annotation.*;\n");
+        if (!nestedListFields.isEmpty()) {
+            content.append("import ").append(ctx.getXmlBindNs()).append(".annotation.adapters.XmlAdapter;\n");
+            content.append("import ").append(ctx.getXmlBindNs()).append(".annotation.adapters.XmlJavaTypeAdapter;\n");
+        }
         content.append("import ").append(ctx.getXmlBindNs()).append(".JAXBElement;\n");
         content.append("import javax.xml.namespace.QName;\n");
         content.append("import java.io.Serializable;\n");
@@ -403,6 +418,10 @@ class JerseyModelGenerator {
 
             // Wrapper type: single @XmlElement(name=fieldName). Direct list: @XmlElementWrapper + @XmlElement(). Else: @XmlElement(name=fieldName).
             if (isWrapperType) {
+                content.append("@XmlElement(name = \"").append(fieldName).append("\")\n    ");
+            } else if (isSingleNestedList(fieldType)) {
+                String adapterName = JerseyNamingUtils.getCapitalizedPropertyNameForAccessor(javaFieldName) + "Adapter";
+                content.append("@XmlJavaTypeAdapter(").append(adapterName).append(".class)\n    ");
                 content.append("@XmlElement(name = \"").append(fieldName).append("\")\n    ");
             } else if (fieldType.startsWith("List<")) {
                 content.append("@XmlElementWrapper(name = \"").append(fieldName).append("\")\n    ");
@@ -711,6 +730,9 @@ class JerseyModelGenerator {
         // Generate static inner wrapper classes (object-with-single-array)
         for (WrapperToGenerate w : wrappersToGenerate) {
             appendWrapperInnerClass(content, w, schemaName);
+        }
+        for (NestedListField nested : nestedListFields) {
+            appendNestedListXmlAdapter(content, nested);
         }
 
         content.append("}\n");
@@ -1198,6 +1220,90 @@ class JerseyModelGenerator {
         content.append("            return names;\n");
         content.append("        }\n");
         content.append("    }\n");
+    }
+
+    /** {@code List<List<T>>} with a single simple element type. Deeper or wildcard nests stay unchanged. */
+    private static boolean isSingleNestedList(String fieldType) {
+        if (fieldType == null || !fieldType.startsWith("List<List<") || !fieldType.endsWith(">>")) {
+            return false;
+        }
+        String element = nestedListElementType(fieldType);
+        return !element.isEmpty() && element.indexOf('<') < 0 && element.indexOf('>') < 0 && element.indexOf(',') < 0;
+    }
+
+    private static String nestedListElementType(String fieldType) {
+        return fieldType.substring("List<List<".length(), fieldType.length() - 2).trim();
+    }
+
+    /**
+     * JAXB cannot bind {@code List<List<T>>} because the element type is the {@code List} interface.
+     * The Java field stays a nested list so JSON is unchanged. XML goes through a concrete holder.
+     */
+    private void appendNestedListXmlAdapter(StringBuilder content, NestedListField nested) {
+        String prefix = JerseyNamingUtils.getCapitalizedPropertyNameForAccessor(nested.javaFieldName);
+        String adapter = prefix + "Adapter";
+        String xmlType = prefix + "Xml";
+        String rowType = prefix + "Row";
+        String element = nested.elementType;
+        String itemElement = element.substring(0, 1).toLowerCase(Locale.ROOT) + element.substring(1);
+
+        content.append("    public static class ").append(adapter)
+                .append(" extends XmlAdapter<").append(xmlType).append(", List<List<").append(element).append(">>> {\n");
+        content.append("        @Override\n");
+        content.append("        public List<List<").append(element).append(">> unmarshal(").append(xmlType).append(" value) {\n");
+        content.append("            if (value == null || value.items == null) {\n");
+        content.append("                return null;\n");
+        content.append("            }\n");
+        content.append("            List<List<").append(element).append(">> result = new ArrayList<>();\n");
+        content.append("            for (").append(rowType).append(" row : value.items) {\n");
+        content.append("                if (row == null || row.items == null) {\n");
+        content.append("                    result.add(new ArrayList<>());\n");
+        content.append("                } else {\n");
+        content.append("                    result.add(row.items);\n");
+        content.append("                }\n");
+        content.append("            }\n");
+        content.append("            return result;\n");
+        content.append("        }\n\n");
+        content.append("        @Override\n");
+        content.append("        public ").append(xmlType).append(" marshal(List<List<").append(element).append(">> value) {\n");
+        content.append("            if (value == null) {\n");
+        content.append("                return null;\n");
+        content.append("            }\n");
+        content.append("            ").append(xmlType).append(" xml = new ").append(xmlType).append("();\n");
+        content.append("            for (List<").append(element).append("> row : value) {\n");
+        content.append("                ").append(rowType).append(" holder = new ").append(rowType).append("();\n");
+        content.append("                if (row != null) {\n");
+        content.append("                    holder.items.addAll(row);\n");
+        content.append("                }\n");
+        content.append("                xml.items.add(holder);\n");
+        content.append("            }\n");
+        content.append("            return xml;\n");
+        content.append("        }\n");
+        content.append("    }\n\n");
+
+        content.append("    @XmlAccessorType(XmlAccessType.FIELD)\n");
+        content.append("    public static class ").append(xmlType).append(" {\n");
+        content.append("        @XmlElement(name = \"").append(nested.jsonName).append("\")\n");
+        content.append("        private List<").append(rowType).append("> items = new ArrayList<>();\n");
+        content.append("    }\n\n");
+
+        content.append("    @XmlAccessorType(XmlAccessType.FIELD)\n");
+        content.append("    public static class ").append(rowType).append(" {\n");
+        content.append("        @XmlElement(name = \"").append(itemElement).append("\")\n");
+        content.append("        private List<").append(element).append("> items = new ArrayList<>();\n");
+        content.append("    }\n\n");
+    }
+
+    private static final class NestedListField {
+        final String javaFieldName;
+        final String jsonName;
+        final String elementType;
+
+        NestedListField(String javaFieldName, String jsonName, String elementType) {
+            this.javaFieldName = javaFieldName;
+            this.jsonName = jsonName;
+            this.elementType = elementType;
+        }
     }
 
     // ---------------------------------------------------------------------------

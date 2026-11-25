@@ -49,6 +49,18 @@ class JerseyModelGeneratorNestedArrayImportTest {
         String generated = Files.readString(publishViewJava, StandardCharsets.UTF_8);
         assertTrue(generated.contains("private List<List<TagCategory>> tagCategories"),
                 "Expected nested List field in:\n" + generated);
+        assertTrue(generated.contains("@XmlJavaTypeAdapter(TagCategoriesAdapter.class)"),
+                "Expected JAXB adapter on the nested list in:\n" + generated);
+        assertTrue(generated.contains("import javax.xml.bind.annotation.adapters.XmlAdapter;"),
+                "Expected javax XmlAdapter import in:\n" + generated);
+        assertTrue(generated.contains("import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;"),
+                "Expected javax XmlJavaTypeAdapter import in:\n" + generated);
+        assertTrue(generated.contains("class TagCategoriesAdapter extends XmlAdapter<TagCategoriesXml, List<List<TagCategory>>>"),
+                "Expected generated adapter class in:\n" + generated);
+        assertTrue(generated.contains("class TagCategoriesXml"),
+                "Expected concrete XML holder in:\n" + generated);
+        assertFalse(generated.contains("@XmlElementWrapper(name = \"tagCategories\")"),
+                "Nested list must not use XmlElementWrapper; JAXB would still see List as the item type:\n" + generated);
         assertTrue(generated.contains("import com.egain.bindings.ws.model.xsds.common.v4.tagcategory.TagCategory;"),
                 "Expected TagCategory import in:\n" + generated);
         assertFalse(generated.contains("list<tagcategory>"),
