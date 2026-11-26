@@ -927,16 +927,15 @@ class JerseyModelGenerator {
                 JerseySchemaUtils.mergePropertiesIntoAll(allProperties, envelopeProps, spec);
             }
         } else if (JerseySchemaUtils.isRefWithNestedRequiredOverlay(innerSchema, spec)) {
-            // $ref + required overlay: expand the ref so inner class keeps base fields and marks overlay required
+            // $ref + required overlay: expand the ref so inner class keeps base fields and marks overlay required.
+            // Only an unresolved $ref needs its own base branch; when the parser already inlined the ref
+            // (x-resolved-ref only), the overlay copy below already carries the base properties.
             List<Map<String, Object>> allOfSchemas = new ArrayList<>();
-            Map<String, Object> refBranch = new LinkedHashMap<>();
             if (innerSchema.containsKey("$ref")) {
+                Map<String, Object> refBranch = new LinkedHashMap<>();
                 refBranch.put("$ref", innerSchema.get("$ref"));
+                allOfSchemas.add(refBranch);
             }
-            if (innerSchema.containsKey("x-resolved-ref")) {
-                refBranch.put("x-resolved-ref", innerSchema.get("x-resolved-ref"));
-            }
-            allOfSchemas.add(refBranch);
             Map<String, Object> overlay = new LinkedHashMap<>(innerSchema);
             overlay.remove("$ref");
             overlay.remove("x-resolved-ref");

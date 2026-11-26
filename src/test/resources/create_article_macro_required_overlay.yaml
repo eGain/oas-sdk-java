@@ -36,6 +36,12 @@ components:
           type: string
         macro:
           $ref: '#/components/schemas/Macro'
+        fallbackMacro:
+          $ref: '#/components/schemas/Macro'
+        macros:
+          type: array
+          items:
+            $ref: '#/components/schemas/Macro'
     CreateArticle:
       allOf:
         - type: object
